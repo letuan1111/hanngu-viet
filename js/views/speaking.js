@@ -6,6 +6,7 @@ import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml } fro
 import { checkSentence } from '../core/checker.js';
 import { vocabSet, ex5 } from './vocabset.js';
 import { typingTrainer, splitSentences } from './typing.js';
+import { SPEAK_LONG } from '../data/speaking-long.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -18,7 +19,7 @@ export const focusOf = id => SPEAK_FOCUS.find(f => f.qs.includes(id));
 export function speakingList(root) {
   const best = store.s.speakBest || {};
   root.innerHTML = `<div class="page-head"><div><h1>Luyện nói theo chủ đề</h1></div></div>
-  <p class="muted">${esc(SPEAK_INTRO)} Đọc với pinyin và nghĩa tiếng Việt, tắt dần khi đã quen, nghe giọng mẫu, rồi ghi âm để máy chấm từng chữ. Cuối mỗi bài có khung 5 phần để bạn tự viết bài nói của mình.</p>
+  <p class="muted">${esc(SPEAK_INTRO)} Đọc với pinyin và nghĩa tiếng Việt, tắt dần khi đã quen, nghe giọng mẫu, rồi ghi âm để máy chấm từng chữ. Mỗi chủ đề có hai dạng: <b>khung 15 câu</b> và <b>bài nói hoàn chỉnh khoảng 200 chữ</b>. Cuối mỗi bài có khung 5 phần để bạn tự viết bài nói của mình.</p>
   <section class="card sp-focus"><h2>🧭 Học theo nhóm cấu trúc – không cần thuộc 480 câu riêng lẻ</h2>
     <p class="muted small">32 chủ đề có tổng cộng 480 câu mẫu, nhưng nhiều câu dùng lại cùng cấu trúc. Hãy học theo nhóm:</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nhóm</th><th>Câu hỏi</th><th>Cấu trúc trọng tâm</th></tr></thead><tbody>
@@ -58,13 +59,19 @@ function align(target, said) {
 }
 
 // ── Trang bài nói ──
-export function speakingItem(root, id) {
-  const x = SPEAK_ITEMS.find(i => i.id === +id); if (!x) { root.innerHTML = '<p>Không có bài này.</p>'; return; }
+export function speakingItem(root, id, mode) {
+  const x0 = SPEAK_ITEMS.find(i => i.id === +id); if (!x0) { root.innerHTML = '<p>Không có bài này.</p>'; return; }
+  const long = mode === 'long' && SPEAK_LONG[x0.id];
+  // bài hoàn chỉnh ~200 chữ dùng chung giao diện; điểm & luyện gõ lưu riêng
+  const x = long ? { ...x0, s: SPEAK_LONG[x0.id].map(([, zh, vi]) => [zh, vi]), pi: SPEAK_LONG[x0.id].map(r => r[0]) } : { ...x0, pi: x0.s.map((_, i) => Math.floor(i / 3)) };
+  const bk = long ? x0.id + 'L' : x0.id, sfx = long ? '/long' : '';
+  const range = k => { const a = x.pi.indexOf(k), b = x.pi.lastIndexOf(k); return a === b ? `câu ${a + 1}` : `câu ${a + 1}–${b + 1}`; };
+  const hanN = [...x.s.map(r => r[0]).join('')].filter(isHan).length;
   const st = store.s.settings, opt = store.s.speakOpt || { py: true, vi: true, size: 1.5 };
   const idx = SPEAK_ITEMS.indexOf(x), prev = SPEAK_ITEMS[idx - 1], next = SPEAK_ITEMS[idx + 1];
   const g = SPEAK_GROUPS.find(gg => gg[0] === x.g) || ['', '', ''];
   let base = 0;
-  const rows = x.s.map(([zh, vi], i) => { const r = sentenceChars(zh, base); const ph = i % 3 === 0 && x.parts?.[i / 3] ? `<h3 class="sp-part"><span class="sp-pn">${NUM[i / 3]}</span> ${esc(x.parts[i / 3])} <small class="muted">câu ${i + 1}–${i + 3}</small></h3>` : ''; const row = ph + `<div class="sp-row" data-i="${i}" data-zh="${esc(zh)}" data-from="${base}" data-n="${r.n}">
+  const rows = x.s.map(([zh, vi], i) => { const r = sentenceChars(zh, base); const k = x.pi[i]; const ph = (i === 0 || x.pi[i - 1] !== k) && x.parts?.[k] ? `<h3 class="sp-part"><span class="sp-pn">${NUM[k]}</span> ${esc(x.parts[k])} <small class="muted">${range(k)}</small></h3>` : ''; const row = ph + `<div class="sp-row" data-i="${i}" data-zh="${esc(zh)}" data-from="${base}" data-n="${r.n}">
       <div class="sp-body"><div class="sp-zh" lang="zh-CN">${r.html}</div><div class="sp-vi">${esc(vi)}</div><div class="sp-res"></div></div>
       <div class="sp-act"><button class="say sp-play" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button>${SR ? `<button class="say sp-mic" title="Ghi âm câu này" aria-label="Ghi âm câu này">${icon('mic')}</button>` : ''}</div></div>`; base += r.n; return row; }).join('');
   const total = base;
@@ -73,7 +80,8 @@ export function speakingItem(root, id) {
   <div class="sp-head card"><p class="eyebrow">Câu hỏi ${x.id} · Nhóm ${g[0]} – ${esc(g[1])}</p><div class="sp-qbig" lang="zh-CN">${qr.html}</div><div class="sp-qvi">${esc(x.qvi)}</div>
     <div class="sp-outline">${(x.parts || []).map((p, i) => `<span class="sp-ol"><b>${NUM[i]}</b> ${esc(p)}</span>`).join('<span class="sp-arr">→</span>')}</div>
     ${focusOf(x.id) ? `<p class="small sp-fc"><b>Cấu trúc trọng tâm (nhóm “${esc(focusOf(x.id).name)}”):</b> <span lang="zh-CN">${focusOf(x.id).ids.map(id => `<span class="chip sm" title="${esc(structById(id).vi)}">${esc(structById(id).f)}</span>`).join(' ')}</span></p>` : ''}
-    <p class="muted small">5 phần × 3 câu = 15 câu. Có thể thay tên, thời gian, địa điểm, sở thích cho đúng bản thân.</p>
+    <p class="muted small">${long ? `Bài nói hoàn chỉnh ${hanN} chữ, vẫn theo 5 phần nhưng nối câu dài và tự nhiên hơn.` : '5 phần × 3 câu = 15 câu.'} Có thể thay tên, thời gian, địa điểm, sở thích cho đúng bản thân.</p>
+    <div class="tabs sp-mode" role="tablist"><a class="tab ${long ? '' : 'on'}" href="#/speaking/${x.id}" role="tab" aria-selected="${!long}">📋 Khung 15 câu</a><a class="tab ${long ? 'on' : ''}" href="#/speaking/${x.id}/long" role="tab" aria-selected="${!!long}">📄 Bài hoàn chỉnh ~200 chữ</a></div>
     ${x.note ? `<p class="note small">💡 ${esc(x.note)}</p>` : ''}</div>
   <div class="sp-bar card" role="toolbar" aria-label="Tùy chọn hiển thị">
     <label class="sw"><input type="checkbox" id="oPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
@@ -98,7 +106,7 @@ export function speakingItem(root, id) {
     <div id="typing"></div></section>
   <div id="study"></div>
   <section class="card my-sp" id="mySp"></section>
-  <div class="lesson-nav">${prev ? `<a class="btn ghost" href="#/speaking/${prev.id}">‹ Câu ${prev.id}</a>` : '<span></span>'}${next ? `<a class="btn" href="#/speaking/${next.id}">Câu ${next.id} ›</a>` : ''}</div>`;
+  <div class="lesson-nav">${prev ? `<a class="btn ghost" href="#/speaking/${prev.id}${sfx}">‹ Câu ${prev.id}</a>` : '<span></span>'}${next ? `<a class="btn" href="#/speaking/${next.id}${sfx}">Câu ${next.id} ›</a>` : ''}</div>`;
 
   const text = $('.sp-text', root), srows = $$('.sp-row', root);
   const saveOpt = () => store.update(s => s.speakOpt = { py: $('#oPy', root).checked, vi: $('#oVi', root).checked, size: opt.size });
@@ -159,12 +167,12 @@ export function speakingItem(root, id) {
     const r = align(all, transcript);
     const per = srows.map(el => { const from = +el.dataset.from, n = +el.dataset.n; const m = r.marks.slice(from, from + n); paint(el, m); const sc = n ? Math.round((m.filter(v => v === 'ok').length + m.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; $('.sp-res', el).innerHTML = badge(sc); return { el, sc, i: +el.dataset.i }; });
     const weak = per.filter(p => p.sc < 70);
-    store.update(s => { s.speakBest = s.speakBest || {}; s.speakBest[x.id] = Math.max(s.speakBest[x.id] || 0, r.score); });
+    store.update(s => { s.speakBest = s.speakBest || {}; s.speakBest[bk] = Math.max(s.speakBest[bk] || 0, r.score); });
     logActivity(5);
     out.innerHTML = `<div class="sp-sum">
       <div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div>
       <div><h3>${r.score >= 85 ? 'Rất tốt! Phát âm rõ ràng.' : r.score >= 65 ? 'Khá tốt, luyện thêm vài câu nữa nhé.' : 'Cần luyện thêm – hãy nghe mẫu rồi đọc chậm, rõ từng chữ.'}</h3>
-        <p>Đọc đúng <b>${r.ok}</b>/${total} chữ · gần đúng <b>${r.tone}</b> · thiếu/sai <b>${total - r.ok - r.tone}</b>. Điểm cao nhất: <b>${store.s.speakBest[x.id]}%</b></p>
+        <p>Đọc đúng <b>${r.ok}</b>/${total} chữ · gần đúng <b>${r.tone}</b> · thiếu/sai <b>${total - r.ok - r.tone}</b>. Điểm cao nhất: <b>${store.s.speakBest[bk]}%</b></p>
         ${audioUrl ? `<p class="small muted">Nghe lại giọng của bạn rồi so với giọng mẫu:</p><audio controls src="${audioUrl}"></audio>` : ''}
       </div></div>
       ${weak.length ? `<h3 class="sub">Câu nên luyện lại (${weak.length})</h3><ul class="weak">${weak.map(p => `<li><a href="#" data-goto="${p.i}">Câu ${p.i + 1}: <span lang="zh-CN">${esc(x.s[p.i][0])}</span></a> ${badge(p.sc)}</li>`).join('')}</ul>` : '<p class="ok-t">Không có câu nào dưới 70%. Giỏi lắm!</p>'}
@@ -172,10 +180,10 @@ export function speakingItem(root, id) {
       <p class="muted small">Lưu ý: chấm điểm dựa trên nhận dạng giọng nói của trình duyệt, chỉ mang tính tham khảo. Chữ màu cam thường là chữ đồng âm hoặc cần kiểm tra lại thanh điệu.</p>`;
     out.scrollIntoView({ behavior: 'smooth' });
   };
-  typingTrainer($('#typing', root), { key: 'sp' + x.id, sentences: x.s });
-  renderStudy($('#study', root), x);
-  renderMySpeech($('#mySp', root), x);
-  return `Luyện nói: ${x.q}`;
+  typingTrainer($('#typing', root), { key: 'sp' + bk, sentences: x.s });
+  renderStudy($('#study', root), x0);
+  renderMySpeech($('#mySp', root), x0);
+  return `Luyện nói: ${x.q}${long ? ' (bài 200 chữ)' : ''}`;
 }
 
 // Nhận dạng một câu (trả về các phương án)
@@ -331,6 +339,7 @@ function renderMySpeech(box, x) {
   const vocab = ((SPEAK_VOCAB[x.id] || {}).w || []).map(([h, p, vi]) => ({ h, p, vi }));
   const parts = x.parts && x.parts.length ? x.parts : ['Mở đầu', 'Nội dung 1', 'Nội dung 2', 'Nội dung 3', 'Kết luận'];
   const model = parts.map((_, k) => x.s.slice(k * 3, k * 3 + 3));
+  const longPart = k => (SPEAK_LONG[x.id] || []).filter(r => r[0] === k).map(r => [r[1], r[2]]);
   const fc = focusOf(x.id), focusSt = fc ? fc.ids.map(structById) : [];
   const allSt = structsIn(x.s.map(s => s[0]));
   const m = mineOf(x.id);
@@ -344,7 +353,7 @@ function renderMySpeech(box, x) {
     <div class="my-parts">${parts.map((p, k) => { const st = structsIn(model[k].map(s => s[0])); return `<div class="my-part" data-k="${k}">
       <div class="my-ph"><span class="sp-pn">${NUM[k]}</span> <b>${esc(p)}</b> <span class="muted small my-pc"></span></div>
       ${st.length ? `<div class="my-pst"><span class="muted small">Cấu trúc gợi ý:</span> ${st.map(t => `<button class="chip sm my-frame" lang="zh-CN" data-frame="${esc(t.frame)}" title="${esc(t.vi)} – bấm để chèn khung câu">${esc(t.f)}</button>`).join('')}</div>` : ''}
-      <details class="my-model"><summary>Xem 3 câu mẫu</summary><div class="ex-box">${model[k].map(([zh, vi]) => exampleHtml(zh, vi)).join('')}</div><button class="mini my-use">Dùng câu mẫu làm nháp</button></details>
+      <details class="my-model"><summary>Xem câu mẫu</summary><p class="small muted">Khung 3 câu:</p><div class="ex-box">${model[k].map(([zh, vi]) => exampleHtml(zh, vi)).join('')}</div>${longPart(k).length ? `<p class="small muted">Trong bài hoàn chỉnh ~200 chữ:</p><div class="ex-box">${longPart(k).map(([zh, vi]) => exampleHtml(zh, vi)).join('')}</div>` : ''}<span class="row gap wrap"><button class="mini my-use">Dùng khung 3 câu làm nháp</button>${longPart(k).length ? '<button class="mini my-use" data-long="1">Dùng đoạn 200 chữ làm nháp</button>' : ''}</span></details>
       <textarea class="inp my-ptxt" lang="zh-CN" rows="3" placeholder="${esc(st.slice(0, 3).map(t => t.frame).join('') || '……。……。……。')}">${esc(m.parts[k] || '')}</textarea>
     </div>`; }).join('')}</div>
     ${vocab.length ? `<div class="my-chips"><span class="muted small">Từ vựng của bài (bấm để chèn vào ô đang viết):</span> ${vocab.map(w => `<button class="chip my-chip" data-h="${esc(w.h)}" title="${esc(w.p)} – ${esc(w.vi)}" lang="zh-CN">${esc(w.h)}</button>`).join('')}</div>` : ''}
@@ -403,7 +412,7 @@ function renderMySpeech(box, x) {
 
   box.addEventListener('click', e => {
     const fr = e.target.closest('.my-frame'); if (fr) { const pp = fr.closest('.my-part'); insert(pp ? $('.my-ptxt', pp) : active, fr.dataset.frame); return; }
-    const us = e.target.closest('.my-use'); if (us) { const part = us.closest('.my-part'), ta = $('.my-ptxt', part), k = +part.dataset.k; if (ta.value.trim() && !confirm('Thay nội dung phần này bằng 3 câu mẫu?')) return; ta.value = model[k].map(s => s[0]).join(''); autosave(); ta.focus(); toast('Đã chép câu mẫu – hãy sửa lại cho đúng với bản thân bạn.'); return; }
+    const us = e.target.closest('.my-use'); if (us) { const part = us.closest('.my-part'), ta = $('.my-ptxt', part), k = +part.dataset.k; if (ta.value.trim() && !confirm('Thay nội dung phần này bằng câu mẫu?')) return; ta.value = (us.dataset.long ? longPart(k) : model[k]).map(s => s[0]).join(''); autosave(); ta.focus(); toast('Đã chép câu mẫu – hãy sửa lại cho đúng với bản thân bạn.'); return; }
     const ch = e.target.closest('.my-chip'); if (ch) { insert(active, ch.dataset.h); return; }
     const sy = e.target.closest('.my-say'); if (sy) { const el = sy.closest('.sp-row'); speak(el.dataset.zh, { el }); }
   });

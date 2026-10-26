@@ -776,3 +776,4 @@ h1 { font-weight: 800; letter-spacing: -.025em; } h2 { font-weight: 700; letter-
 .my-sp .my-stf { font-weight: 700; color: var(--red); }
 .my-sp .my-stx { color: var(--ink2); }
 .my-sp .my-st .mini { align-self: flex-start; margin-top: 3px; white-space: normal; text-align: left; }
+.sp-mode { justify-content: center; margin: 12px 0 0; }

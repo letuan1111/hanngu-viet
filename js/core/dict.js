@@ -72,8 +72,21 @@ function segmentRaw(text) {
 // ── Pinyin theo ngữ cảnh (pinyin-pro nếu đã tải, nếu không dùng từ điển) ──
 const PP = () => window.pinyinPro;
 export function charPinyins(text) {
-  if (PP()) { try { return PP().pinyin(text, { type: 'array', toneSandhi: true, nonZh: 'consecutive' }); } catch {} }
+  if (PP()) { try { return fixPy([...text], PP().pinyin(text, { type: 'array', toneSandhi: true, nonZh: 'consecutive' })); } catch {} }
   return null;
+}
+// Sửa vài chữ đa âm pinyin-pro hay đọc sai: 得/地 trợ từ (de), 教会 (jiāohuì)
+const DE_PREV_V = new Set([...'玩睡跑说写做学吃唱跳来走长过记跑考讲画住干办打洗过扫觉懂值显晓']), DE_NEXT = new Set([...'很太非真好不更比挺特越多快慢清']);
+const DI_PREV = new Set([...'心情利敢好律乐慢真动兴静轻断细松快']), DI_NEXT_NOUN = new Set([...'方图铁点区球址面板上下里']);
+function fixPy(cs, a) {
+  if (!Array.isArray(a) || a.length !== cs.length) return a;
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i], pv = cs[i - 1], nx = cs[i + 1];
+    if (c === '得' && a[i] === 'dé' && nx !== '到' && pv && (DE_PREV_V.has(pv) || (nx && DE_NEXT.has(nx)))) a[i] = 'de';
+    else if (c === '地' && a[i] === 'dì' && pv && DI_PREV.has(pv) && nx && isHan(nx) && !DI_NEXT_NOUN.has(nx)) a[i] = 'de';
+    else if (c === '教' && a[i] === 'jiào' && !(nx && '室育学练材授师导'.includes(nx)) && !(pv && '请宗佛道领'.includes(pv))) a[i] = 'jiāo';
+  }
+  return a;
 }
 function splitSyl(p, n) { // tách pinyin của từ thành từng âm tiết (gần đúng)
   const parts = p.replace(/[·'’-]/g, ' ').split(/\s+/).filter(Boolean);
