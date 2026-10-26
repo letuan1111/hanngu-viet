@@ -22,6 +22,7 @@ const routes = [
   [/^\/lesson\/(\d+)(?:\/(\w+))?$/, lesson, 'Bài học'],
   [/^\/chapter\/(\d)\/(\d)$/, chapterTest, 'Kiểm tra chương'],
   [/^\/hsk1-500$/, hsk500, 'Bảng 500 từ HSK 1'],
+  [/^\/hsk30\/([123])$/, hsk500, 'Bảng từ vựng HSK'],
   [/^\/reading(?:\/([\w-]+))?$/, readings, 'Bài đọc HSK 1'],
   [/^\/speaking$/, speakingList, 'Luyện nói'],
   [/^\/speaking\/(\d+)$/, speakingItem, 'Luyện nói'],

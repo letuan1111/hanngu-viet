@@ -1,5 +1,6 @@
+import { vocabSet } from './vocabset.js';
 import { store, srsAdd, logActivity } from '../core/store.js';
-import { READINGS, LESSON_LIST, lessonsOf, CHAPTERS, entry, grammarById, hskWords, shuffle, pick, segment, TOPICS, POS, sentenceBank, levelLabel } from '../core/dict.js';
+import { HSK30_ORDER, READINGS, LESSON_LIST, lessonsOf, CHAPTERS, entry, grammarById, hskWords, shuffle, pick, segment, TOPICS, POS, sentenceBank, levelLabel } from '../core/dict.js';
 import { CURRICULUM } from '../data/lessons.js';
 import { GRAMMAR } from '../data/grammar.js';
 import { esc, say, sentence, icon, toast, modal, writer, short, $, $$, gridSvg } from '../core/ui.js';
@@ -22,9 +23,11 @@ export function course(root, lv = '1') {
     <a class="btn sm" href="#/exam/${lv}">Đánh giá cuối cấp</a></div>
   ${lv === 1 ? `<div class="feature-row">
     <a class="feature" href="#/pinyin"><span class="fi" lang="zh-CN">音</span><span><b>Bài 0 · Luyện phát âm</b><small>Thanh điệu, 23 thanh mẫu, 36 vận mẫu, biến điệu, bảng âm tiết – nên học trước bài 1</small></span></a>
-    <a class="feature" href="#/hsk1-500"><span class="fi" lang="zh-CN">五百</span><span><b>Bảng 500 từ HSK 1</b><small>Chuẩn HSK 3.0 · ${Object.keys(s.known30 || {}).length}/506 đã thuộc · tra, nghe, đánh dấu, kiểm tra</small></span></a>
+    <a class="feature" href="#/hsk1-500"><span class="fi" lang="zh-CN">五百</span><span><b>Bảng 500 từ HSK 1</b><small>Chuẩn HSK 3.0 · ${HSK30_ORDER[1].filter(h => (s.known30 || {})[h]).length}/506 đã thuộc · tra, nghe, học kiểu Quizlet</small></span></a>
     <a class="feature" href="#/reading"><span class="fi" lang="zh-CN">读</span><span><b>Bài đọc theo cấu trúc</b><small>${READINGS.length} bài · mỗi bài luyện một cấu trúc ngữ pháp HSK 1, có câu hỏi đọc hiểu</small></span></a>
-  </div>` : ''}
+  </div>` : `<div class="feature-row">
+    <a class="feature" href="#/hsk30/${lv}"><span class="fi" lang="zh-CN">${lv === 2 ? '二级' : '三级'}</span><span><b>Bảng từ vựng HSK ${lv} (chuẩn 3.0)</b><small>${HSK30_ORDER[lv].length} từ mới của cấp ${lv} · ${HSK30_ORDER[lv].filter(h => (s.known30 || {})[h]).length} đã thuộc · tra, nghe, 5 câu ví dụ, học kiểu Quizlet</small></span></a>
+  </div>`}
   ${chapters.map((name, ci) => {
     const ls = LESSON_LIST.filter(l => l.level === lv && l.chapter === ci);
     const best = s.tests.filter(t => t.kind === 'chapter' && t.level === lv && t.ch === ci).reduce((m, t) => Math.max(m, Math.round(t.score / t.total * 100)), -1);
@@ -87,7 +90,14 @@ function paneVocab(pane, l) {
   const main = l.words.map(entry).filter(Boolean), extra = l.extra.map(entry).filter(Boolean);
   pane.innerHTML = `<div class="pane-tools"><p class="muted">Bấm vào thẻ để xem chi tiết. Biểu tượng cọ để luyện viết.</p><button class="btn sm" id="addAll">${icon('plus')} Thêm tất cả vào ôn tập</button></div>
     <div class="wgrid-list">${main.map(wordTile).join('')}</div>
-    ${extra.length ? `<h3 class="sub">Từ HSK ${l.level} cùng chủ đề <span class="badge">Bổ sung</span></h3><div class="wgrid-list">${extra.map(wordTile).join('')}</div>` : ''}`;
+    ${extra.length ? `<h3 class="sub">Từ HSK ${l.level} cùng chủ đề <span class="badge">Bổ sung</span></h3><div class="wgrid-list">${extra.map(wordTile).join('')}</div>` : ''}
+    <section class="card vs-sec lesson-ql"><h2>🃏 Học từ mới kiểu Quizlet</h2><p class="muted small">Toàn bộ ${main.length + extra.length} từ của bài: danh sách 5 câu ví dụ, thẻ lật, Học, Kiểm tra và trò chơi.</p><div id="lqBox"></div></section>`;
+  const qlKey = 'L' + l.idx;
+  vocabSet($('#lqBox', pane), [...main, ...extra].map(w => ({ h: w.h, p: w.p, vi: w.vi })), {
+    id: qlKey, sent: l.d.map(d => [d[1], d[2]]),
+    known: () => (store.s.lessonKnown || {})[qlKey] || {},
+    setKnown: (h, v) => store.update(s => { s.lessonKnown = s.lessonKnown || {}; s.lessonKnown[qlKey] = s.lessonKnown[qlKey] || {}; s.lessonKnown[qlKey][h] = v; if (v) { s.known30 = s.known30 || {}; s.known30[h] = true; } }),
+  });
   $('#addAll', pane).onclick = () => { [...main, ...extra].forEach(w => srsAdd(w.h)); toast(`Đã thêm ${main.length + extra.length} từ vào ôn tập`); };
 }
 

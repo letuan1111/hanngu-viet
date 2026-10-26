@@ -736,3 +736,4 @@ h1 { font-weight: 800; letter-spacing: -.025em; } h2 { font-weight: 700; letter-
 .pr-tones .pr-ex { grid-template-columns: auto auto auto 1fr auto; } .pr-tones .pr-p { min-width: 4.5em; }
 .pr-formula { align-items: stretch; } .pr-formula i { align-self: center; } .pr-formula > div b { line-height: 1.2; }
 @media (max-width: 640px) { .pr-tones { grid-template-columns: minmax(0, 1fr); } }
+#pg { flex-wrap: wrap; gap: 6px; margin: 10px 0; } #qlG { max-width: 100%; }

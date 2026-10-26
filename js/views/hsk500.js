@@ -1,5 +1,6 @@
 import { store, srsAdd, logActivity } from '../core/store.js';
-import { hsk30List, READINGS, grammarById, POS, TOPICS, IN30, pick, shuffle, curatedExamples } from '../core/dict.js';
+import { hsk30List, READINGS, grammarById, POS, TOPICS, IN30, HSK30_ORDER, pick, shuffle, curatedExamples, examplesFor } from '../core/dict.js';
+import { vocabSet } from './vocabset.js';
 import { esc, say, sentence, exampleHtml, icon, toast, $, $$ } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { speakSeq, stopSeq } from '../core/tts.js';
@@ -7,13 +8,16 @@ import { speakSeq, stopSeq } from '../core/tts.js';
 const plain = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s/g, '');
 
 // ── Bảng 500 từ HSK 1 (chuẩn HSK 3.0) ──
-export function hsk500(root) {
-  const list = hsk30List();
+export function hsk500(root, lvArg) {
+  const lv = +lvArg || 1;
+  const list = hsk30List(lv), inLv = new Set(HSK30_ORDER[lv]);
+  const TITLE = lv === 1 ? 'Bảng 500 từ vựng HSK 1' : `Bảng từ vựng HSK ${lv}`;
   const known = () => store.s.known30 || {};
-  root.innerHTML = `<nav class="crumb"><a href="#/course/1">HSK 1</a> › Bảng 500 từ</nav>
-  <div class="page-head"><div><p class="eyebrow">Chuẩn HSK 3.0 · cấp 1</p><h1>Bảng 500 từ vựng HSK 1</h1></div>
-    <div class="row gap wrap"><button class="btn sm" id="learn">${icon('plus')} Học 20 từ chưa thuộc</button><button class="btn sm ghost" id="test">Kiểm tra nhanh</button><a class="btn sm ghost" href="#/reading">Bài đọc theo cấu trúc</a></div></div>
-  <p class="muted small">Danh sách cấp 1 theo Tiêu chuẩn trình độ tiếng Trung quốc tế (HSK 3.0, 2021): 500 từ (506 mục do một số từ có biến thể). Bao gồm toàn bộ 150 từ HSK 1 cũ cùng nhiều từ HSK 2–3 cũ. Bấm vào chữ Hán để tra, đánh dấu ✓ những từ đã thuộc.</p>
+  root.innerHTML = `<nav class="crumb"><a href="#/course/${lv}">HSK ${lv}</a> › Bảng từ vựng</nav>
+  <div class="page-head"><div><p class="eyebrow">Chuẩn HSK 3.0 · cấp ${lv}</p><h1>${TITLE}</h1></div>
+    <div class="row gap wrap"><button class="btn sm" id="learn">${icon('plus')} Học 20 từ chưa thuộc</button><button class="btn sm ghost" id="test">Kiểm tra nhanh</button>${lv === 1 ? '<a class="btn sm ghost" href="#/reading">Bài đọc theo cấu trúc</a>' : ''}</div></div>
+  <nav class="tabs">${[1, 2, 3].map(l => `<a class="tab ${l === lv ? 'on' : ''}" href="#/hsk30/${l}">HSK ${l} <span class="cnt">${HSK30_ORDER[l].length}</span></a>`).join('')}</nav>
+  <p class="muted small">${lv === 1 ? 'Danh sách cấp 1 theo Tiêu chuẩn trình độ tiếng Trung quốc tế (HSK 3.0, 2021): 500 từ (506 mục do một số từ có biến thể). Bao gồm toàn bộ 150 từ HSK 1 cũ cùng nhiều từ HSK 2–3 cũ.' : `Danh sách từ mới riêng của cấp ${lv} theo HSK 3.0 (2021): ${list.length} mục, không lặp lại từ của cấp dưới. Từ gắn nhãn “mới” là từ không có trong HSK 1–3 cũ (2.0).`} Bấm vào chữ Hán để tra, đánh dấu ✓ những từ đã thuộc. Kéo xuống cuối trang để học kiểu Quizlet theo từng nhóm 20 từ.</p>
   <div class="card lv-sum"><div class="grow"><b id="kc"></b><span class="bar"><i id="kb"></i></span></div></div>
   <div class="filters">
     <input id="q30" class="inp" placeholder="Tìm chữ Hán, pinyin hoặc nghĩa…" style="max-width:340px">
@@ -25,15 +29,15 @@ export function hsk500(root) {
   let filter = 'all', page = 0; const PER = 100;
   const rows = () => {
     const q = plain($('#q30', root).value), tp = $('#t30', root).value, k = known();
-    return list.filter(w => (filter === 'all' || (filter === 'known' ? k[w.h] : filter === 'todo' ? !k[w.h] : w.source === 'hsk30'))
+    return list.filter(w => (filter === 'all' || (filter === 'known' ? k[w.h] : filter === 'todo' ? !k[w.h] : w.isNew))
       && (!tp || w.topics?.includes(tp)) && (!q || w.h.includes($('#q30', root).value.trim()) || plain(w.p).includes(q) || plain(w.vi).includes(q)));
   };
   const draw = () => {
-    const k = known(), all = rows(), n = Object.keys(k).filter(h => IN30.has(h)).length;
+    const k = known(), all = rows(), n = Object.keys(k).filter(h => inLv.has(h)).length;
     $('#kc', root).textContent = `Đã thuộc ${n}/${list.length} từ`; $('#kb', root).style.width = `${n / list.length * 100}%`;
     const pages = Math.ceil(all.length / PER); page = Math.min(page, Math.max(0, pages - 1));
     $('#tb', root).innerHTML = all.slice(page * PER, page * PER + PER).map(w => `<tr class="${k[w.h] ? 'kn' : ''}">
-      <td class="muted">${w.no}</td><td><span class="t-h" lang="zh-CN" data-w="${esc(w.h)}">${esc(w.h)}</span>${w.source === 'hsk30' ? ' <span class="badge hsk30">mới</span>' : ''}</td>
+      <td class="muted">${w.no}</td><td><span class="t-h" lang="zh-CN" data-w="${esc(w.h)}">${esc(w.h)}</span>${w.isNew ? ' <span class="badge hsk30">mới</span>' : ''}</td>
       <td class="t-p">${esc(w.p)}</td><td>${esc(w.vi)}</td><td class="hide-sm muted small">${esc(POS[w.pos] || '')}</td>
       <td class="nowrap">${say(w.h)} <button class="mini ex-btn" data-ex="${esc(w.h)}" aria-expanded="false">5 câu ▾</button></td><td><input type="checkbox" class="kn-box" data-h="${esc(w.h)}" ${k[w.h] ? 'checked' : ''} aria-label="Đã thuộc ${esc(w.h)}"></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Không có từ phù hợp.</td></tr>';
     $('#pg', root).innerHTML = pages > 1 ? [...Array(pages)].map((_, i) => `<button class="chip ${i === page ? 'on' : ''}" data-pg="${i}">${i * PER + 1}–${Math.min(all.length, (i + 1) * PER)}</button>`).join('') : '';
@@ -47,22 +51,32 @@ export function hsk500(root) {
       const tr = xb.closest('tr'), nx = tr.nextElementSibling;
       if (nx && nx.classList.contains('ex-row')) { nx.remove(); xb.setAttribute('aria-expanded', 'false'); xb.textContent = '5 câu ▾'; return; }
       const row = document.createElement('tr'); row.className = 'ex-row';
-      row.innerHTML = `<td></td><td colspan="6"><div class="ex-box">${curatedExamples(xb.dataset.ex).map(x => exampleHtml(x.zh, x.vi)).join('')}</div></td>`;
+      const exs = curatedExamples(xb.dataset.ex); const more = exs.length >= 5 ? exs : [...exs, ...examplesFor(xb.dataset.ex, 8).filter(e => !exs.some(c => c.zh === e.zh))].slice(0, 5);
+      row.innerHTML = `<td></td><td colspan="6"><div class="ex-box">${more.length ? more.map(x => exampleHtml(x.zh, x.vi)).join('') : '<p class="muted small">Chưa có câu ví dụ cho từ này.</p>'}</div></td>`;
       tr.after(row); xb.setAttribute('aria-expanded', 'true'); xb.textContent = '5 câu ▴'; logActivity(); return;
     }
     const p = e.target.closest('[data-pg]'); if (p) { page = +p.dataset.pg; draw(); $('.tbl-wrap', root).scrollIntoView({ behavior: 'smooth' }); }
   };
-  root.onchange = e => { const b = e.target.closest('.kn-box'); if (b) { store.update(s => { s.known30 = s.known30 || {}; if (b.checked) s.known30[b.dataset.h] = true; else delete s.known30[b.dataset.h]; }); b.closest('tr').classList.toggle('kn', b.checked); const n = Object.keys(known()).length; $('#kc', root).textContent = `Đã thuộc ${n}/${list.length} từ`; $('#kb', root).style.width = `${n / list.length * 100}%`; logActivity(); } };
+  root.onchange = e => { const b = e.target.closest('.kn-box'); if (b) { store.update(s => { s.known30 = s.known30 || {}; if (b.checked) s.known30[b.dataset.h] = true; else delete s.known30[b.dataset.h]; }); b.closest('tr').classList.toggle('kn', b.checked); const n = Object.keys(known()).filter(h => inLv.has(h)).length; $('#kc', root).textContent = `Đã thuộc ${n}/${list.length} từ`; $('#kb', root).style.width = `${n / list.length * 100}%`; logActivity(); } };
   $('#learn', root).onclick = () => { const todo = list.filter(w => !known()[w.h] && !store.s.srs[w.h]).slice(0, 20); todo.forEach(w => srsAdd(w.h)); toast(`Đã thêm ${todo.length} từ vào ôn tập`); location.hash = '#/review/all'; };
   $('#test', root).onclick = () => {
     const src = rows().length >= 10 ? rows() : list;
-    runQuiz($('#qz30', root), pick(src, 10).map((w, i) => (i % 3 === 0 ? Q.listen : i % 3 === 1 ? Q.meaning : Q.hanzi)(w, list)), { title: 'Kiểm tra 500 từ', onDone: (r, t, p, res) => {
+    runQuiz($('#qz30', root), pick(src, 10).map((w, i) => (i % 3 === 0 ? Q.listen : i % 3 === 1 ? Q.meaning : Q.hanzi)(w, list)), { title: `Kiểm tra từ vựng HSK ${lv}`, onDone: (r, t, p, res) => {
       store.update(s => { s.known30 = s.known30 || {}; res.forEach(({ q, ok }) => { if (ok && q.h) s.known30[q.h] = true; }); }); draw();
     } });
     $('#qz30', root).scrollIntoView({ behavior: 'smooth' });
   };
   draw();
-  return 'Bảng 500 từ HSK 1';
+  // ── Học kiểu Quizlet theo nhóm 20 từ ──
+  const qs = document.createElement('section'); qs.className = 'card vs-sec';
+  const nG = Math.ceil(list.length / 20);
+  qs.innerHTML = `<div class="row gap wrap" style="justify-content:space-between"><h2>🃏 Học kiểu Quizlet</h2><label class="sel">Bộ từ <select id="qlG" class="inp sm"><option value="todo">20 từ chưa thuộc</option><option value="filter">20 từ đầu của danh sách đang lọc</option>${[...Array(nG)].map((_, i) => `<option value="${i}">Nhóm ${i + 1}: từ ${i * 20 + 1}–${Math.min(list.length, i * 20 + 20)}</option>`).join('')}</select></label></div>
+    <p class="muted small">Danh sách kèm 5 câu ví dụ, thẻ lật, chế độ Học, Kiểm tra, Ghép thẻ, Sao băng và Đúng hay sai. Từ đánh dấu ✓ ở đây cũng được tích ✓ trong bảng phía trên.</p><div id="qlBox"></div>`;
+  $('#qz30', root).before(qs);
+  const pickSet = () => { const v = $('#qlG', root).value, k = known(); const ws = v === 'todo' ? list.filter(w => !k[w.h]) : v === 'filter' ? rows() : list.slice(+v * 20, +v * 20 + 20); return ws.slice(0, 20).map(w => ({ h: w.h, p: w.p, vi: w.vi })); };
+  const startQl = () => vocabSet($('#qlBox', root), pickSet(), { id: `hsk30-${lv}`, sent: [], known: () => known(), setKnown: (h, v) => store.update(s => { s.known30 = s.known30 || {}; if (v) s.known30[h] = true; else delete s.known30[h]; }), onChange: draw });
+  $('#qlG', root).onchange = startQl; startQl();
+  return TITLE;
 }
 
 // ── Bài đọc theo cấu trúc ngữ pháp ──
