@@ -2,8 +2,9 @@
 import { store, logActivity } from '../core/store.js';
 import { SPEAK_GROUPS, SPEAK_ITEMS, SPEAK_VOCAB } from '../data/speaking.js';
 import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById } from '../core/dict.js';
-import { esc, icon, $, $$, toast, applyDisplay, say, sentence } from '../core/ui.js';
+import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml } from '../core/ui.js';
 import { checkSentence } from '../core/checker.js';
+import { vocabSet, ex5 } from './vocabset.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -213,83 +214,22 @@ function renderStudy(box, x) {
   const v = SPEAK_VOCAB[x.id] || { w: [], g: [] };
   const words = v.w.map(([h, p, vi]) => ({ h, p, vi }));
   box.innerHTML = `
-  <section class="card"><div class="row gap wrap" style="justify-content:space-between"><h2>📘 Từ mới trong bài <small class="muted">(${words.length})</small></h2><span class="muted small" id="wkc"></span></div>
-    <div class="tbl-wrap"><table class="tbl nw-tbl"><thead><tr><th>Chữ Hán</th><th>Pinyin</th><th>Nghĩa</th><th></th><th>Trạng thái</th></tr></thead><tbody id="nwb"></tbody></table></div></section>
+  <section class="card vs-sec"><div class="row gap wrap" style="justify-content:space-between"><h2>📘 Từ vựng trong bài <small class="muted">(${words.length})</small></h2><span class="muted small" id="wkc"></span></div>
+    <p class="muted small">Học như Quizlet: xem danh sách kèm 5 câu ví dụ mỗi từ, lật thẻ, học trắc nghiệm, làm bài kiểm tra và chơi trò chơi. Từ đánh dấu ✓/✗ được lưu trên trình duyệt.</p>
+    <div id="vsBox"></div></section>
   <section class="card"><h2>🧩 Cấu trúc ngữ pháp trong bài <small class="muted">(${v.g.length})</small></h2>
     <div class="gs-list">${v.g.map(([f, ex, s, gid]) => { const g = gid && grammarById(gid); return `<div class="gs"><div class="gs-f" lang="zh-CN">${esc(f)}</div><div class="gs-x">${esc(ex)}${g ? ` · <a href="#/grammar/${g.id}">Xem bài ngữ pháp</a>` : ''}</div>${sentence(s, x.s.find(([zh]) => zh === s)?.[1] || '')}</div>`; }).join('')}</div></section>
-  <section class="card fc-sec" id="fcSec"><div class="row gap wrap" style="justify-content:space-between"><h2>🃏 Thẻ ghi nhớ</h2>
-    <div class="row gap wrap"><label class="sel">Mặt trước <select id="fcFront"><option value="h">Chữ Hán</option><option value="vi">Nghĩa tiếng Việt</option><option value="au">Nghe âm</option></select></label><label class="chk"><input type="checkbox" id="fcShuf" checked> Trộn thẻ</label></div></div>
-    <div id="fcBox"></div></section>
   <section class="card" id="msSec"><h2>✍️ Tự đặt 5 câu & ghi âm</h2>
     <p class="muted small">Chọn một từ, tự viết 5 câu có dùng từ đó, bấm “Kiểm tra” để máy soát lỗi, rồi bấm 🎤 đọc to câu bạn viết – máy so giọng đọc với câu đã viết và cho bạn nghe lại. Câu viết được lưu trên trình duyệt; bản ghi âm chỉ giữ trong phiên này.</p>
     <label class="sel">Từ <select id="msWord" class="inp"></select></label><div id="msBox"></div></section>`;
 
-  // bảng từ mới
-  const drawTable = () => {
-    const k = knownOf(x.id);
-    $('#nwb', box).innerHTML = words.map(w => `<tr class="${k[w.h] === true ? 'kn' : k[w.h] === false ? 'unk' : ''}"><td><span class="t-h" lang="zh-CN" data-w="${esc(w.h)}">${esc(w.h)}</span></td><td class="t-p">${esc(w.p)}</td><td>${esc(w.vi)}</td><td>${say(w.h)}</td><td>${k[w.h] === true ? '<span class="st ok">✓ Đã thuộc</span>' : k[w.h] === false ? '<span class="st no">✗ Chưa thuộc</span>' : '<span class="muted small">Chưa học</span>'}</td></tr>`).join('');
-    const n = words.filter(w => k[w.h] === true).length;
-    $('#wkc', box).textContent = `Đã thuộc ${n}/${words.length}`;
-  };
-  drawTable();
-
-  // ── thẻ lật ──
-  let deck = [], i = 0, res = {};
-  const start = list => { deck = $('#fcShuf', box).checked ? [...list].sort(() => Math.random() - .5) : [...list]; i = 0; res = {}; drawCard(); };
-  const drawCard = () => {
-    const fb = $('#fcBox', box);
-    if (!deck.length) { fb.innerHTML = '<p class="muted">Bài này chưa có từ mới.</p>'; return; }
-    if (i >= deck.length) return drawSummary();
-    const w = deck[i], mode = $('#fcFront', box).value, ex = sentWith(x, w.h)[0];
-    const yes = Object.values(res).filter(Boolean).length, no = Object.values(res).filter(r => r === false).length;
-    fb.innerHTML = `<div class="ql">
-      <div class="ql-top"><span class="ql-no">✗ ${no}</span><span>${i + 1} / ${deck.length}</span><span class="ql-yes">✓ ${yes}</span></div>
-      <div class="bar"><i style="width:${i / deck.length * 100}%"></i></div>
-      <div class="ql-card" tabindex="0" role="button" aria-label="Bấm để lật thẻ">
-        <div class="ql-inner">
-          <div class="ql-face ql-front">${mode === 'vi' ? `<div class="ql-vi">${esc(w.vi)}</div>` : mode === 'au' ? `<div class="ql-au">${icon('vol')}<span>Bấm loa để nghe lại</span></div>` : `<div class="ql-h" lang="zh-CN">${esc(w.h)}</div>`}<div class="ql-hint">Bấm vào thẻ hoặc phím cách để lật</div></div>
-          <div class="ql-face ql-back"><div class="ql-h sm" lang="zh-CN">${esc(w.h)}</div><div class="ql-p">${esc(w.p)}</div><div class="ql-vi">${esc(w.vi)}</div>
-            ${ex ? `<div class="ql-ex"><div lang="zh-CN">${esc(ex[0])}</div><div class="small muted">${esc(ex[1])}</div></div>` : ''}</div>
-        </div>
-        <button class="say ql-say" data-say="${esc(w.h)}" aria-label="Nghe">${icon('vol')}</button>
-      </div>
-      <div class="ql-btns"><button class="ql-b no" id="qlNo">✗ Chưa thuộc <kbd>←</kbd></button><button class="ql-b yes" id="qlYes">✓ Đã thuộc <kbd>→</kbd></button></div>
-    </div>`;
-    if (mode === 'au') speak(w.h);
-    const card = $('.ql-card', fb);
-    card.onclick = e => { if (e.target.closest('.ql-say')) return; card.classList.toggle('flipped'); if (card.classList.contains('flipped') && mode !== 'au') speak(w.h); };
-    const mark = ok => { res[w.h] = ok; setKnown(x.id, w.h, ok); i++; logActivity(); drawTable(); drawCard(); };
-    $('#qlNo', fb).onclick = () => mark(false); $('#qlYes', fb).onclick = () => mark(true);
-  };
-  const drawSummary = () => {
-    const unk = deck.filter(w => res[w.h] === false), ok = deck.length - unk.length;
-    $('#fcBox', box).innerHTML = `<div class="ql-sum">
-      <div class="sp-sum"><div class="score-ring" style="--p:${Math.round(ok / deck.length * 100)}"><span>${ok}/${deck.length}</span></div>
-      <div><h3>${unk.length ? `Bạn còn ${unk.length} từ chưa thuộc` : 'Tuyệt vời! Bạn đã thuộc hết các từ.'}</h3><p class="muted">${unk.length ? 'Đọc to các câu bên dưới vài lần để nhớ từ trong ngữ cảnh, rồi học lại.' : 'Hãy thử tự đặt câu với các từ mới để nhớ lâu hơn.'}</p>
-      <div class="row gap wrap">${unk.length ? `<button class="btn" id="reUnk">Học lại ${unk.length} từ chưa thuộc</button>` : ''}<button class="btn ghost" id="reAll">Học lại tất cả</button>${unk.length ? '<button class="btn ghost" id="toMs">Tự đặt câu với từ chưa thuộc</button>' : ''}</div></div></div>
-      ${unk.map(w => { const ss = sentWith(x, w.h); const more = examplesFor(w.h, 4).filter(e => !ss.some(s => s[0] === e.zh)).slice(0, 2);
-        return `<div class="unk-w"><div class="unk-h"><span lang="zh-CN" class="t-h" data-w="${esc(w.h)}">${esc(w.h)}</span> <span class="t-p">${esc(w.p)}</span> – ${esc(w.vi)} ${say(w.h)}</div>
-          <div class="muted small">Câu để học thuộc:</div>${ss.map(([zh, vi]) => sentence(zh, vi)).join('')}${more.map(e => sentence(e.zh.replace(/^[AB]：/, ''), e.vi.replace(/^[AB]: /, ''))).join('')}</div>`; }).join('')}
-    </div>`;
-    const q = sel => $(sel, box);
-    if (q('#reUnk')) q('#reUnk').onclick = () => start(unk);
-    q('#reAll').onclick = () => start(words);
-    if (q('#toMs')) q('#toMs').onclick = () => { $('#msWord', box).value = unk[0].h; drawMs(); $('#msSec', box).scrollIntoView({ behavior: 'smooth' }); };
-    drawMsOptions();
-  };
-  $('#fcFront', box).onchange = () => drawCard();
-  $('#fcShuf', box).onchange = () => start(deck.length ? deck : words);
-  const keyh = e => {
-    if (!box.isConnected) return document.removeEventListener('keydown', keyh);
-    if (e.target.matches('input,textarea,select')) return;
-    const card = $('.ql-card', box); if (!card) return;
-    const r = card.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return;
-    if (e.code === 'Space') { e.preventDefault(); card.click(); }
-    if (e.key === 'ArrowLeft') $('#qlNo', box)?.click();
-    if (e.key === 'ArrowRight') $('#qlYes', box)?.click();
-  };
-  document.addEventListener('keydown', keyh);
-  start(words);
+  const drawCount = () => { const k = knownOf(x.id); $('#wkc', box).textContent = `Đã thuộc ${words.filter(w => k[w.h] === true).length}/${words.length}`; };
+  drawCount();
+  vocabSet($('#vsBox', box), words, {
+    id: x.id, sent: x.s, known: () => knownOf(x.id), setKnown: (h, val) => setKnown(x.id, h, val),
+    onChange: () => { drawCount(); drawMsOptions(); },
+    onPractice: h => { $('#msWord', box).value = h; drawMs(); $('#msSec', box).scrollIntoView({ behavior: 'smooth' }); },
+  });
 
   // ── tự đặt câu ──
   const drawMsOptions = () => {
@@ -302,7 +242,9 @@ function renderStudy(box, x) {
     const h = $('#msWord', box).value, w = words.find(z => z.h === h); if (!w) return;
     const mine = (store.s.mySent || {})[h] || [];
     const ref = sentWith(x, h)[0];
+    const refs = ex5(h, sentWith(x, h));
     $('#msBox', box).innerHTML = `${ref ? `<div class="ms-ref"><span class="muted small">Câu mẫu trong bài:</span>${sentence(ref[0], ref[1])}</div>` : ''}
+      <details class="vs-det"><summary>📖 Xem 5 câu ví dụ với “${esc(h)}” để tham khảo</summary><div class="ex-box">${refs.map(([zh, vi]) => exampleHtml(zh, vi)).join('')}</div></details>
       ${[0, 1, 2, 3, 4].map(n => `<div class="ms-row" data-n="${n}">
         <span class="ms-no">${n + 1}</span>
         <div class="ms-main"><input class="inp ms-in" lang="zh-CN" placeholder="Viết câu có từ “${esc(h)}”…" value="${esc(mine[n] || '')}">
