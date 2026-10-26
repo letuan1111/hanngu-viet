@@ -439,3 +439,5 @@ body.split .tk { margin: 0 .18em; } body.split .gl { display: block; }
 @media (max-width: 640px) { .mt-grid { grid-template-columns: repeat(3, 1fr); } .mt-t { min-height: 74px; } .gv-area { height: 240px; } }
 .row.wrap > .btn { max-width: 100%; white-space: normal; text-align: center; }
 #msSec label.sel { display: flex; align-items: center; gap: 6px; max-width: 100%; } #msWord { min-width: 0; max-width: 100%; flex: 1; }
+.foot-msg { margin-top: 14px; padding: 16px 18px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); line-height: 1.65; }
+.foot-msg h3 { margin: 0 0 8px; font-size: 1.05rem; color: var(--red); } .foot-msg p { margin: 0 0 8px; } .foot-msg p:last-child { margin: 0; font-weight: 600; }
