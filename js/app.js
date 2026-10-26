@@ -13,9 +13,11 @@ import { community } from './views/community.js';
 import { progress, settings } from './views/progress.js';
 import { hsk500, readings } from './views/hsk500.js';
 import { speakingList, speakingItem } from './views/speaking.js';
+import { pronounce } from './views/pronounce.js';
 
 const routes = [
   [/^\/?$/, home, 'Trang chủ'],
+  [/^\/pinyin(?:\/([\w-]+))?$/, pronounce, 'Luyện phát âm'],
   [/^\/course(?:\/(\d))?$/, course, 'Khóa học'],
   [/^\/lesson\/(\d+)(?:\/(\w+))?$/, lesson, 'Bài học'],
   [/^\/chapter\/(\d)\/(\d)$/, chapterTest, 'Kiểm tra chương'],

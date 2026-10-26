@@ -21,6 +21,7 @@ export function course(root, lv = '1') {
   <div class="card lv-sum"><span class="lv-badge lv${lv}">HSK ${lv}</span><div class="grow"><b>${p.done}/${p.total} bài hoàn thành</b><span class="bar"><i style="width:${p.pct}%"></i></span></div>
     <a class="btn sm" href="#/exam/${lv}">Đánh giá cuối cấp</a></div>
   ${lv === 1 ? `<div class="feature-row">
+    <a class="feature" href="#/pinyin"><span class="fi" lang="zh-CN">音</span><span><b>Bài 0 · Luyện phát âm</b><small>Thanh điệu, 23 thanh mẫu, 36 vận mẫu, biến điệu, bảng âm tiết – nên học trước bài 1</small></span></a>
     <a class="feature" href="#/hsk1-500"><span class="fi" lang="zh-CN">五百</span><span><b>Bảng 500 từ HSK 1</b><small>Chuẩn HSK 3.0 · ${Object.keys(s.known30 || {}).length}/506 đã thuộc · tra, nghe, đánh dấu, kiểm tra</small></span></a>
     <a class="feature" href="#/reading"><span class="fi" lang="zh-CN">读</span><span><b>Bài đọc theo cấu trúc</b><small>${READINGS.length} bài · mỗi bài luyện một cấu trúc ngữ pháp HSK 1, có câu hỏi đọc hiểu</small></span></a>
   </div>` : ''}

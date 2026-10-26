@@ -24,7 +24,7 @@ export function home(root) {
       <p class="lead">Tiếng Trung phổ thông từ con số 0 đến HSK 3, giải thích bằng tiếng Việt. Mỗi bài kết thúc bằng một nhiệm vụ nói và viết về chủ đề thật. Bấm vào chữ Hán bất kỳ để xem nghĩa, pinyin và nghe phát âm.</p>
       ${s.profile.name ? '' : `<form class="name-form" id="nameF"><input class="inp" id="nm" placeholder="Tên của bạn" maxlength="30" aria-label="Tên của bạn"><button class="btn">Lưu tên</button></form>`}
       <div class="row gap wrap hero-cta">
-        ${s.last ? `<a class="btn" href="${esc(s.last.route)}">Tiếp tục: ${esc(s.last.title)}</a>` : `<a class="btn" href="#/lesson/0">Học bài đầu tiên</a>`}
+        ${s.last ? `<a class="btn" href="${esc(s.last.route)}">Tiếp tục: ${esc(s.last.title)}</a>` : `<a class="btn" href="#/pinyin">Bắt đầu từ phát âm</a><a class="btn ghost" href="#/lesson/0">Vào bài 1</a>`}
         <a class="btn ghost" href="#/placement">Kiểm tra trình độ</a>
       </div>
     </div>
@@ -58,6 +58,7 @@ export function home(root) {
     <h2 class="sec">Chọn cách học</h2>
     <div class="paths">
       ${[
+        ['#/pinyin', '音', 'Luyện phát âm', 'Bài 0: thanh điệu, thanh mẫu, vận mẫu'],
         ['#/course/1', '学', 'Học từ đầu', 'Theo thứ tự bài HSK 1 → 3'],
         ['#/placement', '测', 'Kiểm tra đầu vào', 'Biết mình đang ở đâu, nên học bài nào'],
         ['#/vocab', '词', 'Từ vựng', 'Tra từ, nhóm chủ đề, thứ tự nét viết'],

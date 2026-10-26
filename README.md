@@ -7,6 +7,7 @@ Giao diện tiếng Việt, chạy trên máy tính, điện thoại và máy t�
 
 ## Tính năng
 
+- **Luyện phát âm (Bài 0)**: thanh điệu có biểu đồ độ cao và 16 tổ hợp hai thanh, 23 thanh mẫu và 38 vận mẫu – mỗi âm có cách đọc, so sánh với tiếng Việt, lỗi người Việt hay gặp và 5 ví dụ để nghe, ghi âm kiểm tra đúng âm/đúng thanh; biến điệu (3+3, 不, 一, 儿); bảng 406 âm tiết bấm để nghe 4 thanh; luyện nghe phân biệt các cặp âm dễ nhầm; quy tắc viết pinyin.
 - **Khóa học HSK 1–3** (khung HSK 2.0): 10 chương, 50 bài. Mỗi bài: Từ vựng → Hội thoại → Ngữ pháp → Bài tập → Kiểm tra (≥ 70%) → Thực hành nói/viết theo chủ đề → Hoàn thành. Có kiểm tra cuối chương và đánh giá cuối cấp.
 - **Bảng 500 từ HSK 1 theo chuẩn HSK 3.0** (506 mục): tra cứu, lọc, nghe, đánh dấu đã thuộc, học 20 từ/lần, kiểm tra nhanh. 194 từ mới so với HSK 2.0 được gắn nhãn.
 - **2.530 câu ví dụ HSK 1**: mỗi từ trong 506 mục có 5 câu ví dụ bao quát các nghĩa, câu khẳng định/phủ định/nghi vấn và kết hợp thường gặp, kèm pinyin và nghĩa tiếng Việt. Hiển thị ở trang từ, cửa sổ tra từ, thẻ ôn tập và bảng 500 từ.
@@ -56,6 +57,8 @@ js/data/examples1.js  5 câu ví dụ cho mỗi từ HSK 1
 js/data/speaking.js   32 bài nói mẫu theo chủ đề
 js/data/examples-speak.js  5 câu ví dụ cho từ mới phần Luyện nói
 js/views/typing.js    luyện gõ lại bài
+js/views/pronounce.js luyện phát âm
+js/data/pinyin.js     nội dung phát âm · js/data/syllables.js bảng âm tiết
 js/views/myexam.js    thi thử: đề tự sinh, tải bộ đề, phiếu trả lời, chấm điểm
 js/views/hskgen.js    sinh đề HSK 1–3 đúng cấu trúc
 js/data/examgen*.js   ngân hàng câu cho đề tự sinh
