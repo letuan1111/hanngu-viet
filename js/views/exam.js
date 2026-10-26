@@ -2,6 +2,7 @@ import { store } from '../core/store.js';
 import { hskWords, sentenceBank, GRAMMAR, lessonsOf, pick, shuffle } from '../core/dict.js';
 import { esc, $, toast } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
+import { myExamSection, bindMyExamSection } from './myexam.js';
 
 const CFG = { 1: { n: 20, min: 15 }, 2: { n: 25, min: 20 }, 3: { n: 30, min: 25 } };
 
@@ -24,9 +25,11 @@ export function exam(root, lv) {
   if (!lv) {
     root.innerHTML = `<div class="page-head"><h1>Thi thử HSK</h1></div>
     <p class="muted">Đề mô phỏng cấu trúc HSK (Nghe – Đọc – Viết) với từ vựng và ngữ pháp của từng cấp, có tính giờ. Mỗi lần thi là một đề ngẫu nhiên mới. Cần đạt 60% để đạt.</p>
-    <div class="exam-grid">${[1, 2, 3].map(l => { const mine = tests.filter(t => t.level === l); const best = mine.reduce((m, t) => Math.max(m, Math.round(t.score / t.total * 100)), -1);
+    <div class="exam-grid">${[1, 2, 3].map(l => { const mine = tests.filter(t => t.level === l && !t.custom); const best = mine.reduce((m, t) => Math.max(m, Math.round(t.score / t.total * 100)), -1);
       return `<div class="card exam-card"><span class="lv-badge lv${l}">HSK ${l}</span><h3>${CFG[l].n} câu · ${CFG[l].min} phút</h3><p class="muted small">${l === 1 ? 'Nghe và Đọc' : 'Nghe, Đọc và Viết (sắp xếp câu)'}</p><p>${best >= 0 ? `Điểm cao nhất: <b>${best}%</b> (${mine.length} lần)` : 'Chưa thi'}</p><a class="btn" href="#/exam/${l}">Bắt đầu thi</a></div>`; }).join('')}</div>
-    ${tests.length ? `<h3 class="sub">Lịch sử</h3><table class="tbl"><tr><th>Ngày</th><th>Cấp</th><th>Điểm</th></tr>${tests.slice(-10).reverse().map(t => `<tr><td>${new Date(t.at).toLocaleDateString('vi')}</td><td>HSK ${t.level}</td><td>${t.score}/${t.total} (${Math.round(t.score / t.total * 100)}%)</td></tr>`).join('')}</table>` : ''}`;
+    ${myExamSection()}
+    ${tests.length ? `<h3 class="sub">Lịch sử</h3><table class="tbl"><tr><th>Ngày</th><th>Cấp</th><th>Điểm</th></tr>${tests.slice(-10).reverse().map(t => `<tr><td>${new Date(t.at).toLocaleDateString('vi')}</td><td>HSK ${t.level}${t.custom ? ' · đề của bạn' : ''}</td><td>${t.score}/${t.total} (${Math.round(t.score / t.total * 100)}%)</td></tr>`).join('')}</table>` : ''}`;
+    bindMyExamSection(root, () => exam(root));
     return 'Thi thử HSK';
   }
   lv = +lv;

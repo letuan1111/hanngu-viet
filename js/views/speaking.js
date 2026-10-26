@@ -5,6 +5,7 @@ import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById }
 import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml } from '../core/ui.js';
 import { checkSentence } from '../core/checker.js';
 import { vocabSet, ex5 } from './vocabset.js';
+import { typingTrainer } from './typing.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -80,6 +81,9 @@ export function speakingItem(root, id) {
     <div id="rLive" class="sp-live" aria-live="polite"></div>
     <div id="rOut"></div>
   </section>
+  <section class="card ty-sec"><h2>⌨️ Luyện gõ lại bài đọc</h2>
+    <p class="muted small">Gõ lại từng câu của bài: gõ đúng đến chữ nào, chữ đó biến mất khỏi câu mẫu; gõ xong một câu sẽ tự chuyển sang câu tiếp. Đồng hồ tính tốc độ theo chữ/phút và từ/phút.</p>
+    <div id="typing"></div></section>
   <div id="study"></div>
   <div class="lesson-nav">${prev ? `<a class="btn ghost" href="#/speaking/${prev.id}">‹ Câu ${prev.id}</a>` : '<span></span>'}${next ? `<a class="btn" href="#/speaking/${next.id}">Câu ${next.id} ›</a>` : ''}</div>`;
 
@@ -155,6 +159,7 @@ export function speakingItem(root, id) {
       <p class="muted small">Lưu ý: chấm điểm dựa trên nhận dạng giọng nói của trình duyệt, chỉ mang tính tham khảo. Chữ màu cam thường là chữ đồng âm hoặc cần kiểm tra lại thanh điệu.</p>`;
     out.scrollIntoView({ behavior: 'smooth' });
   };
+  typingTrainer($('#typing', root), { key: 'sp' + x.id, sentences: x.s });
   renderStudy($('#study', root), x);
   return `Luyện nói: ${x.q}`;
 }
