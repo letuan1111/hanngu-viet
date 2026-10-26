@@ -1,5 +1,5 @@
 import { store, logActivity } from '../core/store.js';
-import { GRAMMAR, grammarById, lessonsWithGrammar, shuffle, pick, sentencePinyin } from '../core/dict.js';
+import { READINGS, GRAMMAR, grammarById, lessonsWithGrammar, shuffle, pick, sentencePinyin } from '../core/dict.js';
 import { esc, say, sentence, $, $$ } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { checkSentence, analyse } from '../core/checker.js';
@@ -49,6 +49,7 @@ export function grammarDetail(root, id) {
     <section class="card"><h2>Bài tập áp dụng</h2><p class="muted small">Điền từ, sắp xếp câu${g.transform ? ', biến đổi khẳng định → phủ định → nghi vấn' : ''}.</p><div id="gqz"></div></section>
     <section class="card"><h2>Tự đặt câu</h2><p class="muted small">Đặt một câu dùng cấu trúc này, hệ thống sẽ kiểm tra theo quy tắc.</p>
       <div class="row gap"><input id="own" class="inp grow" lang="zh-CN" placeholder="Ví dụ: ${esc(g.ex[0][0])}"><button class="btn" id="ownb">Kiểm tra</button></div><div id="ownr"></div></section>
+    ${READINGS.filter(r => r.g === g.id).map(r => `<section class="card"><h2>Bài đọc luyện cấu trúc này</h2><a class="lk" href="#/reading/${r.id}">${esc(r.t)} ›</a></section>`).join('')}
     ${ls.length ? `<section class="card"><h2>Bài học liên quan</h2>${ls.map(l => `<a class="lk" href="#/lesson/${l.idx}/grammar">HSK ${l.level} · Bài ${l.no}: ${esc(l.t)}</a>`).join('')}</section>` : ''}
     <div class="lesson-nav">${prev ? `<a class="btn ghost" href="#/grammar/${prev.id}">‹ ${esc(prev.name)}</a>` : '<span></span>'}${next ? `<a class="btn ghost" href="#/grammar/${next.id}">${esc(next.name)} ›</a>` : ''}</div>
   </div>`;

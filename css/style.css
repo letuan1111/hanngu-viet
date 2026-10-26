@@ -299,3 +299,20 @@ body.split .tk { margin: 0 .18em; } body.split .gl { display: block; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media print { .top, .bottom, .foot, .say, .peek, .lesson-nav, .steps { display: none !important; } body { background: #fff; } }
+
+/* ── Bảng 500 từ, bài đọc ── */
+.feature-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.feature { display: flex; gap: 14px; align-items: center; background: linear-gradient(135deg, var(--red2), var(--gold2)); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; color: var(--ink); text-decoration: none !important; transition: transform .15s; }
+.feature:hover { transform: translateY(-2px); border-color: var(--red); }
+.fi { flex: none; width: 58px; height: 58px; border-radius: 14px; background: var(--red); color: #fff8ef; display: grid; place-items: center; font: 700 1.2rem var(--zh); }
+.feature span:last-child { display: grid; } .feature small { color: var(--ink2); }
+.badge.hsk30 { background: var(--jade2); color: var(--jade); }
+.tbl-wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); margin: 12px 0; }
+.t500 td, .t500 th { padding: 8px 12px; vertical-align: middle; } .t500 th { position: sticky; top: 0; background: var(--paper); font-size: .85rem; color: var(--ink2); }
+.t500 tr:hover td { background: var(--bg); } .t500 tr.kn td { background: color-mix(in srgb, var(--jade2) 60%, transparent); }
+.t-h { font: 700 1.35rem var(--zh); cursor: pointer; } .t-h:hover { color: var(--red); } .t-p { color: var(--red); font-weight: 500; white-space: nowrap; }
+.t500 .say { width: 30px; height: 30px; } .kn-box { width: 18px; height: 18px; accent-color: var(--jade); cursor: pointer; }
+@media (max-width: 640px) { .hide-sm { display: none; } .t500 td, .t500 th { padding: 6px 6px; } }
+.reading-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.gfocus { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; } .gfocus .formula { margin: 0; } .gfocus p { margin: 4px 0 0; }
+.tk.key { background: var(--gold2); color: var(--red); font-weight: 700; box-shadow: inset 0 -2px 0 var(--gold); }

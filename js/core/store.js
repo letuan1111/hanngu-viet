@@ -20,7 +20,9 @@ const DEFAULT = {
   community: { words: [], examples: [], tips: [], dialogues: [], questions: [], topics: [], reports: [], likes: {} },
   journal: [],              // bài viết của người học { lesson, text, at }
   grammarSeen: {},
-  skill: {},               // kỹ năng -> [đúng, tổng]
+  skill: {},
+  known30: {},              // từ trong bảng 500 từ HSK 1 đã thuộc
+  readDone: {},             // bài đọc đã làm -> điểm cao nhất               // kỹ năng -> [đúng, tổng]
 };
 
 function merge(base, extra) {

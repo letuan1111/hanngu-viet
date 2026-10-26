@@ -10,12 +10,15 @@ import { practice } from './views/practice.js';
 import { exam, placement } from './views/exam.js';
 import { community } from './views/community.js';
 import { progress, settings } from './views/progress.js';
+import { hsk500, readings } from './views/hsk500.js';
 
 const routes = [
   [/^\/?$/, home, 'Trang chủ'],
   [/^\/course(?:\/(\d))?$/, course, 'Khóa học'],
   [/^\/lesson\/(\d+)(?:\/(\w+))?$/, lesson, 'Bài học'],
   [/^\/chapter\/(\d)\/(\d)$/, chapterTest, 'Kiểm tra chương'],
+  [/^\/hsk1-500$/, hsk500, 'Bảng 500 từ HSK 1'],
+  [/^\/reading(?:\/([\w-]+))?$/, readings, 'Bài đọc HSK 1'],
   [/^\/vocab$/, dictionary, 'Từ vựng'],
   [/^\/word\/(.+)$/, word, 'Từ'],
   [/^\/topics(?:\/(\w+))?$/, topics, 'Nhóm từ'],

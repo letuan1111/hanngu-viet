@@ -3,9 +3,18 @@ import { LESSONS, CHAPTERS } from '../data/lessons.js';
 import { GRAMMAR } from '../data/grammar.js';
 import { CHARS } from '../data/chars.js';
 import { store } from './store.js';
+import { HSK30_1_ORDER, HSK30_1_NEW } from '../data/hsk30.js';
+import { READINGS } from '../data/readings.js';
 
-export { POS, TOPICS, LESSONS, CHAPTERS, GRAMMAR, CHARS };
+export { POS, TOPICS, LESSONS, CHAPTERS, GRAMMAR, CHARS, READINGS };
 export const isHan = c => /\p{Script=Han}/u.test(c);
+
+// Từ HSK 1 chuẩn 3.0 chưa có trong bộ HSK 2.0
+const V30_NEW = HSK30_1_NEW.trim().split('\n').map((line, i) => {
+  const [h, p, vi, pos, topics] = line.split('|');
+  return { id: `30-${i}`, h, p, vi, pos, topics: topics.split(','), level: 1, source: 'hsk30' };
+});
+export const IN30 = new Set(HSK30_1_ORDER);
 
 // ── Chỉ mục từ điển (HSK + từ mở rộng + đóng góp cá nhân) ──
 let byH = new Map(); let maxLen = 1;
@@ -13,6 +22,7 @@ export function rebuild() {
   byH = new Map();
   const add = w => { if (!byH.has(w.h)) byH.set(w.h, []); byH.get(w.h).push(w); maxLen = Math.max(maxLen, w.h.length); };
   VOCAB.forEach(add);
+  V30_NEW.forEach(add);
   for (const w of store.s.community.words) add({ ...w, source: 'community' });
 }
 rebuild();
@@ -20,6 +30,8 @@ export const lookup = h => byH.get(h) || [];
 export const entry = h => lookup(h)[0];
 export const allWords = () => [...byH.values()].map(a => a[0]);
 export const hskWords = lv => VOCAB.filter(v => v.level === lv);
+// Bảng 500 từ HSK 1 (chuẩn 3.0) theo thứ tự chính thức
+export const hsk30List = () => HSK30_1_ORDER.map((h, i) => ({ no: i + 1, ...(lookup(h).find(x => x.source === 'hsk30' || x.level === 1) || entry(h)) }));
 
 // Tách từ: khớp dài nhất từ trái sang phải (ưu tiên từ ghép)
 export function segment(text) {
@@ -159,4 +171,4 @@ export function search(q) {
 
 export const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 export const pick = (a, n) => shuffle(a).slice(0, n);
-export const levelLabel = w => w.source === 'community' ? 'Cộng đồng' : w.source === 'extra' ? 'Mở rộng' : `HSK ${w.level}`;
+export const levelLabel = w => w.source === 'community' ? 'Cộng đồng' : w.source === 'hsk30' ? 'HSK 1 · 3.0' : w.source === 'extra' ? (IN30.has(w.h) ? 'HSK 1 · 3.0' : 'Mở rộng') : `HSK ${w.level}`;

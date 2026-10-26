@@ -1,5 +1,5 @@
 import { store, srsAdd } from '../core/store.js';
-import { allWords, lookup, entry, search, examplesFor, collocations, confusables, lessonsWithWord, TOPICS, POS, levelLabel, isHan, charPinyin, sentencePinyin, GRAMMAR, hskWords, pick, shuffle } from '../core/dict.js';
+import { IN30, allWords, lookup, entry, search, examplesFor, collocations, confusables, lessonsWithWord, TOPICS, POS, levelLabel, isHan, charPinyin, sentencePinyin, GRAMMAR, hskWords, pick, shuffle } from '../core/dict.js';
 import { esc, say, sentence, icon, toast, writer, charInfo, short, $, $$, gridSvg, modal } from '../core/ui.js';
 import { MNEMONICS, RADICALS } from '../data/radicals.js';
 import { Q, runQuiz } from '../core/quiz.js';
@@ -17,7 +17,7 @@ export function dictionary(root) {
   root.innerHTML = `<div class="page-head"><h1>Từ vựng</h1><a class="btn sm ghost" href="#/topics">Học theo nhóm chủ đề</a></div>
   <div class="search-box"><input id="q" class="inp big" placeholder="Tìm bằng chữ Hán, pinyin (không cần dấu) hoặc tiếng Việt…" autocomplete="off" aria-label="Tìm từ"></div>
   <div class="filters">
-    <div class="chips" id="lv">${[['all', 'Tất cả'], ['1', 'HSK 1'], ['2', 'HSK 2'], ['3', 'HSK 3'], ['extra', 'Mở rộng'], ['community', 'Của bạn'], ['saved', '★ Đã lưu'], ['hard', '⚑ Từ khó']].map(([k, n], i) => `<button class="chip ${i ? '' : 'on'}" data-k="${k}">${n}</button>`).join('')}</div>
+    <div class="chips" id="lv">${[['all', 'Tất cả'], ['1', 'HSK 1'], ['30', 'HSK 1 · 3.0 (500 từ)'], ['2', 'HSK 2'], ['3', 'HSK 3'], ['extra', 'Mở rộng'], ['community', 'Của bạn'], ['saved', '★ Đã lưu'], ['hard', '⚑ Từ khó']].map(([k, n], i) => `<button class="chip ${i ? '' : 'on'}" data-k="${k}">${n}</button>`).join('')}</div>
     <select id="tp" class="inp sm"><option value="">Mọi chủ đề</option>${Object.entries(TOPICS).map(([k, [n]]) => `<option value="${k}">${n}</option>`).join('')}</select>
   </div>
   <div id="cnt" class="muted small"></div><div id="list" class="wlist"></div><div class="center"><button class="btn ghost" id="more" hidden>Xem thêm</button></div>`;
@@ -25,7 +25,7 @@ export function dictionary(root) {
   const draw = () => {
     const q = $('#q', root).value; const tp = $('#tp', root).value;
     let ws = q ? search(q) : allWords().sort((a, b) => (a.level || 9) - (b.level || 9));
-    ws = ws.filter(w => lv === 'all' ? true : lv === 'saved' ? s.saved[w.h] : lv === 'hard' ? s.hard[w.h] : lv === 'extra' ? w.source === 'extra' : lv === 'community' ? w.source === 'community' : w.level === +lv && w.source === 'hsk');
+    ws = ws.filter(w => lv === 'all' ? true : lv === '30' ? IN30.has(w.h) : lv === 'saved' ? s.saved[w.h] : lv === 'hard' ? s.hard[w.h] : lv === 'extra' ? w.source === 'extra' && !IN30.has(w.h) : lv === 'community' ? w.source === 'community' : w.level === +lv && w.source === 'hsk');
     if (tp) ws = ws.filter(w => w.topics.includes(tp));
     $('#cnt', root).textContent = `${ws.length} từ`;
     $('#list', root).innerHTML = ws.slice(0, limit).map(w => `<a class="wrow" href="#/word/${encodeURIComponent(w.h)}"><span class="wr-h" lang="zh-CN">${esc(w.h)}</span><span class="wr-p">${esc(w.p)}</span><span class="wr-vi">${esc(w.vi)}</span><span class="badge ${w.source}">${levelLabel(w)}</span><span class="no-pop">${say(w.h)}</span></a>`).join('') || '<p class="muted">Không tìm thấy. Bạn có thể <a href="#/community/add">tự thêm từ mới</a>.</p>';

@@ -1,5 +1,5 @@
 import { store, srsAdd, logActivity } from '../core/store.js';
-import { LESSON_LIST, lessonsOf, CHAPTERS, entry, grammarById, hskWords, shuffle, pick, segment, TOPICS, POS, sentenceBank, levelLabel } from '../core/dict.js';
+import { READINGS, LESSON_LIST, lessonsOf, CHAPTERS, entry, grammarById, hskWords, shuffle, pick, segment, TOPICS, POS, sentenceBank, levelLabel } from '../core/dict.js';
 import { CURRICULUM } from '../data/lessons.js';
 import { GRAMMAR } from '../data/grammar.js';
 import { esc, say, sentence, icon, toast, modal, writer, short, $, $$, gridSvg } from '../core/ui.js';
@@ -20,6 +20,10 @@ export function course(root, lv = '1') {
   <p class="muted small">Chương trình áp dụng: <b>${esc(CURRICULUM.version)}</b>. ${esc(CURRICULUM.note)}</p>
   <div class="card lv-sum"><span class="lv-badge lv${lv}">HSK ${lv}</span><div class="grow"><b>${p.done}/${p.total} bài hoàn thành</b><span class="bar"><i style="width:${p.pct}%"></i></span></div>
     <a class="btn sm" href="#/exam/${lv}">Đánh giá cuối cấp</a></div>
+  ${lv === 1 ? `<div class="feature-row">
+    <a class="feature" href="#/hsk1-500"><span class="fi" lang="zh-CN">五百</span><span><b>Bảng 500 từ HSK 1</b><small>Chuẩn HSK 3.0 · ${Object.keys(s.known30 || {}).length}/506 đã thuộc · tra, nghe, đánh dấu, kiểm tra</small></span></a>
+    <a class="feature" href="#/reading"><span class="fi" lang="zh-CN">读</span><span><b>Bài đọc theo cấu trúc</b><small>${READINGS.length} bài · mỗi bài luyện một cấu trúc ngữ pháp HSK 1, có câu hỏi đọc hiểu</small></span></a>
+  </div>` : ''}
   ${chapters.map((name, ci) => {
     const ls = LESSON_LIST.filter(l => l.level === lv && l.chapter === ci);
     const best = s.tests.filter(t => t.kind === 'chapter' && t.level === lv && t.ch === ci).reduce((m, t) => Math.max(m, Math.round(t.score / t.total * 100)), -1);

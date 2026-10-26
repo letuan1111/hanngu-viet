@@ -641,6 +641,8 @@ const EXTRA = `
 河内|Hénèi|Hà Nội|d|diadiem
 阿兰|Ā Lán|Lan (tên riêng)|d|giaotiep
 小明|Xiǎomíng|Tiểu Minh (tên riêng)|d|giaotiep
+大明|Dàmíng|Đại Minh (tên riêng)|d|giaotiep
+毛毛|Máomao|Mao Mao (tên con vật)|d|giaotiep
 小王|Xiǎo Wáng|Tiểu Vương (cách gọi thân mật)|d|giaotiep
 王|Wáng|họ Vương|d|giaotiep
 李|Lǐ|họ Lý|d|giaotiep

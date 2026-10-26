@@ -8,7 +8,9 @@ Giao diện tiếng Việt, chạy trên máy tính, điện thoại và máy t�
 ## Tính năng
 
 - **Khóa học HSK 1–3** (khung HSK 2.0): 10 chương, 50 bài. Mỗi bài: Từ vựng → Hội thoại → Ngữ pháp → Bài tập → Kiểm tra (≥ 70%) → Thực hành nói/viết theo chủ đề → Hoàn thành. Có kiểm tra cuối chương và đánh giá cuối cấp.
-- **Từ vựng ~650 từ** (HSK 1: 155, HSK 2: 150, HSK 3: 315 + từ mở rộng): pinyin, nghĩa, từ loại, cấp độ, phát âm, ví dụ tự tìm từ kho câu, từ kết hợp, đồng/trái nghĩa, từ dễ nhầm, lỗi thường gặp, bài học có chứa từ.
+- **Bảng 500 từ HSK 1 theo chuẩn HSK 3.0** (506 mục): tra cứu, lọc, nghe, đánh dấu đã thuộc, học 20 từ/lần, kiểm tra nhanh. 194 từ mới so với HSK 2.0 được gắn nhãn.
+- **20 bài đọc HSK 1 theo cấu trúc ngữ pháp**: mỗi bài luyện một cấu trúc, tô đậm cấu trúc trong bài, nghe cả bài, ẩn/hiện nghĩa, câu hỏi đọc hiểu và điền cấu trúc.
+- **Từ vựng ~870 từ** (HSK 1: 155, HSK 2: 150, HSK 3: 315 + từ mở rộng): pinyin, nghĩa, từ loại, cấp độ, phát âm, ví dụ tự tìm từ kho câu, từ kết hợp, đồng/trái nghĩa, từ dễ nhầm, lỗi thường gặp, bài học có chứa từ.
 - **Bấm vào mọi chữ Hán**: tách từ theo từ điển (ưu tiên từ ghép), xem riêng từng chữ, pinyin theo ngữ cảnh (chữ đa âm, biến điệu 不/一).
 - **Chế độ hiển thị**: bật/tắt chữ Hán, pinyin (trên chữ / dòng riêng / bấm để hiện / tắt), nghĩa tiếng Việt, tách từng từ kèm nghĩa, cỡ chữ, giao diện sáng/tối.
 - **Ghi nhớ thông minh**: thứ tự nét (Hanzi Writer) và tự viết bằng chuột/ngón tay, bộ thủ, thành phần, loại chữ (tượng hình/hội ý/hình thanh). Phân biệt rõ *cấu tạo có căn cứ* với *mẹo liên tưởng*.
@@ -40,6 +42,8 @@ js/views/             các màn hình
 js/data/vocab.js      từ vựng (sửa/thêm từ tại đây)
 js/data/lessons.js    chương và bài học
 js/data/grammar.js    ngữ pháp
+js/data/hsk30.js      500 từ HSK 1 (chuẩn HSK 3.0)
+js/data/readings.js   bài đọc HSK 1 theo cấu trúc
 js/data/chars.js      cấu tạo chữ (Make Me a Hanzi)
 strokes/              dữ liệu nét chữ (Hanzi Writer)
 vendor/               pinyin-pro, hanzi-writer
@@ -51,4 +55,5 @@ Quản trị nội dung: thêm/sửa/sắp xếp chương, bài, từ và ngữ 
 
 - [Hanzi Writer](https://hanziwriter.org) và dữ liệu nét `hanzi-writer-data` (Arphic Public License)
 - [Make Me a Hanzi](https://github.com/skishore/makemeahanzi) – cấu tạo chữ (LGPL / Arphic)
+- [complete-hsk-vocabulary](https://github.com/drkameleon/complete-hsk-vocabulary) – danh sách từ HSK 3.0 (MIT)
 - [pinyin-pro](https://github.com/zh-lx/pinyin-pro) – chuyển pinyin theo ngữ cảnh (MIT)
