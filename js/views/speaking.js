@@ -5,7 +5,7 @@ import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById }
 import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml } from '../core/ui.js';
 import { checkSentence } from '../core/checker.js';
 import { vocabSet, ex5 } from './vocabset.js';
-import { typingTrainer } from './typing.js';
+import { typingTrainer, splitSentences } from './typing.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -17,7 +17,7 @@ export function speakingList(root) {
   root.innerHTML = `<div class="page-head"><div><h1>Luyện nói theo chủ đề</h1></div></div>
   <p class="muted">Mỗi câu hỏi có một bài nói mẫu khoảng 300 chữ. Đọc với pinyin và nghĩa tiếng Việt, tắt dần khi đã quen, nghe giọng mẫu, rồi ghi âm để máy chấm từng chữ bạn đọc đúng hay sai.</p>
   ${SPEAK_GROUPS.map(([g, name, ic]) => { const items = SPEAK_ITEMS.filter(x => x.g === g); return `<section class="chapter"><h2 class="grp-h">${ic} ${esc(name)} <span class="grp-n">${items.length} bài</span></h2>
-    <div class="lesson-list">${items.map(x => `<a class="lesson-item ${best[x.id] >= 80 ? 'done' : ''}" href="#/speaking/${x.id}"><span class="ln">${best[x.id] >= 80 ? icon('check') : x.id}</span><span class="lt"><b lang="zh-CN" class="sp-q">${esc(x.q)}</b><small>${esc(x.qvi)}</small></span>${best[x.id] != null ? `<span class="best">${best[x.id]}%</span>` : ''}</a>`).join('')}</div></section>`; }).join('')}`;
+    <div class="lesson-list">${items.map(x => `<a class="lesson-item ${best[x.id] >= 80 ? 'done' : ''}" href="#/speaking/${x.id}"><span class="ln">${best[x.id] >= 80 ? icon('check') : x.id}</span><span class="lt"><b lang="zh-CN" class="sp-q">${esc(x.q)}</b><small>${esc(x.qvi)}</small></span>${(store.s.mySpeech || {})[x.id]?.text ? '<span class="best" title="Đã có bài nói của bạn">✍️</span>' : ''}${best[x.id] != null ? `<span class="best">${best[x.id]}%</span>` : ''}</a>`).join('')}</div></section>`; }).join('')}`;
   return 'Luyện nói theo chủ đề';
 }
 
@@ -85,6 +85,7 @@ export function speakingItem(root, id) {
     <p class="muted small">Gõ lại từng câu của bài: gõ đúng đến chữ nào, chữ đó biến mất khỏi câu mẫu; gõ xong một câu sẽ tự chuyển sang câu tiếp. Đồng hồ tính tốc độ theo chữ/phút và từ/phút.</p>
     <div id="typing"></div></section>
   <div id="study"></div>
+  <section class="card my-sp" id="mySp"></section>
   <div class="lesson-nav">${prev ? `<a class="btn ghost" href="#/speaking/${prev.id}">‹ Câu ${prev.id}</a>` : '<span></span>'}${next ? `<a class="btn" href="#/speaking/${next.id}">Câu ${next.id} ›</a>` : ''}</div>`;
 
   const text = $('.sp-text', root), srows = $$('.sp-row', root);
@@ -161,6 +162,7 @@ export function speakingItem(root, id) {
   };
   typingTrainer($('#typing', root), { key: 'sp' + x.id, sentences: x.s });
   renderStudy($('#study', root), x);
+  renderMySpeech($('#mySp', root), x);
   return `Luyện nói: ${x.q}`;
 }
 
@@ -302,4 +304,126 @@ async function recordClip(btn) {
   await new Promise(res => { btn._stop = res; setTimeout(res, 15000); });
   btn._stop = null;
   return { alts: [], url: await stopRec() };
+}
+
+// ════════════ Bài nói của bạn: tự soạn, lưu trên trình duyệt, nghe, kiểm tra, ghi âm chấm điểm ════════════
+const fmtAt = t => new Date(t).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+const hanCount = t => [...t].filter(isHan).length;
+const mineOf = id => (store.s.mySpeech || {})[id] || { text: '', vi: '', at: 0, versions: [] };
+function setMine(id, fn) { store.update(s => { s.mySpeech = s.mySpeech || {}; const m = s.mySpeech[id] || { text: '', vi: '', at: 0, versions: [] }; fn(m); s.mySpeech[id] = m; }); }
+
+function renderMySpeech(box, x) {
+  const vocab = ((SPEAK_VOCAB[x.id] || {}).w || []).map(([h, p, vi]) => ({ h, p, vi }));
+  const m = mineOf(x.id);
+  box.innerHTML = `<div class="row gap wrap" style="justify-content:space-between"><h2>📝 Bài nói của bạn</h2><span class="muted small" id="myState"></span></div>
+    <p class="muted small">Hãy tự viết bài nói của bạn để trả lời câu hỏi <b lang="zh-CN">${esc(x.q)}</b> (${esc(x.qvi)}). Bài được <b>tự động lưu trên trình duyệt</b> mỗi khi bạn gõ; bấm “Lưu bản này” để giữ lại nhiều phiên bản. Sau đó nghe máy đọc, kiểm tra lỗi, ghi âm để chấm điểm và luyện gõ lại chính bài của mình. Nên viết khoảng 150–300 chữ.</p>
+    ${vocab.length ? `<div class="my-chips"><span class="muted small">Bấm để chèn từ của bài:</span> ${vocab.map(w => `<button class="chip my-chip" data-h="${esc(w.h)}" title="${esc(w.p)} – ${esc(w.vi)}" lang="zh-CN">${esc(w.h)}</button>`).join('')}</div>` : ''}
+    <label class="my-lab" for="myTxt">Bài nói (chữ Hán)</label>
+    <textarea id="myTxt" class="inp my-txt" lang="zh-CN" rows="8" placeholder="我叫……。今天我想谈谈……。首先，……。其次，……。总之，……。">${esc(m.text)}</textarea>
+    <div class="my-meter"><div class="my-bar"><span id="myBar"></span></div><span class="muted small" id="myCnt"></span></div>
+    <details class="vs-det" ${m.vi ? 'open' : ''}><summary>🇻🇳 Ghi chú / bản dịch tiếng Việt (không bắt buộc)</summary>
+      <textarea id="myVi" class="inp" rows="4" placeholder="Viết dàn ý hoặc nghĩa tiếng Việt của bài để tự kiểm tra…">${esc(m.vi)}</textarea></details>
+    <div class="row gap wrap my-acts">
+      <button class="btn" id="mySave">💾 Lưu bản này</button>
+      <button class="btn ghost" id="myPlay">${icon('play')} Nghe bài của tôi</button><button class="btn ghost" id="myStop">${icon('stop')}</button>
+      <button class="btn ghost" id="myChk">✔️ Kiểm tra lỗi</button>
+      <button class="btn ghost" id="myType">⌨️ Luyện gõ bài này</button>
+      <button class="btn ghost" id="myDl">⬇️ Tải về .txt</button>
+      <button class="btn ghost" id="myClr">🗑️ Xóa</button>
+    </div>
+    <div id="myPrev" class="sp-text my-prev" style="--sp-size:1.35rem"></div>
+    <div id="myChkOut"></div>
+    <div class="my-rec">
+      <h3 class="sub">${icon('mic')} Ghi âm bài của bạn</h3>
+      <div class="row gap wrap"><button class="btn" id="myRStart">${icon('mic')} Bắt đầu đọc</button><button class="btn ghost" id="myRStop" disabled>Dừng & chấm điểm</button><span id="myRTime" class="muted"></span></div>
+      <div id="myRLive" class="sp-live" aria-live="polite"></div><div id="myROut"></div>
+    </div>
+    <div id="myTyping"></div>
+    <h3 class="sub">📂 Các bản đã lưu <small class="muted" id="myVerN"></small></h3>
+    <div id="myVers"></div>`;
+
+  const txt = $('#myTxt', box), vi = $('#myVi', box);
+  const state = msg => { $('#myState', box).textContent = msg; };
+  const info = () => { const mm = mineOf(x.id); state(mm.at ? `Đã tự lưu lúc ${fmtAt(mm.at)}` : 'Chưa có nội dung'); };
+  const sents = () => splitSentences(txt.value);
+  const drawPrev = () => {
+    const ss = sents(); let base = 0;
+    $('#myPrev', box).innerHTML = ss.length ? ss.map((zh, i) => { const r = sentenceChars(zh, base); base += r.n;
+      return `<div class="sp-row" data-i="${i}" data-zh="${esc(zh)}"><div class="sp-body"><div class="sp-zh" lang="zh-CN">${r.html}</div><div class="sp-res"></div></div><div class="sp-act"><button class="say my-say" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button></div></div>`; }).join('')
+      : '<p class="muted small">Bản xem trước có pinyin sẽ hiện ở đây khi bạn viết.</p>';
+    const n = hanCount(txt.value), used = vocab.filter(w => txt.value.includes(w.h));
+    $('#myCnt', box).textContent = `${n} chữ · ${ss.length} câu${vocab.length ? ` · dùng ${used.length}/${vocab.length} từ của bài` : ''}`;
+    $('#myBar', box).style.width = Math.min(100, n / 300 * 100) + '%';
+    $$('.my-chip', box).forEach(c => c.classList.toggle('used', txt.value.includes(c.dataset.h)));
+  };
+  let tmr;
+  const autosave = () => { clearTimeout(tmr); tmr = setTimeout(() => { setMine(x.id, mm => { mm.text = txt.value; mm.vi = vi.value; mm.at = Date.now(); }); info(); }, 400); drawPrev(); };
+  txt.oninput = autosave; vi.oninput = autosave;
+
+  const drawVers = () => {
+    const v = mineOf(x.id).versions || [];
+    $('#myVerN', box).textContent = v.length ? `(${v.length}/10)` : '';
+    $('#myVers', box).innerHTML = v.length ? `<ul class="my-vers">${v.map((it, i) => `<li><div><b>${fmtAt(it.at)}</b> · ${hanCount(it.text)} chữ<div class="muted small" lang="zh-CN">${esc(it.text.slice(0, 60))}${it.text.length > 60 ? '…' : ''}</div></div>
+      <span class="row gap"><button class="mini" data-load="${i}">Mở</button><button class="mini" data-del="${i}">Xóa</button></span></li>`).join('')}</ul>`
+      : '<p class="muted small">Chưa có bản nào. Bấm “Lưu bản này” để giữ lại phiên bản hiện tại (tối đa 10 bản).</p>';
+  };
+
+  $('#mySave', box).onclick = () => {
+    const t = txt.value.trim(); if (!t) { toast('Hãy viết bài nói trước khi lưu.', 'bad'); return; }
+    setMine(x.id, mm => { mm.text = txt.value; mm.vi = vi.value; mm.at = Date.now(); mm.versions = [{ text: txt.value, vi: vi.value, at: Date.now() }, ...(mm.versions || [])].slice(0, 10); });
+    logActivity(2); info(); drawVers(); toast('Đã lưu bài nói vào trình duyệt.');
+  };
+  $('#myVers', box).onclick = e => {
+    const l = e.target.closest('[data-load]'), d = e.target.closest('[data-del]');
+    if (l) { const it = mineOf(x.id).versions[+l.dataset.load]; txt.value = it.text; vi.value = it.vi || ''; autosave(); toast('Đã mở bản đã lưu.'); txt.focus(); }
+    if (d) { setMine(x.id, mm => mm.versions.splice(+d.dataset.del, 1)); drawVers(); }
+  };
+  $('#myClr', box).onclick = () => { if (!txt.value && !vi.value) return; if (!confirm('Xóa nội dung đang viết? (Các bản đã lưu vẫn được giữ)')) return; txt.value = ''; vi.value = ''; autosave(); };
+  $('#myDl', box).onclick = () => {
+    const t = txt.value.trim(); if (!t) { toast('Chưa có nội dung để tải.', 'bad'); return; }
+    const body = `${x.q}\n${x.qvi}\n\n${t}\n\n${sents().map(z => sentencePinyin(z)).join('\n')}${vi.value.trim() ? `\n\n${vi.value.trim()}` : ''}\n`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'text/plain;charset=utf-8' })); a.download = `bai-noi-${x.id}.txt`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  $('#myPlay', box).onclick = () => { const rows = $$('#myPrev .sp-row', box); if (!rows.length) { toast('Hãy viết bài nói trước.', 'bad'); return; } logActivity(); speakSeq(rows.map(el => ({ text: el.dataset.zh, el })), { rate: store.s.settings.rate || 1, onItem: k => rows.forEach((r, j) => r.classList.toggle('now', j === k)) }); };
+  $('#myStop', box).onclick = stopSeq;
+  $('#myChk', box).onclick = () => {
+    const ss = sents(), out = $('#myChkOut', box);
+    if (!ss.length) { out.innerHTML = '<p class="muted">Hãy viết bài nói trước.</p>'; return; }
+    const res = ss.map(z => ({ z, issues: checkSentence(z).issues.filter(i => !i.info) })).filter(r => r.issues.length);
+    out.innerHTML = res.length ? `<div class="note"><b>Có ${res.length}/${ss.length} câu nên xem lại:</b><ul class="ms-iss">${res.map(r => `<li><span lang="zh-CN">${esc(r.z)}</span><ul>${r.issues.map(i => `<li class="warn">${esc(i.msg)}</li>`).join('')}</ul></li>`).join('')}</ul><p class="muted small">Máy chỉ phát hiện các lỗi phổ biến theo quy tắc, hãy nhờ thầy cô xem lại thêm.</p></div>`
+      : `<p class="ok-t">✓ Không phát hiện lỗi phổ biến trong ${ss.length} câu.</p>`;
+  };
+  $('#myType', box).onclick = () => {
+    const ss = sents(); if (!ss.length) { toast('Hãy viết bài nói trước.', 'bad'); return; }
+    typingTrainer($('#myTyping', box), { key: 'my' + x.id, sentences: ss.map(z => [z, '']) });
+    $('#myTyping', box).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  $('#myPrev', box).onclick = e => { const b = e.target.closest('.my-say'); if (b) { const el = b.closest('.sp-row'); speak(el.dataset.zh, { el }); } };
+  $$('.my-chip', box).forEach(c => c.onclick = () => { const a = txt.selectionStart ?? txt.value.length, b = txt.selectionEnd ?? a; txt.value = txt.value.slice(0, a) + c.dataset.h + txt.value.slice(b); txt.focus(); txt.selectionStart = txt.selectionEnd = a + c.dataset.h.length; autosave(); });
+
+  // ghi âm & chấm theo chính bài của mình
+  let rec = null;
+  const paintRow = (el, marks) => $$('.cz', el).forEach((c, j) => { c.classList.remove('ok', 'tone', 'miss'); if (marks[j]) c.classList.add(marks[j]); });
+  $('#myRStart', box).onclick = async () => {
+    if (!sents().length) { toast('Hãy viết bài nói trước rồi ghi âm.', 'bad'); return; }
+    stopSeq(); drawPrev(); $('#myROut', box).innerHTML = '';
+    rec = await startSession($('#myRLive', box), $('#myRTime', box)); if (!rec) return;
+    $('#myRStart', box).disabled = true; $('#myRStop', box).disabled = false;
+  };
+  $('#myRStop', box).onclick = async () => {
+    if (!rec) return;
+    $('#myRStop', box).disabled = true; $('#myRStart', box).disabled = false;
+    const { transcript, audioUrl } = await rec.stop(); rec = null; $('#myRLive', box).innerHTML = '';
+    const out = $('#myROut', box), audio = audioUrl ? `<p class="small muted">Nghe lại giọng của bạn:</p><audio controls src="${audioUrl}"></audio>` : '';
+    if (!SR || !transcript.trim()) { out.innerHTML = (SR ? '<p class="bad-t">Không nhận được giọng nói. Hãy kiểm tra micro và đọc to, rõ hơn.</p>' : '') + audio; return; }
+    const rows = $$('#myPrev .sp-row', box), all = rows.map(r => r.dataset.zh).join(''), r = align(all, transcript);
+    let from = 0;
+    rows.forEach(el => { const n = $$('.cz', el).length, mk = r.marks.slice(from, from + n); from += n; paintRow(el, mk); const sc = n ? Math.round((mk.filter(v => v === 'ok').length + mk.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; $('.sp-res', el).innerHTML = `<span class="score ${sc >= 80 ? 'good' : sc >= 50 ? 'mid' : 'bad'}">${sc}%</span>`; });
+    setMine(x.id, mm => { mm.best = Math.max(mm.best || 0, r.score); });
+    logActivity(5);
+    out.innerHTML = `<div class="sp-sum"><div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div><div><p>Đọc đúng <b>${r.ok}</b> chữ · gần đúng <b>${r.tone}</b> · điểm cao nhất với bài của bạn: <b>${mineOf(x.id).best}%</b></p>${audio}</div></div>
+      <details class="small"><summary>Văn bản máy nghe được</summary><p lang="zh-CN">${esc(transcript)}</p></details>`;
+  };
+
+  info(); drawPrev(); drawVers();
 }

@@ -737,3 +737,21 @@ h1 { font-weight: 800; letter-spacing: -.025em; } h2 { font-weight: 700; letter-
 .pr-formula { align-items: stretch; } .pr-formula i { align-self: center; } .pr-formula > div b { line-height: 1.2; }
 @media (max-width: 640px) { .pr-tones { grid-template-columns: minmax(0, 1fr); } }
 #pg { flex-wrap: wrap; gap: 6px; margin: 10px 0; } #qlG { max-width: 100%; }
+
+/* Bài nói của bạn */
+.my-sp .my-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 12px; }
+.my-sp .my-chip { font-family: var(--zh); font-size: 1rem; }
+.my-sp .my-lab { display: block; font-weight: 600; margin: 6px 0 4px; }
+.my-sp .my-txt { width: 100%; min-height: 180px; font-family: var(--zh); font-size: 1.2rem; line-height: 1.8; resize: vertical; box-sizing: border-box; }
+.my-sp textarea#myVi { width: 100%; box-sizing: border-box; margin-top: 6px; resize: vertical; }
+.my-sp .my-meter { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; flex-wrap: wrap; }
+.my-sp .my-bar { flex: 1; min-width: 120px; max-width: 320px; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.my-sp .my-bar span { display: block; height: 100%; width: 0; background: var(--jade, #2e7d5b); transition: width .3s; }
+.my-sp .my-acts { margin: 10px 0; }
+.my-sp .my-prev { margin: 10px 0; padding: 4px 0; }
+.my-sp .my-prev:empty { display: none; }
+.my-sp .my-rec { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.my-sp .my-vers { list-style: none; padding: 0; margin: 6px 0; }
+.my-sp .my-vers li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.my-sp .my-vers li > div { min-width: 0; overflow: hidden; }
+.my-sp .my-vers .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
