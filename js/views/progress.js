@@ -1,7 +1,7 @@
 import { store, streak, masteryOf, dueWords } from '../core/store.js';
 import { lessonsOf, entry, LESSON_LIST } from '../core/dict.js';
 import { esc, $, $$, toast, applyDisplay, say } from '../core/ui.js';
-import { zhVoices, speak, ttsSupported, SR } from '../core/tts.js';
+import { zhVoices, speak, ttsSupported, SR, voiceLabel } from '../core/tts.js';
 import { levelProgress } from './home.js';
 import { CURRICULUM } from '../data/lessons.js';
 
@@ -53,8 +53,8 @@ export function settings(root) {
   </section>
   <section class="card"><h2>Giọng đọc tiếng Trung</h2>
     ${!ttsSupported() ? '<p class="bad-t">Trình duyệt không hỗ trợ đọc giọng nói.</p>' : vs.length ? `
-      <div class="set"><b>Giọng chính (vai A)</b><select class="inp" id="v1"><option value="">Tự chọn tốt nhất</option>${vs.map(v => `<option ${v.name === st.voice ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select><button class="btn sm ghost" data-test="0">Nghe thử</button></div>
-      <div class="set"><b>Giọng thứ hai (vai B)</b><select class="inp" id="v2"><option value="">Tự chọn</option>${vs.map(v => `<option ${v.name === st.voice2 ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select><button class="btn sm ghost" data-test="1">Nghe thử</button></div>`
+      <div class="set"><b>Giọng chính (vai A)</b><select class="inp" id="v1"><option value="">Tự chọn tốt nhất</option>${vs.map(v => `<option value="${esc(v.name)}" ${v.name === st.voice ? 'selected' : ''}>${esc(voiceLabel(v))}</option>`).join('')}</select><button class="btn sm ghost" data-test="0">Nghe thử</button></div>
+      <div class="set"><b>Giọng thứ hai (vai B)</b><select class="inp" id="v2"><option value="">Tự chọn</option>${vs.map(v => `<option value="${esc(v.name)}" ${v.name === st.voice2 ? 'selected' : ''}>${esc(voiceLabel(v))}</option>`).join('')}</select><button class="btn sm ghost" data-test="1">Nghe thử</button></div>`
       : `<p class="note">Chưa tìm thấy giọng tiếng Trung trên thiết bị. Cách khắc phục: dùng <b>Microsoft Edge</b> (có sẵn giọng tự nhiên “Xiaoxiao Online”), hoặc <b>Chrome</b> (giọng Google 普通话), hoặc cài gói ngôn ngữ Tiếng Trung (giản thể) trong Cài đặt Windows → Thời gian & ngôn ngữ → Giọng nói. Trên iPhone: Cài đặt → Trợ năng → Nội dung được đọc → Giọng nói → Tiếng Trung.</p>`}
     <div class="set"><b>Tốc độ mặc định</b>${radio('rate', [[0.75, '0.75x'], [1, '1.0x'], [1.25, '1.25x']])}</div>
     <p class="muted small">Chất lượng giọng phụ thuộc vào trình duyệt và hệ điều hành. Giọng có chữ “Natural/Online” thường tự nhiên nhất. Nhận dạng giọng nói (luyện phát âm): ${SR ? 'có hỗ trợ ✓' : 'chưa hỗ trợ trên trình duyệt này – dùng Chrome hoặc Edge'}.</p>
@@ -77,7 +77,7 @@ export function settings(root) {
     if (t.id === 'goal') store.update(s => s.profile.goal = +t.value);
   };
   root.onclick = e => {
-    const b = e.target.closest('[data-test]'); if (b) speak('你好！欢迎来到汉语学习网站。', { role: +b.dataset.test });
+    const b = e.target.closest('[data-test]'); if (b) speak(+b.dataset.test ? '你好！我叫小明，很高兴认识你。' : '你好！欢迎来到汉语学习网站。', { role: +b.dataset.test });
     if (e.target.id === 'reset' && confirm('Xóa toàn bộ tiến độ, từ đã lưu và đóng góp? Không thể hoàn tác.')) { store.reset(); toast('Đã xóa dữ liệu'); location.hash = '#/'; }
   };
   if (ttsSupported() && !vs.length) setTimeout(() => { if (zhVoices().length && root.isConnected && location.hash === '#/settings') settings(root); }, 800);
