@@ -1,6 +1,6 @@
-// Luyện nói theo chủ đề: bài nói mẫu ~300 chữ, bật/tắt pinyin & nghĩa, đổi phông, nghe mẫu, ghi âm và chấm từng chữ
+// Luyện nói theo chủ đề: bài nói mẫu 5 phần × 3 câu, bật/tắt pinyin & nghĩa, đổi phông, nghe mẫu, ghi âm và chấm từng chữ
 import { store, logActivity } from '../core/store.js';
-import { SPEAK_GROUPS, SPEAK_ITEMS, SPEAK_VOCAB } from '../data/speaking.js';
+import { SPEAK_GROUPS, SPEAK_ITEMS, SPEAK_VOCAB, SPEAK_STRUCT, SPEAK_FOCUS, SPEAK_INTRO } from '../data/speaking.js';
 import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById } from '../core/dict.js';
 import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml } from '../core/ui.js';
 import { checkSentence } from '../core/checker.js';
@@ -12,11 +12,19 @@ const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song'
 const strip = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v');
 
 // ── Danh sách chủ đề ──
+export const NUM = ['①', '②', '③', '④', '⑤', '⑥'];
+export const structById = id => SPEAK_STRUCT.find(t => t.id === id);
+export const focusOf = id => SPEAK_FOCUS.find(f => f.qs.includes(id));
 export function speakingList(root) {
   const best = store.s.speakBest || {};
   root.innerHTML = `<div class="page-head"><div><h1>Luyện nói theo chủ đề</h1></div></div>
-  <p class="muted">Mỗi câu hỏi có một bài nói mẫu khoảng 300 chữ. Đọc với pinyin và nghĩa tiếng Việt, tắt dần khi đã quen, nghe giọng mẫu, rồi ghi âm để máy chấm từng chữ bạn đọc đúng hay sai.</p>
-  ${SPEAK_GROUPS.map(([g, name, ic]) => { const items = SPEAK_ITEMS.filter(x => x.g === g); return `<section class="chapter"><h2 class="grp-h">${ic} ${esc(name)} <span class="grp-n">${items.length} bài</span></h2>
+  <p class="muted">${esc(SPEAK_INTRO)} Đọc với pinyin và nghĩa tiếng Việt, tắt dần khi đã quen, nghe giọng mẫu, rồi ghi âm để máy chấm từng chữ. Cuối mỗi bài có khung 5 phần để bạn tự viết bài nói của mình.</p>
+  <section class="card sp-focus"><h2>🧭 Học theo nhóm cấu trúc – không cần thuộc 480 câu riêng lẻ</h2>
+    <p class="muted small">32 chủ đề có tổng cộng 480 câu mẫu, nhưng nhiều câu dùng lại cùng cấu trúc. Hãy học theo nhóm:</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nhóm</th><th>Câu hỏi</th><th>Cấu trúc trọng tâm</th></tr></thead><tbody>
+    ${SPEAK_FOCUS.map(f => `<tr><td><b>${esc(f.name)}</b></td><td>${f.qs.map(q => `<a href="#/speaking/${q}">${q}</a>`).join(', ')}</td><td lang="zh-CN">${f.ids.map(id => { const t = structById(id); return `<span class="chip sm" title="${esc(t.vi)}">${esc(t.f)}</span>`; }).join(' ')}</td></tr>`).join('')}
+    </tbody></table></div></section>
+  ${SPEAK_GROUPS.map(([g, name, ic]) => { const items = SPEAK_ITEMS.filter(x => x.g === g); return `<section class="chapter"><h2 class="grp-h">${ic} Nhóm ${g} – ${esc(name)} <span class="grp-n">${items.length} bài</span></h2>
     <div class="lesson-list">${items.map(x => `<a class="lesson-item ${best[x.id] >= 80 ? 'done' : ''}" href="#/speaking/${x.id}"><span class="ln">${best[x.id] >= 80 ? icon('check') : x.id}</span><span class="lt"><b lang="zh-CN" class="sp-q">${esc(x.q)}</b><small>${esc(x.qvi)}</small></span>${(store.s.mySpeech || {})[x.id]?.text ? '<span class="best" title="Đã có bài nói của bạn">✍️</span>' : ''}${best[x.id] != null ? `<span class="best">${best[x.id]}%</span>` : ''}</a>`).join('')}</div></section>`; }).join('')}`;
   return 'Luyện nói theo chủ đề';
 }
@@ -54,15 +62,19 @@ export function speakingItem(root, id) {
   const x = SPEAK_ITEMS.find(i => i.id === +id); if (!x) { root.innerHTML = '<p>Không có bài này.</p>'; return; }
   const st = store.s.settings, opt = store.s.speakOpt || { py: true, vi: true, size: 1.5 };
   const idx = SPEAK_ITEMS.indexOf(x), prev = SPEAK_ITEMS[idx - 1], next = SPEAK_ITEMS[idx + 1];
-  const g = SPEAK_GROUPS.find(gg => gg[0] === x.g);
+  const g = SPEAK_GROUPS.find(gg => gg[0] === x.g) || ['', '', ''];
   let base = 0;
-  const rows = x.s.map(([zh, vi], i) => { const r = sentenceChars(zh, base); const row = `<div class="sp-row" data-i="${i}" data-zh="${esc(zh)}" data-from="${base}" data-n="${r.n}">
+  const rows = x.s.map(([zh, vi], i) => { const r = sentenceChars(zh, base); const ph = i % 3 === 0 && x.parts?.[i / 3] ? `<h3 class="sp-part"><span class="sp-pn">${NUM[i / 3]}</span> ${esc(x.parts[i / 3])} <small class="muted">câu ${i + 1}–${i + 3}</small></h3>` : ''; const row = ph + `<div class="sp-row" data-i="${i}" data-zh="${esc(zh)}" data-from="${base}" data-n="${r.n}">
       <div class="sp-body"><div class="sp-zh" lang="zh-CN">${r.html}</div><div class="sp-vi">${esc(vi)}</div><div class="sp-res"></div></div>
       <div class="sp-act"><button class="say sp-play" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button>${SR ? `<button class="say sp-mic" title="Ghi âm câu này" aria-label="Ghi âm câu này">${icon('mic')}</button>` : ''}</div></div>`; base += r.n; return row; }).join('');
   const total = base;
   const qr = sentenceChars(x.q, 100000);
   root.innerHTML = `<nav class="crumb"><a href="#/speaking">Luyện nói</a> › ${g[2]} ${esc(g[1])}</nav>
-  <div class="sp-head card"><p class="eyebrow">Câu hỏi ${x.id} · ${esc(g[1])}</p><div class="sp-qbig" lang="zh-CN">${qr.html}</div><div class="sp-qvi">${esc(x.qvi)}</div></div>
+  <div class="sp-head card"><p class="eyebrow">Câu hỏi ${x.id} · Nhóm ${g[0]} – ${esc(g[1])}</p><div class="sp-qbig" lang="zh-CN">${qr.html}</div><div class="sp-qvi">${esc(x.qvi)}</div>
+    <div class="sp-outline">${(x.parts || []).map((p, i) => `<span class="sp-ol"><b>${NUM[i]}</b> ${esc(p)}</span>`).join('<span class="sp-arr">→</span>')}</div>
+    ${focusOf(x.id) ? `<p class="small sp-fc"><b>Cấu trúc trọng tâm (nhóm “${esc(focusOf(x.id).name)}”):</b> <span lang="zh-CN">${focusOf(x.id).ids.map(id => `<span class="chip sm" title="${esc(structById(id).vi)}">${esc(structById(id).f)}</span>`).join(' ')}</span></p>` : ''}
+    <p class="muted small">5 phần × 3 câu = 15 câu. Có thể thay tên, thời gian, địa điểm, sở thích cho đúng bản thân.</p>
+    ${x.note ? `<p class="note small">💡 ${esc(x.note)}</p>` : ''}</div>
   <div class="sp-bar card" role="toolbar" aria-label="Tùy chọn hiển thị">
     <label class="sw"><input type="checkbox" id="oPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
     <label class="sw"><input type="checkbox" id="oVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>
@@ -306,20 +318,36 @@ async function recordClip(btn) {
   return { alts: [], url: await stopRec() };
 }
 
-// ════════════ Bài nói của bạn: tự soạn, lưu trên trình duyệt, nghe, kiểm tra, ghi âm chấm điểm ════════════
+// ════════════ Bài nói của bạn: khung 5 phần × 3 câu, cấu trúc gợi ý, lưu trên trình duyệt ════════════
 const fmtAt = t => new Date(t).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
 const hanCount = t => [...t].filter(isHan).length;
-const mineOf = id => (store.s.mySpeech || {})[id] || { text: '', vi: '', at: 0, versions: [] };
-function setMine(id, fn) { store.update(s => { s.mySpeech = s.mySpeech || {}; const m = s.mySpeech[id] || { text: '', vi: '', at: 0, versions: [] }; fn(m); s.mySpeech[id] = m; }); }
+const joinParts = ps => ps.map(t => (t || '').trim()).filter(Boolean).map(t => /[。！？!?.…]$/.test(t) ? t : t + '。').join('\n');
+const mineOf = id => { const m = (store.s.mySpeech || {})[id] || {}; const parts = m.parts ? [...m.parts] : [m.text || '', '', '', '', '']; while (parts.length < 5) parts.push(''); return { vi: '', at: 0, versions: [], ...m, parts }; };
+function setMine(id, fn) { store.update(s => { s.mySpeech = s.mySpeech || {}; const m = mineOf(id); fn(m); m.text = joinParts(m.parts); s.mySpeech[id] = m; }); }
+// cấu trúc xuất hiện trong một nhóm câu
+const structsIn = sents => SPEAK_STRUCT.filter(t => { const re = new RegExp(t.re); return sents.some(z => re.test(z)); }).map(t => ({ ...t, ex: sents.find(z => new RegExp(t.re).test(z)) }));
 
 function renderMySpeech(box, x) {
   const vocab = ((SPEAK_VOCAB[x.id] || {}).w || []).map(([h, p, vi]) => ({ h, p, vi }));
+  const parts = x.parts && x.parts.length ? x.parts : ['Mở đầu', 'Nội dung 1', 'Nội dung 2', 'Nội dung 3', 'Kết luận'];
+  const model = parts.map((_, k) => x.s.slice(k * 3, k * 3 + 3));
+  const fc = focusOf(x.id), focusSt = fc ? fc.ids.map(structById) : [];
+  const allSt = structsIn(x.s.map(s => s[0]));
   const m = mineOf(x.id);
   box.innerHTML = `<div class="row gap wrap" style="justify-content:space-between"><h2>📝 Bài nói của bạn</h2><span class="muted small" id="myState"></span></div>
-    <p class="muted small">Hãy tự viết bài nói của bạn để trả lời câu hỏi <b lang="zh-CN">${esc(x.q)}</b> (${esc(x.qvi)}). Bài được <b>tự động lưu trên trình duyệt</b> mỗi khi bạn gõ; bấm “Lưu bản này” để giữ lại nhiều phiên bản. Sau đó nghe máy đọc, kiểm tra lỗi, ghi âm để chấm điểm và luyện gõ lại chính bài của mình. Nên viết khoảng 150–300 chữ.</p>
-    ${vocab.length ? `<div class="my-chips"><span class="muted small">Bấm để chèn từ của bài:</span> ${vocab.map(w => `<button class="chip my-chip" data-h="${esc(w.h)}" title="${esc(w.p)} – ${esc(w.vi)}" lang="zh-CN">${esc(w.h)}</button>`).join('')}</div>` : ''}
-    <label class="my-lab" for="myTxt">Bài nói (chữ Hán)</label>
-    <textarea id="myTxt" class="inp my-txt" lang="zh-CN" rows="8" placeholder="我叫……。今天我想谈谈……。首先，……。其次，……。总之，……。">${esc(m.text)}</textarea>
+    <p class="muted small">Tự viết bài trả lời câu hỏi <b lang="zh-CN">${esc(x.q)}</b> (${esc(x.qvi)}) theo đúng khung của bài mẫu: <b>5 phần, mỗi phần 3 câu</b>. Mỗi phần có cấu trúc gợi ý (bấm để chèn khung câu) và 3 câu mẫu để tham khảo – hãy thay tên, thời gian, địa điểm, sở thích cho đúng bản thân. Bài <b>tự động lưu trên trình duyệt</b> khi bạn gõ; bấm “Lưu bản này” để giữ nhiều phiên bản.</p>
+    <details class="vs-det my-stbox" open><summary>📐 Bảng cấu trúc để viết bài này</summary>
+      ${fc ? `<p class="small"><b>Trọng tâm nhóm “${esc(fc.name)}”:</b></p><div class="my-stlist">${focusSt.map(t => stCard(t, x.s.find(([z]) => new RegExp(t.re).test(z))?.[0])).join('')}</div>` : ''}
+      <p class="small"><b>Các cấu trúc khác dùng trong bài mẫu:</b></p>
+      <div class="my-stlist">${allSt.filter(t => !focusSt.some(f => f.id === t.id)).map(t => stCard(t, t.ex)).join('')}</div>
+    </details>
+    <div class="my-parts">${parts.map((p, k) => { const st = structsIn(model[k].map(s => s[0])); return `<div class="my-part" data-k="${k}">
+      <div class="my-ph"><span class="sp-pn">${NUM[k]}</span> <b>${esc(p)}</b> <span class="muted small my-pc"></span></div>
+      ${st.length ? `<div class="my-pst"><span class="muted small">Cấu trúc gợi ý:</span> ${st.map(t => `<button class="chip sm my-frame" lang="zh-CN" data-frame="${esc(t.frame)}" title="${esc(t.vi)} – bấm để chèn khung câu">${esc(t.f)}</button>`).join('')}</div>` : ''}
+      <details class="my-model"><summary>Xem 3 câu mẫu</summary><div class="ex-box">${model[k].map(([zh, vi]) => exampleHtml(zh, vi)).join('')}</div><button class="mini my-use">Dùng câu mẫu làm nháp</button></details>
+      <textarea class="inp my-ptxt" lang="zh-CN" rows="3" placeholder="${esc(st.slice(0, 3).map(t => t.frame).join('') || '……。……。……。')}">${esc(m.parts[k] || '')}</textarea>
+    </div>`; }).join('')}</div>
+    ${vocab.length ? `<div class="my-chips"><span class="muted small">Từ vựng của bài (bấm để chèn vào ô đang viết):</span> ${vocab.map(w => `<button class="chip my-chip" data-h="${esc(w.h)}" title="${esc(w.p)} – ${esc(w.vi)}" lang="zh-CN">${esc(w.h)}</button>`).join('')}</div>` : ''}
     <div class="my-meter"><div class="my-bar"><span id="myBar"></span></div><span class="muted small" id="myCnt"></span></div>
     <details class="vs-det" ${m.vi ? 'open' : ''}><summary>🇻🇳 Ghi chú / bản dịch tiếng Việt (không bắt buộc)</summary>
       <textarea id="myVi" class="inp" rows="4" placeholder="Viết dàn ý hoặc nghĩa tiếng Việt của bài để tự kiểm tra…">${esc(m.vi)}</textarea></details>
@@ -331,6 +359,7 @@ function renderMySpeech(box, x) {
       <button class="btn ghost" id="myDl">⬇️ Tải về .txt</button>
       <button class="btn ghost" id="myClr">🗑️ Xóa</button>
     </div>
+    <h3 class="sub">👀 Xem trước bài của bạn (có pinyin)</h3>
     <div id="myPrev" class="sp-text my-prev" style="--sp-size:1.35rem"></div>
     <div id="myChkOut"></div>
     <div class="my-rec">
@@ -342,46 +371,64 @@ function renderMySpeech(box, x) {
     <h3 class="sub">📂 Các bản đã lưu <small class="muted" id="myVerN"></small></h3>
     <div id="myVers"></div>`;
 
-  const txt = $('#myTxt', box), vi = $('#myVi', box);
+  const pts = $$('.my-ptxt', box), vi = $('#myVi', box);
+  let active = pts[0];
+  pts.forEach(t => t.addEventListener('focus', () => { active = t; }));
+  const curParts = () => pts.map(t => t.value);
+  const fullText = () => joinParts(curParts());
   const state = msg => { $('#myState', box).textContent = msg; };
-  const info = () => { const mm = mineOf(x.id); state(mm.at ? `Đã tự lưu lúc ${fmtAt(mm.at)}` : 'Chưa có nội dung'); };
-  const sents = () => splitSentences(txt.value);
+  const info = () => { const mm = (store.s.mySpeech || {})[x.id]; state(mm && mm.at ? `Đã tự lưu lúc ${fmtAt(mm.at)}` : 'Chưa có nội dung'); };
+  const sents = () => splitSentences(fullText());
   const drawPrev = () => {
-    const ss = sents(); let base = 0;
-    $('#myPrev', box).innerHTML = ss.length ? ss.map((zh, i) => { const r = sentenceChars(zh, base); base += r.n;
-      return `<div class="sp-row" data-i="${i}" data-zh="${esc(zh)}"><div class="sp-body"><div class="sp-zh" lang="zh-CN">${r.html}</div><div class="sp-res"></div></div><div class="sp-act"><button class="say my-say" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button></div></div>`; }).join('')
-      : '<p class="muted small">Bản xem trước có pinyin sẽ hiện ở đây khi bạn viết.</p>';
-    const n = hanCount(txt.value), used = vocab.filter(w => txt.value.includes(w.h));
-    $('#myCnt', box).textContent = `${n} chữ · ${ss.length} câu${vocab.length ? ` · dùng ${used.length}/${vocab.length} từ của bài` : ''}`;
-    $('#myBar', box).style.width = Math.min(100, n / 300 * 100) + '%';
-    $$('.my-chip', box).forEach(c => c.classList.toggle('used', txt.value.includes(c.dataset.h)));
+    let base = 0, n = 0, html = '';
+    curParts().forEach((p, k) => {
+      const ss = splitSentences(p);
+      $$('.my-pc', box)[k].textContent = ss.length ? `· ${ss.length}/3 câu${ss.length === 3 ? ' ✓' : ''}` : '';
+      $$('.my-pc', box)[k].classList.toggle('ok-t', ss.length === 3);
+      if (!ss.length) return;
+      html += `<h3 class="sp-part"><span class="sp-pn">${NUM[k]}</span> ${esc(parts[k])}</h3>`;
+      ss.forEach(zh => { const r = sentenceChars(zh, base); base += r.n; n++;
+        html += `<div class="sp-row" data-zh="${esc(zh)}"><div class="sp-body"><div class="sp-zh" lang="zh-CN">${r.html}</div><div class="sp-res"></div></div><div class="sp-act"><button class="say my-say" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button></div></div>`; });
+    });
+    $('#myPrev', box).innerHTML = html || '<p class="muted small">Bản xem trước có pinyin sẽ hiện ở đây khi bạn viết.</p>';
+    const t = fullText(), c = hanCount(t), used = vocab.filter(w => t.includes(w.h)), done = curParts().filter(p => splitSentences(p).length >= 3).length;
+    $('#myCnt', box).textContent = `${c} chữ · ${n}/15 câu · ${done}/5 phần đủ 3 câu${vocab.length ? ` · dùng ${used.length}/${vocab.length} từ của bài` : ''}`;
+    $('#myBar', box).style.width = Math.min(100, n / 15 * 100) + '%';
+    $$('.my-chip', box).forEach(ch => ch.classList.toggle('used', t.includes(ch.dataset.h)));
   };
   let tmr;
-  const autosave = () => { clearTimeout(tmr); tmr = setTimeout(() => { setMine(x.id, mm => { mm.text = txt.value; mm.vi = vi.value; mm.at = Date.now(); }); info(); }, 400); drawPrev(); };
-  txt.oninput = autosave; vi.oninput = autosave;
+  const autosave = () => { clearTimeout(tmr); tmr = setTimeout(() => { setMine(x.id, mm => { mm.parts = curParts(); mm.vi = vi.value; mm.at = Date.now(); }); info(); }, 400); drawPrev(); };
+  pts.forEach(t => { t.oninput = autosave; }); vi.oninput = autosave;
+  const insert = (ta, str) => { const a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a; ta.value = ta.value.slice(0, a) + str + ta.value.slice(b); ta.focus(); ta.selectionStart = ta.selectionEnd = a + str.length; active = ta; autosave(); };
+
+  box.addEventListener('click', e => {
+    const fr = e.target.closest('.my-frame'); if (fr) { const pp = fr.closest('.my-part'); insert(pp ? $('.my-ptxt', pp) : active, fr.dataset.frame); return; }
+    const us = e.target.closest('.my-use'); if (us) { const part = us.closest('.my-part'), ta = $('.my-ptxt', part), k = +part.dataset.k; if (ta.value.trim() && !confirm('Thay nội dung phần này bằng 3 câu mẫu?')) return; ta.value = model[k].map(s => s[0]).join(''); autosave(); ta.focus(); toast('Đã chép câu mẫu – hãy sửa lại cho đúng với bản thân bạn.'); return; }
+    const ch = e.target.closest('.my-chip'); if (ch) { insert(active, ch.dataset.h); return; }
+    const sy = e.target.closest('.my-say'); if (sy) { const el = sy.closest('.sp-row'); speak(el.dataset.zh, { el }); }
+  });
 
   const drawVers = () => {
     const v = mineOf(x.id).versions || [];
     $('#myVerN', box).textContent = v.length ? `(${v.length}/10)` : '';
-    $('#myVers', box).innerHTML = v.length ? `<ul class="my-vers">${v.map((it, i) => `<li><div><b>${fmtAt(it.at)}</b> · ${hanCount(it.text)} chữ<div class="muted small" lang="zh-CN">${esc(it.text.slice(0, 60))}${it.text.length > 60 ? '…' : ''}</div></div>
-      <span class="row gap"><button class="mini" data-load="${i}">Mở</button><button class="mini" data-del="${i}">Xóa</button></span></li>`).join('')}</ul>`
+    $('#myVers', box).innerHTML = v.length ? `<ul class="my-vers">${v.map((it, i) => { const t = it.parts ? joinParts(it.parts) : it.text || ''; return `<li><div><b>${fmtAt(it.at)}</b> · ${hanCount(t)} chữ<div class="muted small" lang="zh-CN">${esc(t.replace(/\n/g, '').slice(0, 60))}${t.length > 60 ? '…' : ''}</div></div>
+      <span class="row gap"><button class="mini" data-load="${i}">Mở</button><button class="mini" data-del="${i}">Xóa</button></span></li>`; }).join('')}</ul>`
       : '<p class="muted small">Chưa có bản nào. Bấm “Lưu bản này” để giữ lại phiên bản hiện tại (tối đa 10 bản).</p>';
   };
-
   $('#mySave', box).onclick = () => {
-    const t = txt.value.trim(); if (!t) { toast('Hãy viết bài nói trước khi lưu.', 'bad'); return; }
-    setMine(x.id, mm => { mm.text = txt.value; mm.vi = vi.value; mm.at = Date.now(); mm.versions = [{ text: txt.value, vi: vi.value, at: Date.now() }, ...(mm.versions || [])].slice(0, 10); });
+    if (!fullText().trim()) { toast('Hãy viết bài nói trước khi lưu.', 'bad'); return; }
+    setMine(x.id, mm => { mm.parts = curParts(); mm.vi = vi.value; mm.at = Date.now(); mm.versions = [{ parts: curParts(), vi: vi.value, at: Date.now() }, ...(mm.versions || [])].slice(0, 10); });
     logActivity(2); info(); drawVers(); toast('Đã lưu bài nói vào trình duyệt.');
   };
   $('#myVers', box).onclick = e => {
     const l = e.target.closest('[data-load]'), d = e.target.closest('[data-del]');
-    if (l) { const it = mineOf(x.id).versions[+l.dataset.load]; txt.value = it.text; vi.value = it.vi || ''; autosave(); toast('Đã mở bản đã lưu.'); txt.focus(); }
+    if (l) { const it = mineOf(x.id).versions[+l.dataset.load]; const ps = it.parts || [it.text || '', '', '', '', '']; pts.forEach((t, k) => { t.value = ps[k] || ''; }); vi.value = it.vi || ''; autosave(); toast('Đã mở bản đã lưu.'); }
     if (d) { setMine(x.id, mm => mm.versions.splice(+d.dataset.del, 1)); drawVers(); }
   };
-  $('#myClr', box).onclick = () => { if (!txt.value && !vi.value) return; if (!confirm('Xóa nội dung đang viết? (Các bản đã lưu vẫn được giữ)')) return; txt.value = ''; vi.value = ''; autosave(); };
+  $('#myClr', box).onclick = () => { if (!fullText() && !vi.value) return; if (!confirm('Xóa nội dung đang viết? (Các bản đã lưu vẫn được giữ)')) return; pts.forEach(t => { t.value = ''; }); vi.value = ''; autosave(); };
   $('#myDl', box).onclick = () => {
-    const t = txt.value.trim(); if (!t) { toast('Chưa có nội dung để tải.', 'bad'); return; }
-    const body = `${x.q}\n${x.qvi}\n\n${t}\n\n${sents().map(z => sentencePinyin(z)).join('\n')}${vi.value.trim() ? `\n\n${vi.value.trim()}` : ''}\n`;
+    if (!fullText().trim()) { toast('Chưa có nội dung để tải.', 'bad'); return; }
+    const body = `${x.q}\n${x.qvi}\n\n` + curParts().map((p, k) => p.trim() ? `${NUM[k]} ${parts[k]}\n${p.trim()}\n${splitSentences(p).map(z => sentencePinyin(z)).join(' ')}` : '').filter(Boolean).join('\n\n') + (vi.value.trim() ? `\n\n${vi.value.trim()}` : '') + '\n';
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'text/plain;charset=utf-8' })); a.download = `bai-noi-${x.id}.txt`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
   $('#myPlay', box).onclick = () => { const rows = $$('#myPrev .sp-row', box); if (!rows.length) { toast('Hãy viết bài nói trước.', 'bad'); return; } logActivity(); speakSeq(rows.map(el => ({ text: el.dataset.zh, el })), { rate: store.s.settings.rate || 1, onItem: k => rows.forEach((r, j) => r.classList.toggle('now', j === k)) }); };
@@ -390,16 +437,19 @@ function renderMySpeech(box, x) {
     const ss = sents(), out = $('#myChkOut', box);
     if (!ss.length) { out.innerHTML = '<p class="muted">Hãy viết bài nói trước.</p>'; return; }
     const res = ss.map(z => ({ z, issues: checkSentence(z).issues.filter(i => !i.info) })).filter(r => r.issues.length);
-    out.innerHTML = res.length ? `<div class="note"><b>Có ${res.length}/${ss.length} câu nên xem lại:</b><ul class="ms-iss">${res.map(r => `<li><span lang="zh-CN">${esc(r.z)}</span><ul>${r.issues.map(i => `<li class="warn">${esc(i.msg)}</li>`).join('')}</ul></li>`).join('')}</ul><p class="muted small">Máy chỉ phát hiện các lỗi phổ biến theo quy tắc, hãy nhờ thầy cô xem lại thêm.</p></div>`
-      : `<p class="ok-t">✓ Không phát hiện lỗi phổ biến trong ${ss.length} câu.</p>`;
+    const short = curParts().map((p, k) => [k, splitSentences(p).length]).filter(([, n]) => n < 3);
+    const usedSt = structsIn(ss);
+    const blanks = curParts().map((p, k) => [k, p]).filter(([, p]) => /……|\.\.\./.test(p)).map(([k]) => `${NUM[k]} ${esc(parts[k])}`);
+    out.innerHTML = `${blanks.length ? `<p class="note small">✏️ Còn chỗ “……” chưa điền ở: ${blanks.join(', ')} – hãy thay bằng thông tin của bạn.</p>` : ''}${short.length ? `<p class="note small">Khung bài: còn ${short.map(([k, n]) => `${NUM[k]} ${esc(parts[k])} (${n}/3 câu)`).join(', ')} chưa đủ 3 câu.</p>` : '<p class="ok-t">✓ Đủ 5 phần, mỗi phần 3 câu.</p>'}
+      <p class="small">Cấu trúc bạn đã dùng (${usedSt.length}): <span lang="zh-CN">${usedSt.map(t => `<span class="chip sm">${esc(t.f)}</span>`).join(' ') || '—'}</span>${focusSt.length ? ` · Trọng tâm chưa dùng: <span lang="zh-CN">${focusSt.filter(t => !usedSt.some(u => u.id === t.id)).map(t => `<span class="chip sm">${esc(t.f)}</span>`).join(' ') || '✓ đã dùng đủ'}</span>` : ''}</p>
+      ${res.length ? `<div class="note"><b>Có ${res.length}/${ss.length} câu nên xem lại:</b><ul class="ms-iss">${res.map(r => `<li><span lang="zh-CN">${esc(r.z)}</span><ul>${r.issues.map(i => `<li class="warn">${esc(i.msg)}</li>`).join('')}</ul></li>`).join('')}</ul><p class="muted small">Máy chỉ phát hiện các lỗi phổ biến theo quy tắc, hãy nhờ thầy cô xem lại thêm.</p></div>`
+      : `<p class="ok-t">✓ Không phát hiện lỗi phổ biến trong ${ss.length} câu.</p>`}`;
   };
   $('#myType', box).onclick = () => {
     const ss = sents(); if (!ss.length) { toast('Hãy viết bài nói trước.', 'bad'); return; }
     typingTrainer($('#myTyping', box), { key: 'my' + x.id, sentences: ss.map(z => [z, '']) });
     $('#myTyping', box).scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  $('#myPrev', box).onclick = e => { const b = e.target.closest('.my-say'); if (b) { const el = b.closest('.sp-row'); speak(el.dataset.zh, { el }); } };
-  $$('.my-chip', box).forEach(c => c.onclick = () => { const a = txt.selectionStart ?? txt.value.length, b = txt.selectionEnd ?? a; txt.value = txt.value.slice(0, a) + c.dataset.h + txt.value.slice(b); txt.focus(); txt.selectionStart = txt.selectionEnd = a + c.dataset.h.length; autosave(); });
 
   // ghi âm & chấm theo chính bài của mình
   let rec = null;
@@ -426,4 +476,7 @@ function renderMySpeech(box, x) {
   };
 
   info(); drawPrev(); drawVers();
+}
+function stCard(t, ex) {
+  return `<div class="my-st"><div class="my-stf" lang="zh-CN">${esc(t.f)}</div><div class="small muted">${esc(t.vi)}</div>${ex ? `<div class="small my-stx" lang="zh-CN">${esc(ex)}</div>` : ''}<button class="mini my-frame" data-frame="${esc(t.frame)}" title="Chèn khung câu vào ô đang viết">＋ Khung: <span lang="zh-CN">${esc(t.frame)}</span></button></div>`;
 }
