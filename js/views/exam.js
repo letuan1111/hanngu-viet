@@ -2,7 +2,7 @@ import { store } from '../core/store.js';
 import { hskWords, sentenceBank, GRAMMAR, lessonsOf, pick, shuffle } from '../core/dict.js';
 import { esc, $, toast } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
-import { myExamSection, bindMyExamSection } from './myexam.js';
+import { examHome, examGenLevel } from './myexam.js';
 
 const CFG = { 1: { n: 20, min: 15 }, 2: { n: 25, min: 20 }, 3: { n: 30, min: 25 } };
 
@@ -21,29 +21,8 @@ function examQuestions(lv) {
 }
 
 export function exam(root, lv) {
-  const tests = store.s.tests.filter(t => t.kind === 'exam');
-  if (!lv) {
-    root.innerHTML = `<div class="page-head"><h1>Thi thử HSK</h1></div>
-    <p class="muted">Đề mô phỏng cấu trúc HSK (Nghe – Đọc – Viết) với từ vựng và ngữ pháp của từng cấp, có tính giờ. Mỗi lần thi là một đề ngẫu nhiên mới. Cần đạt 60% để đạt.</p>
-    <div class="exam-grid">${[1, 2, 3].map(l => { const mine = tests.filter(t => t.level === l && !t.custom); const best = mine.reduce((m, t) => Math.max(m, Math.round(t.score / t.total * 100)), -1);
-      return `<div class="card exam-card"><span class="lv-badge lv${l}">HSK ${l}</span><h3>${CFG[l].n} câu · ${CFG[l].min} phút</h3><p class="muted small">${l === 1 ? 'Nghe và Đọc' : 'Nghe, Đọc và Viết (sắp xếp câu)'}</p><p>${best >= 0 ? `Điểm cao nhất: <b>${best}%</b> (${mine.length} lần)` : 'Chưa thi'}</p><a class="btn" href="#/exam/${l}">Bắt đầu thi</a></div>`; }).join('')}</div>
-    ${myExamSection()}
-    ${tests.length ? `<h3 class="sub">Lịch sử</h3><table class="tbl"><tr><th>Ngày</th><th>Cấp</th><th>Điểm</th></tr>${tests.slice(-10).reverse().map(t => `<tr><td>${new Date(t.at).toLocaleDateString('vi')}</td><td>HSK ${t.level}${t.custom ? ' · đề của bạn' : ''}</td><td>${t.score}/${t.total} (${Math.round(t.score / t.total * 100)}%)</td></tr>`).join('')}</table>` : ''}`;
-    bindMyExamSection(root, () => exam(root));
-    return 'Thi thử HSK';
-  }
-  lv = +lv;
-  root.innerHTML = `<nav class="crumb"><a href="#/exam">Thi thử</a> › HSK ${lv}</nav><h1>Đề thi thử HSK ${lv}</h1>
-    <div class="card note-card" id="intro"><p>${CFG[lv].n} câu trong ${CFG[lv].min} phút. Phần nghe sẽ tự phát âm thanh – hãy bật loa. Hết giờ bài sẽ tự nộp.</p><button class="btn" id="go">Bắt đầu</button></div><div id="ez"></div>`;
-  $('#go', root).onclick = () => {
-    $('#intro', root).remove();
-    runQuiz($('#ez', root), examQuestions(lv), { title: `Thi thử HSK ${lv}`, passPct: 60, timeLimit: CFG[lv].min * 60, onDone: (r, t, pass, res) => {
-      store.update(s => s.tests.push({ kind: 'exam', level: lv, score: r, total: t, at: Date.now() }));
-      const parts = {}; res.forEach(({ q, ok }) => { const p = q.tag.split(' · ')[0]; parts[p] = parts[p] || [0, 0]; parts[p][1]++; if (ok) parts[p][0]++; });
-      $('#ez', root).insertAdjacentHTML('beforeend', `<div class="card"><h3>Kết quả theo phần</h3>${Object.entries(parts).map(([p, [a, b]]) => `<div class="lv-row"><span>${esc(p)}</span><span class="lv-info"><span>${a}/${b}</span><span class="bar"><i style="width:${a / b * 100}%"></i></span></span></div>`).join('')}</div>`);
-    } });
-  };
-  return `Thi thử HSK ${lv}`;
+  if (lv) { root.innerHTML = '<p class="muted">Đang tạo đề…</p>'; examGenLevel(root, +lv); return 'Thi thử HSK'; }
+  examHome(root); return 'Thi thử HSK';
 }
 
 export function placement(root) {

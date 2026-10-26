@@ -8,7 +8,7 @@ import { grammarList, grammarDetail, grammarCompare, checkerView } from './views
 import { review } from './views/review.js';
 import { practice } from './views/practice.js';
 import { exam, placement } from './views/exam.js';
-import { examEdit, examTake } from './views/myexam.js';
+import { examEdit, examDo } from './views/myexam.js';
 import { community } from './views/community.js';
 import { progress, settings } from './views/progress.js';
 import { hsk500, readings } from './views/hsk500.js';
@@ -32,9 +32,9 @@ const routes = [
   [/^\/check$/, checkerView, 'Kiểm tra câu'],
   [/^\/review(?:\/(\w+))?$/, review, 'Ôn tập'],
   [/^\/practice(?:\/(\w+))?$/, practice, 'Luyện tập'],
-  [/^\/exam\/new$/, examEdit, 'Tải đề thi'],
-  [/^\/exam\/edit\/(\w+)$/, examEdit, 'Sửa đề thi'],
-  [/^\/exam\/take\/(\w+)$/, examTake, 'Làm đề thi'],
+  [/^\/exam\/new$/, r => { examEdit(r); return 'Tạo đề thi'; }, 'Tạo đề thi'],
+  [/^\/exam\/edit\/([\w-]+)$/, (r, id) => { examEdit(r, id); return 'Đáp án đề thi'; }, 'Đáp án đề thi'],
+  [/^\/exam\/(?:do|take)\/([\w-]+)$/, (r, id) => { examDo(r, id); return 'Làm đề thi'; }, 'Làm đề thi'],
   [/^\/exam(?:\/(\d))?$/, exam, 'Thi thử HSK'],
   [/^\/placement$/, placement, 'Kiểm tra đầu vào'],
   [/^\/community(?:\/(\w+))?$/, community, 'Cộng đồng'],
