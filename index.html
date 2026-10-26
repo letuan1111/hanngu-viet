@@ -35,6 +35,8 @@
     <a class="ib" href="#/settings" title="Cài đặt hiển thị và giọng đọc" aria-label="Cài đặt"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="3" fill="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" fill="none"/></svg></a>
   </div>
 </header>
+<div class="tip-bar" id="tipBar" role="note"><span>💻 Nên dùng <b>máy tính</b> để có trải nghiệm tốt nhất · 🔊 Dùng trình duyệt <b>Microsoft Edge</b> để nghe đọc tiếng Trung chuẩn nhất.</span><button class="tip-x" id="tipX" aria-label="Ẩn thông báo">✕</button></div>
+<script>try{if(localStorage.getItem('hanngu-tip-off')==='1')document.getElementById('tipBar').hidden=true;}catch(e){}document.getElementById('tipX').onclick=function(){document.getElementById('tipBar').hidden=true;try{localStorage.setItem('hanngu-tip-off','1');}catch(e){}};</script>
 <main id="view" class="view" tabindex="-1"><div class="loading"><span lang="zh-CN">学</span> Đang tải…</div></main>
 <nav class="bottom" aria-label="Điều hướng nhanh">
   <a href="#/"><span>🏠</span>Trang chủ</a><a href="#/course/1"><span>📘</span>Học</a><a href="#/review"><span>🔁</span>Ôn tập</a><a href="#/speaking"><span>🗣️</span>Luyện nói</a><a href="#/vocab"><span>🀄</span>Tra từ</a>

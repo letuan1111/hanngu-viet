@@ -548,3 +548,5 @@ body.split .tk { margin: 0 .18em; } body.split .gl { display: block; }
 .g-exp { margin-top: 10px; border-radius: 10px; padding: 8px 12px; font-size: .92rem; } .g-exp.ok { background: var(--jade2); } .g-exp.bad { background: var(--red2); }
 .g-expt { margin-top: 4px; color: var(--ink2); line-height: 1.6; }
 @media (max-width: 640px) { .g-pic { font-size: 2.4rem; } .g-group { grid-template-columns: repeat(3, 1fr); } .g-group.text { grid-template-columns: 1fr; } .ex-score > div { min-width: 0; flex: 1 1 40%; } }
+.tip-bar { display: flex; align-items: center; gap: 10px; justify-content: center; padding: 7px 14px; background: var(--gold2); color: var(--ink); font-size: .88rem; text-align: center; border-bottom: 1px solid var(--line); }
+.tip-bar[hidden] { display: none; } .tip-x { border: 0; background: none; color: var(--ink2); cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 6px; flex: none; } .tip-x:hover { background: var(--line); }
