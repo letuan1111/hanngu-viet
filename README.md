@@ -12,6 +12,7 @@ Giao diện tiếng Việt, chạy trên máy tính, điện thoại và máy t�
 - **Bảng từ vựng HSK 1, 2, 3 theo chuẩn HSK 3.0** (506 + 750 + 953 mục, đủ từ mới của từng cấp, có nghĩa tiếng Việt): tra cứu, lọc, nghe, câu ví dụ, đánh dấu đã thuộc, kiểm tra nhanh, và học kiểu Quizlet theo nhóm 20 từ (thẻ lật, Học, Kiểm tra, Ghép thẻ, Sao băng, Đúng hay sai). Từ mới so với HSK 2.0 được gắn nhãn.
 - **Từ mới trong mỗi bài học** có thêm bộ học kiểu Quizlet ngay dưới các thẻ từ.
 - **2.530 câu ví dụ HSK 1**: mỗi từ trong 506 mục có 5 câu ví dụ bao quát các nghĩa, câu khẳng định/phủ định/nghi vấn và kết hợp thường gặp, kèm pinyin và nghĩa tiếng Việt. Hiển thị ở trang từ, cửa sổ tra từ, thẻ ôn tập và bảng 500 từ.
+- **6.945 câu ví dụ HSK 2–3 (chuẩn 3.0)**: bổ sung 5 câu (kèm nghĩa tiếng Việt) cho 1.389 từ cấp 2–3 trước đây chưa đủ ví dụ – nay mọi từ trong bảng HSK 1, 2, 3 đều có ít nhất 5 câu.
 - **Luyện nói theo chủ đề**: 32 câu hỏi nói thường gặp chia 8 chủ đề, mỗi câu một bài nói mẫu ~300 chữ kèm pinyin và nghĩa tiếng Việt (bật/tắt riêng), nghe giọng mẫu, ghi âm từng câu hoặc cả bài, máy tô màu từng chữ đọc đúng/gần đúng/sai và cho nghe lại giọng mình. Cuối mỗi bài có bộ từ vựng kiểu Quizlet (460 từ, **mỗi từ 5 câu ví dụ** kèm pinyin, nghĩa, nút nghe) với 7 chế độ: *Danh sách*, *Thẻ lật* (✓ thuộc / ✗ chưa thuộc, tổng kết từ chưa thuộc kèm câu để học thuộc), *Học* (chọn nghĩa → chọn chữ → gõ pinyin, câu sai được hỏi lại), *Kiểm tra* (6 dạng câu, chấm điểm), và 3 trò chơi *Ghép thẻ* (tính giờ, lưu kỷ lục), *Sao băng* (chọn chữ trước khi nghĩa rơi chạm đất) và *Đúng hay sai* (60 giây). Kèm các cấu trúc ngữ pháp dùng trong bài (128 cấu trúc) và phần tự đặt 5 câu với từ mới, kiểm tra lỗi và ghi âm so sánh.
 - **Luyện gõ lại bài đọc**: dưới mỗi bài nói, chạy từng câu một – gõ đúng đến chữ nào chữ đó biến mất; gõ bằng bộ gõ chữ Hán hoặc bằng pinyin không dấu; có đồng hồ, chữ/phút, từ/phút, độ chính xác và kỷ lục. Có ô dán/soạn nội dung tự tạo để luyện gõ theo cùng cách.
 - **Thi thử HSK 1, 2, 3 đúng cấu trúc đề thật** (HSK 1: 40 câu/40 phút, HSK 2: 60 câu/55 phút, HSK 3: 80 câu/90 phút gồm Nghe – Đọc – Viết; mỗi phần 100 điểm, đạt 120/200 hoặc 180/300):
@@ -57,6 +58,7 @@ js/data/readings.js   bài đọc HSK 1 theo cấu trúc
 js/data/examples1.js  5 câu ví dụ cho mỗi từ HSK 1
 js/data/speaking.js   32 bài nói mẫu theo chủ đề
 js/data/examples-speak.js  5 câu ví dụ cho từ mới phần Luyện nói
+js/data/examples23.js  5 câu ví dụ cho từ HSK 3.0 cấp 2–3
 js/views/typing.js    luyện gõ lại bài
 js/views/pronounce.js luyện phát âm
 js/data/pinyin.js     nội dung phát âm · js/data/syllables.js bảng âm tiết

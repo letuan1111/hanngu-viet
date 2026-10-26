@@ -7,6 +7,7 @@ import { HSK30_1_ORDER, HSK30_1_NEW, HSK30_2_ORDER, HSK30_3_ORDER, HSK30_23_NEW 
 import { READINGS } from '../data/readings.js';
 import { EXAMPLES1 } from '../data/examples1.js';
 import { EXAMPLES_SP } from '../data/examples-speak.js';
+import { EXAMPLES23 } from '../data/examples23.js';
 import { SPEAK_DICT } from '../data/speaking.js';
 
 export { POS, TOPICS, LESSONS, CHAPTERS, GRAMMAR, CHARS, READINGS, EXAMPLES1 };
@@ -125,15 +126,19 @@ export const lessonsWithGrammar = id => LESSON_LIST.filter(l => l.g.includes(id)
 
 // ── Kho câu ví dụ: hội thoại + ngữ pháp + đóng góp ──
 // 5 ví dụ chuẩn của từ HSK 1 (bỏ ký hiệu người nói A/B)
-export const curatedExamples = h => EXAMPLES1[h] ? EXAMPLES1[h].map(([zh, vi]) => ({ zh, vi, level: 1, src: 'Ví dụ chuẩn HSK 1', core: true }))
-  : (EXAMPLES_SP[h] || []).map(([zh, vi]) => ({ zh, vi, level: 3, src: 'Ví dụ chuẩn', core: true }));
+export const curatedExamples = h => {
+  if (EXAMPLES1[h]) return EXAMPLES1[h].map(([zh, vi]) => ({ zh, vi, level: 1, src: 'Ví dụ chuẩn HSK 1', core: true }));
+  const seen = new Set(), out = [];
+  for (const [zh, vi] of [...(EXAMPLES_SP[h] || []), ...(EXAMPLES23[h] || [])]) if (!seen.has(zh)) { seen.add(zh); out.push({ zh, vi, level: 3, src: 'Ví dụ chuẩn', core: true }); }
+  return out;
+};
 export function sentenceBank() {
   if (!baseBank) {
     baseBank = [];
     for (const l of LESSON_LIST) for (const d of l.d) baseBank.push({ zh: d[1], vi: d[2], level: l.level, src: `Bài ${l.no} HSK ${l.level}` });
     for (const g of GRAMMAR) for (const e of g.ex) baseBank.push({ zh: e[0], vi: e[1], level: g.level, src: g.name });
     const seen = new Set(baseBank.map(x => x.zh));
-    for (const [h, list] of [...Object.entries(EXAMPLES1), ...Object.entries(EXAMPLES_SP)]) for (const [zh, vi] of list) {
+    for (const [h, list] of [...Object.entries(EXAMPLES1), ...Object.entries(EXAMPLES_SP), ...Object.entries(EXAMPLES23)]) for (const [zh, vi] of list) {
       if (/[AB]：.*[AB]：/.test(zh) || seen.has(zh)) continue;
       seen.add(zh); baseBank.push({ zh: zh.replace(/^[AB]：/, ''), vi: vi.replace(/^[AB]: /, ''), level: 1, src: `Ví dụ của ${h}` });
     }
