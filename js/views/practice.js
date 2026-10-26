@@ -9,6 +9,7 @@ import { checkHtml } from './grammar.js';
 const MODES = [
   ['listen', '🎧', 'Luyện nghe', 'Nghe từ, nghe câu, chép chính tả'],
   ['speak', '🗣️', 'Phát âm & giao tiếp', 'Đọc theo, nhập vai hội thoại'],
+  ['../speaking', '🎤', 'Luyện nói theo chủ đề', '32 bài nói mẫu ~300 chữ, ghi âm chấm điểm'],
   ['read', '📖', 'Đọc hiểu', 'Đọc hội thoại, trả lời câu hỏi'],
   ['write', '✍️', 'Viết chữ Hán', 'Viết từng nét theo thứ tự'],
   ['essay', '📝', 'Viết đoạn văn', 'Viết theo chủ đề, tự kiểm tra lỗi'],
@@ -24,7 +25,7 @@ const wordsUpTo = lv => [1, 2, 3].filter(x => x <= lv).flatMap(hskWords);
 export function practice(root, mode) {
   if (!mode) {
     root.innerHTML = `<div class="page-head"><h1>Luyện tập kỹ năng</h1></div>
-    <div class="paths">${MODES.map(([k, i, t, d]) => `<a class="path" href="#/practice/${k}"><span class="pi">${i}</span><b>${t}</b><small>${d}</small></a>`).join('')}</div>`;
+    <div class="paths">${MODES.map(([k, i, t, d]) => `<a class="path" href="${k.startsWith('../') ? '#/' + k.slice(3) : '#/practice/' + k}"><span class="pi">${i}</span><b>${t}</b><small>${d}</small></a>`).join('')}</div>`;
     return 'Luyện tập';
   }
   const M = MODES.find(m => m[0] === mode) || MODES[0];

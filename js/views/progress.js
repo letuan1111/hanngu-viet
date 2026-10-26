@@ -46,6 +46,7 @@ export function settings(root) {
     <div class="set"><b>Pinyin</b>${radio('pinyin', [['above', 'Trên mỗi chữ'], ['line', 'Dòng riêng dưới câu'], ['tap', 'Ẩn, bấm để hiện'], ['off', 'Tắt – tự đọc']])}</div>
     <div class="set"><b>Nghĩa tiếng Việt</b>${radio('meaning', [['show', 'Hiện dưới câu'], ['tap', 'Ẩn, bấm để hiện'], ['off', 'Tắt']])}</div>
     <div class="set"><b>Cách hiển thị</b>${radio('split', [[false, 'Cả câu liền mạch'], [true, 'Tách từng từ kèm nghĩa']])}</div>
+    <div class="set"><b>Phông chữ Hán</b>${radio('zhFont', [['kai', '楷 Khải thư (chuẩn SGK)'], ['song', '宋 Tống thể'], ['hei', '黑 Hắc thể']])}</div>
     <div class="set"><b>Cỡ chữ Hán</b>${radio('fontSize', [[0.9, 'Nhỏ'], [1, 'Vừa'], [1.2, 'Lớn'], [1.45, 'Rất lớn']])}</div>
     <div class="set"><b>Giao diện</b>${radio('theme', [['auto', 'Theo hệ thống'], ['light', 'Sáng'], ['dark', 'Tối']])}</div>
     <div class="preview card">${'<div class="sent" data-zh="我喜欢学习汉语。"><div class="sent-body"><div class="zh"></div><div class="py-line"></div><div class="vi">Tôi thích học tiếng Trung.</div></div></div>'}</div>

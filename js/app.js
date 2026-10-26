@@ -11,6 +11,7 @@ import { exam, placement } from './views/exam.js';
 import { community } from './views/community.js';
 import { progress, settings } from './views/progress.js';
 import { hsk500, readings } from './views/hsk500.js';
+import { speakingList, speakingItem } from './views/speaking.js';
 
 const routes = [
   [/^\/?$/, home, 'Trang chủ'],
@@ -19,6 +20,8 @@ const routes = [
   [/^\/chapter\/(\d)\/(\d)$/, chapterTest, 'Kiểm tra chương'],
   [/^\/hsk1-500$/, hsk500, 'Bảng 500 từ HSK 1'],
   [/^\/reading(?:\/([\w-]+))?$/, readings, 'Bài đọc HSK 1'],
+  [/^\/speaking$/, speakingList, 'Luyện nói'],
+  [/^\/speaking\/(\d+)$/, speakingItem, 'Luyện nói'],
   [/^\/vocab$/, dictionary, 'Từ vựng'],
   [/^\/word\/(.+)$/, word, 'Từ'],
   [/^\/topics(?:\/(\w+))?$/, topics, 'Nhóm từ'],

@@ -46,6 +46,8 @@ export function applyDisplay() {
   b.toggle('vi-off', s.meaning === 'off'); b.toggle('vi-tap', s.meaning === 'tap');
   b.toggle('hz-off', !s.hanzi); b.toggle('split', !!s.split);
   document.documentElement.style.setProperty('--zh-scale', s.fontSize || 1);
+  const FONT = { kai: "'LXGW WenKai Screen', KaiTi, STKaiti, 'Kaiti SC', 'Noto Serif SC', serif", song: "'Noto Serif SC', 'Songti SC', SimSun, serif", hei: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" };
+  document.documentElement.style.setProperty('--zh', FONT[s.zhFont] || FONT.kai);
   const t = s.theme === 'auto' ? '' : s.theme; document.documentElement.dataset.theme = t;
 }
 

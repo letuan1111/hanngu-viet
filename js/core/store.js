@@ -7,7 +7,7 @@ const DEFAULT = {
     hanzi: true,            // hiện chữ Hán
     pinyin: 'above',        // 'above' | 'tap' | 'off'
     meaning: 'show',        // 'show' | 'tap' | 'off'
-    rate: 1, voice: '', voice2: '', theme: 'auto', curriculum: 'HSK 2.0', fontSize: 1,
+    rate: 1, voice: '', voice2: '', zhFont: 'kai', theme: 'auto', curriculum: 'HSK 2.0', fontSize: 1,
   },
   last: null,               // { route, title, at }
   lessons: {},              // idx -> { done, best, at, steps: {} }

@@ -60,7 +60,7 @@ export function home(root) {
         ['#/placement', '🎯', 'Kiểm tra đầu vào', 'Xác định trình độ và gợi ý bài phù hợp'],
         ['#/vocab', '🀄', 'Học riêng từ vựng', 'Tra từ, nhóm chủ đề, nét viết'],
         ['#/grammar', '🧩', 'Học riêng ngữ pháp', `Thư viện cấu trúc HSK 1–3`],
-        ['#/practice/speak', '🗣️', 'Giao tiếp theo chủ đề', 'Luyện nói, phản xạ và phát âm'],
+        ['#/speaking', '🗣️', 'Luyện nói theo chủ đề', '32 bài nói mẫu, ghi âm chấm từng chữ'],
         ['#/review', '🔁', 'Ôn kiến thức đã quên', 'Thẻ ghi nhớ lặp lại ngắt quãng'],
         ['#/exam', '📝', 'Luyện thi HSK', 'Đề thi thử có tính giờ'],
         ['#/community', '🤝', 'Góc đóng góp', 'Thêm từ, ví dụ, mẹo của riêng bạn'],
