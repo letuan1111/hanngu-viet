@@ -71,7 +71,7 @@ export function hsk500(root, lvArg) {
   const qs = document.createElement('section'); qs.className = 'card vs-sec';
   const nG = Math.ceil(list.length / 20);
   qs.innerHTML = `<div class="row gap wrap" style="justify-content:space-between"><h2>🃏 Học kiểu Quizlet</h2><label class="sel">Bộ từ <select id="qlG" class="inp sm"><option value="todo">20 từ chưa thuộc</option><option value="filter">20 từ đầu của danh sách đang lọc</option>${[...Array(nG)].map((_, i) => `<option value="${i}">Nhóm ${i + 1}: từ ${i * 20 + 1}–${Math.min(list.length, i * 20 + 20)}</option>`).join('')}</select></label></div>
-    <p class="muted small">Danh sách kèm 5 câu ví dụ, thẻ lật, chế độ Học, Kiểm tra, Ghép thẻ, Sao băng và Đúng hay sai. Từ đánh dấu ✓ ở đây cũng được tích ✓ trong bảng phía trên.</p><div id="qlBox"></div>`;
+    <p class="muted small">Danh sách kèm 5 câu ví dụ, thẻ lật, chế độ Học, Kiểm tra, Ghép thẻ, Sao băng và Đúng hay sai. Từ đánh dấu ✓ ở đây cũng được tích ✓ trong bảng từ phía dưới.</p><div id="qlBox"></div>`;
   $('.lv-sum', root).before(qs);
   const pickSet = () => { const v = $('#qlG', root).value, k = known(); const ws = v === 'todo' ? list.filter(w => !k[w.h]) : v === 'filter' ? rows() : list.slice(+v * 20, +v * 20 + 20); return ws.slice(0, 20).map(w => ({ h: w.h, p: w.p, vi: w.vi })); };
   const startQl = () => vocabSet($('#qlBox', root), pickSet(), { id: `hsk30-${lv}`, sent: [], known: () => known(), setKnown: (h, v) => store.update(s => { s.known30 = s.known30 || {}; if (v) s.known30[h] = true; else delete s.known30[h]; }), onChange: draw });
