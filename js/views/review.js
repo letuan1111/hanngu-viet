@@ -28,7 +28,7 @@ export function review(root, mode = 'due') {
     if (!list.length) { fc.innerHTML = `<div class="empty card"><h3>Không có từ nào ở mục này 🎉</h3><p>${mode === 'due' ? 'Bạn đã ôn hết từ đến hạn. Học thêm từ mới nhé!' : ''}</p><a class="btn" href="#/review/new">Học 10 từ mới</a></div>`; return; }
     if (i >= list.length) { fc.innerHTML = `<div class="empty card"><h3>Hoàn thành ${done} thẻ!</h3><p>Hẹn gặp lại ở lần ôn tiếp theo.</p><div class="row gap center"><a class="btn" href="#/review/due">Ôn từ đến hạn</a><a class="btn ghost" href="#/practice">Luyện tập thêm</a></div></div>`; return; }
     const h = list[i], w = entry(h), m = modeOf();
-    const ex = examplesFor(h, 1)[0];
+    const exs = examplesFor(h, 5).filter(e => !/B：/.test(e.zh)); const ex0 = exs[Math.random() * exs.length | 0]; const ex = ex0 && { zh: ex0.zh.replace(/^[AB]：/, ''), vi: ex0.vi.replace(/^[AB]: /, '') };
     const front = m === 'zh' ? `<div class="fc-h" lang="zh-CN">${esc(h)}</div>` : m === 'vi' ? `<div class="fc-vi">${esc(w.vi)}</div><div class="muted small">${esc(w.pos ? '' : '')}</div>` : `<button class="big-say" data-say="${esc(h)}">${icon('vol')} Nghe lại</button>`;
     fc.innerHTML = `<div class="flash">
       <div class="fc-top"><span>${i + 1}/${list.length}</span><span class="bar"><i style="width:${i / list.length * 100}%"></i></span></div>

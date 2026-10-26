@@ -712,6 +712,56 @@ const EXTRA = `
 上面|shàngmiàn|bên trên|d|diadiem
 想法|xiǎngfǎ|suy nghĩ, ý kiến|d|coban
 人们|rénmen|mọi người|d|coban
+北面|běimiàn|phía bắc|d|diadiem
+南面|nánmiàn|phía nam|d|diadiem
+东面|dōngmiàn|phía đông|d|diadiem
+西面|xīmiàn|phía tây|d|diadiem
+左面|zuǒmiàn|bên trái|d|diadiem
+右面|yòumiàn|bên phải|d|diadiem
+外面|wàimiàn|bên ngoài|d|diadiem
+里面|lǐmiàn|bên trong|d|diadiem
+边|biān|bên, cạnh|d|diadiem
+答案|dá'àn|đáp án|d|truonghoc
+客气|kèqi|khách sáo|t|giaotiep
+谢|xiè|cảm ơn|đg|giaotiep
+感谢|gǎnxiè|cảm tạ, cảm ơn|đg|giaotiep
+台|tái|chiếc (lượng từ cho máy)|l|coban
+白色|báisè|màu trắng|d|mausac
+红色|hóngsè|màu đỏ|d|mausac
+黑色|hēisè|màu đen|d|mausac
+刚|gāng|vừa mới|p|thoigian
+假|jià|kỳ nghỉ|d|ngaythang
+首|shǒu|bài (lượng từ cho bài hát)|l|sothich
+出生|chūshēng|sinh ra|đg|giadinh
+踢球|tī qiú|đá bóng|đg|sothich
+棵|kē|cây (lượng từ cho cây)|l|coban
+大声|dàshēng|to tiếng|p|coban
+这样|zhèyàng|như thế này|đt|coban
+笔|bǐ|cái bút|d|truonghoc
+遍|biàn|lượt, lần (từ đầu đến cuối)|l|coban
+加|jiā|cộng, thêm|đg|so
+宿舍|sùshè|ký túc xá|d|truonghoc
+斤|jīn|cân (500 g)|l|muasam
+节|jié|tiết (học)|l|truonghoc
+篇|piān|bài (lượng từ cho bài văn)|l|truonghoc
+死|sǐ|chết; (…chết đi được)|đg|coban
+度|dù|độ|l|thoitiet
+热闹|rènao|náo nhiệt|t|camxuc
+宽|kuān|rộng|t|coban
+南方|nánfāng|phương nam, miền nam|d|diadiem
+举手|jǔ shǒu|giơ tay|đg|truonghoc
+消息|xiāoxi|tin tức|d|giaotiep
+以外|yǐwài|ngoài ra|d|coban
+晚安|wǎn'ān|chúc ngủ ngon|c|giaotiep
+散步|sànbù|đi dạo|đg|sothich
+永远|yǒngyuǎn|mãi mãi|p|coban
+凉快|liángkuai|mát mẻ|t|thoitiet
+封|fēng|lá (lượng từ cho thư)|l|giaotiep
+跳|tiào|nhảy|đg|sothich
+当|dāng|làm, trở thành|đg|congviec
+辣|là|cay|t|anuong
+停|tíng|dừng, tạnh|đg|coban
+空气|kōngqì|không khí|d|thoitiet
 春天|chūntiān|mùa xuân|d|thoitiet
 夏天|xiàtiān|mùa hè|d|thoitiet
 秋天|qiūtiān|mùa thu|d|thoitiet

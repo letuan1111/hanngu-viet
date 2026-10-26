@@ -34,6 +34,12 @@ export function sentence(zh, vi, { speaker = '', role = 0, extra = '' } = {}) {
   </div>`;
 }
 
+// Ví dụ dạng hội thoại "A：…B：…" → tách thành các dòng có người nói
+export function exampleHtml(zh, vi, opts = {}) {
+  if (!/[AB]：/.test(zh)) return sentence(zh, vi, opts);
+  const zs = zh.split(/(?=[AB]：)/).filter(Boolean), vs = (vi || '').split(/(?=[AB]: )/).filter(Boolean);
+  return `<div class="ex-dialog">${zs.map((z, i) => { const sp = z[0]; return sentence(z.slice(2), (vs[i] || '').replace(/^[AB]: /, ''), { ...opts, speaker: sp, role: sp === 'B' ? 1 : 0, extra: i === zs.length - 1 ? opts.extra || '' : '' }); }).join('')}</div>`;
+}
 export function applyDisplay() {
   const s = store.s.settings, b = document.body.classList;
   b.toggle('py-off', s.pinyin === 'off'); b.toggle('py-tap', s.pinyin === 'tap'); b.toggle('py-line-mode', s.pinyin === 'line');
@@ -76,7 +82,7 @@ export function wordCard(h, { full = false } = {}) {
   const ws = lookup(h); const w = ws[0];
   const s = store.s;
   if (!w) return charCard(h);
-  const ex = examplesFor(h, full ? 6 : 1);
+  const ex = examplesFor(h, full ? 6 : 2);
   const col = collocations(h).slice(0, 5);
   const chars = [...h].filter(isHan);
   return `<div class="wc">
@@ -86,7 +92,7 @@ export function wordCard(h, { full = false } = {}) {
     </div>
     <div class="wc-vi">${ws.map(x => esc(x.vi) + (ws.length > 1 ? ` <small>(${esc(x.p)})</small>` : '')).join('<br>')}</div>
     <div class="row gap">${say(h, ' Nghe')}${say(h, ' Chậm').replace('data-say', 'data-rate="0.7" data-say')}</div>
-    ${ex.length ? `<div class="wc-ex">${ex.map(e => `<div class="mini-ex"><div lang="zh-CN">${esc(e.zh)} ${say(e.zh)}</div><div class="mini-py">${esc(sentencePinyin(e.zh))}</div><div class="mini-vi">${esc(e.vi)}</div></div>`).join('')}</div>` : ''}
+    ${ex.length ? `<div class="wc-ex">${ex.map(e => `<div class="mini-ex"><div lang="zh-CN">${esc(e.zh.replace(/^[AB]：/, ''))} ${say(e.zh.replace(/^[AB]：/, ''))}</div><div class="mini-py">${esc(sentencePinyin(e.zh.replace(/^[AB]：/, '')))}</div><div class="mini-vi">${esc(e.vi)}</div></div>`).join('')}</div>` : ''}
     ${col.length ? `<div class="wc-col"><b>Kết hợp thường gặp:</b> ${col.map(c => `<span class="chip" data-w="${esc(c.h)}">${esc(c.h)}</span>`).join(' ')}</div>` : ''}
     ${chars.length > 1 ? `<div class="wc-chars"><b>Từng chữ:</b> ${chars.map(c => `<button class="chip ch" data-c="${esc(c)}">${esc(c)} <small>${esc(charPinyin(c))}</small></button>`).join(' ')}</div>` : ''}
     <div class="wc-act">

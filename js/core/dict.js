@@ -5,8 +5,9 @@ import { CHARS } from '../data/chars.js';
 import { store } from './store.js';
 import { HSK30_1_ORDER, HSK30_1_NEW } from '../data/hsk30.js';
 import { READINGS } from '../data/readings.js';
+import { EXAMPLES1 } from '../data/examples1.js';
 
-export { POS, TOPICS, LESSONS, CHAPTERS, GRAMMAR, CHARS, READINGS };
+export { POS, TOPICS, LESSONS, CHAPTERS, GRAMMAR, CHARS, READINGS, EXAMPLES1 };
 export const isHan = c => /\p{Script=Han}/u.test(c);
 
 // Từ HSK 1 chuẩn 3.0 chưa có trong bộ HSK 2.0
@@ -18,8 +19,10 @@ export const IN30 = new Set(HSK30_1_ORDER);
 
 // ── Chỉ mục từ điển (HSK + từ mở rộng + đóng góp cá nhân) ──
 let byH = new Map(); let maxLen = 1;
+const segCache = new Map();
+let baseBank = null;
 export function rebuild() {
-  byH = new Map();
+  byH = new Map(); segCache.clear(); baseBank = null;
   const add = w => { if (!byH.has(w.h)) byH.set(w.h, []); byH.get(w.h).push(w); maxLen = Math.max(maxLen, w.h.length); };
   VOCAB.forEach(add);
   V30_NEW.forEach(add);
@@ -35,6 +38,12 @@ export const hsk30List = () => HSK30_1_ORDER.map((h, i) => ({ no: i + 1, ...(loo
 
 // Tách từ: khớp dài nhất từ trái sang phải (ưu tiên từ ghép)
 export function segment(text) {
+  const c0 = segCache.get(text); if (c0) return c0;
+  const out = segmentRaw(text);
+  if (segCache.size > 20000) segCache.clear();
+  segCache.set(text, out); return out;
+}
+function segmentRaw(text) {
   const out = []; let i = 0;
   while (i < text.length) {
     const c = text[i];
@@ -106,18 +115,29 @@ export const grammarById = id => GRAMMAR.find(g => g.id === id);
 export const lessonsWithGrammar = id => LESSON_LIST.filter(l => l.g.includes(id));
 
 // ── Kho câu ví dụ: hội thoại + ngữ pháp + đóng góp ──
+// 5 ví dụ chuẩn của từ HSK 1 (bỏ ký hiệu người nói A/B)
+export const curatedExamples = h => (EXAMPLES1[h] || []).map(([zh, vi]) => ({ zh, vi, level: 1, src: 'Ví dụ chuẩn HSK 1', core: true }));
 export function sentenceBank() {
-  const bank = [];
-  for (const l of LESSON_LIST) for (const d of l.d) bank.push({ zh: d[1], vi: d[2], level: l.level, src: `Bài ${l.no} HSK ${l.level}` });
-  for (const g of GRAMMAR) for (const e of g.ex) bank.push({ zh: e[0], vi: e[1], level: g.level, src: g.name });
-  for (const e of store.s.community.examples) bank.push({ zh: e.zh, vi: e.vi, level: 9, src: 'Bạn đóng góp', community: true });
-  return bank;
+  if (!baseBank) {
+    baseBank = [];
+    for (const l of LESSON_LIST) for (const d of l.d) baseBank.push({ zh: d[1], vi: d[2], level: l.level, src: `Bài ${l.no} HSK ${l.level}` });
+    for (const g of GRAMMAR) for (const e of g.ex) baseBank.push({ zh: e[0], vi: e[1], level: g.level, src: g.name });
+    const seen = new Set(baseBank.map(x => x.zh));
+    for (const [h, list] of Object.entries(EXAMPLES1)) for (const [zh, vi] of list) {
+      if (/[AB]：.*[AB]：/.test(zh) || seen.has(zh)) continue;
+      seen.add(zh); baseBank.push({ zh: zh.replace(/^[AB]：/, ''), vi: vi.replace(/^[AB]: /, ''), level: 1, src: `Ví dụ của ${h}` });
+    }
+  }
+  return baseBank.concat(store.s.community.examples.map(e => ({ zh: e.zh, vi: e.vi, level: 9, src: 'Bạn đóng góp', community: true })));
 }
 export function examplesFor(h, max = 6) {
-  const bank = sentenceBank();
+  const core = curatedExamples(h);
+  const coreSet = new Set(core.map(x => x.zh.replace(/^[AB]：/, '')));
+  const bank = sentenceBank().filter(s => !coreSet.has(s.zh));
   const hits = bank.filter(s => segment(s.zh).some(t => t.t === h));
   const loose = h.length === 1 ? [] : bank.filter(s => s.zh.includes(h) && !hits.includes(s));
-  return [...hits, ...loose].sort((a, b) => a.level - b.level || a.zh.length - b.zh.length).slice(0, max);
+  const rest = [...hits, ...loose].sort((a, b) => (a.src.startsWith('Ví dụ của') - b.src.startsWith('Ví dụ của')) || a.level - b.level || a.zh.length - b.zh.length);
+  return [...core, ...rest].slice(0, max);
 }
 // Từ hay đi kèm: từ ghép chứa từ này + cặp từ đứng liền nhau trong cùng vế câu (động–danh, tính–danh…)
 const CONTENT = new Set(['d', 'đg', 't', 'n']);

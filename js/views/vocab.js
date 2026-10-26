@@ -1,9 +1,10 @@
 import { store, srsAdd } from '../core/store.js';
 import { IN30, allWords, lookup, entry, search, examplesFor, collocations, confusables, lessonsWithWord, TOPICS, POS, levelLabel, isHan, charPinyin, sentencePinyin, GRAMMAR, hskWords, pick, shuffle } from '../core/dict.js';
-import { esc, say, sentence, icon, toast, writer, charInfo, short, $, $$, gridSvg, modal } from '../core/ui.js';
+import { esc, say, sentence, exampleHtml, icon, toast, writer, charInfo, short, $, $$, gridSvg, modal } from '../core/ui.js';
 import { MNEMONICS, RADICALS } from '../data/radicals.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { logActivity } from '../core/store.js';
+import { speakSeq } from '../core/tts.js';
 
 const REPO = 'https://github.com/letuan1111/hanngu-viet';
 
@@ -44,7 +45,8 @@ export function word(root, h) {
   if (!ws.length && ![...h].every(isHan)) { root.innerHTML = `<p>Không tìm thấy “${esc(h)}”.</p>`; return; }
   const w = ws[0] || { h, p: charPinyin(h), vi: '', pos: '', level: 0, source: 'char', topics: [] };
   const s = store.s;
-  const ex = examplesFor(h, 8);
+  const exAll = examplesFor(h, 13);
+  const core = exAll.filter(e => e.core), ex = exAll.filter(e => !e.core).slice(0, 8);
   const col = collocations(h);
   const conf = confusables(h);
   const ls = lessonsWithWord(h);
@@ -81,9 +83,11 @@ export function word(root, h) {
       ${col.length ? `<p><b>Kết hợp thường gặp:</b> ${col.map(c => `<span class="chip" data-w="${esc(c.h)}">${esc(c.h)}</span>`).join(' ')}</p>` : ''}
     </section>
 
-    <section class="card span2"><h2>Câu ví dụ <small class="muted">(${ex.length})</small></h2>
-      ${ex.length ? ex.map(e => sentence(e.zh, e.vi, { extra: `<div class="src">${esc(e.src)}</div>` })).join('') : ''}
-      ${ex.length < 3 ? `<p class="muted">Chưa đủ 3 ví dụ cho từ này. <a href="#/community/example?h=${encodeURIComponent(h)}">Thêm ví dụ của bạn</a></p>` : ''}
+    ${core.length ? `<section class="card span2 core-ex"><div class="row gap wrap" style="justify-content:space-between"><h2>${core.length} ví dụ chuẩn <small class="muted">HSK 1</small></h2><button class="btn sm ghost" id="playCore">${icon('play')} Nghe cả 5 câu</button></div>
+      ${core.map((e, i) => exampleHtml(e.zh, e.vi, { extra: `<div class="src">Ví dụ ${i + 1}</div>` })).join('')}</section>` : ''}
+    <section class="card span2"><h2>${core.length ? 'Ví dụ khác trong bài học' : 'Câu ví dụ'} <small class="muted">(${ex.length})</small></h2>
+      ${ex.length ? ex.map(e => sentence(e.zh, e.vi, { extra: `<div class="src">${esc(e.src)}</div>` })).join('') : '<p class="muted">Chưa có thêm ví dụ.</p>'}
+      ${core.length + ex.length < 3 ? `<p class="muted">Chưa đủ 3 ví dụ cho từ này. <a href="#/community/example?h=${encodeURIComponent(h)}">Thêm ví dụ của bạn</a></p>` : ''}
     </section>
 
     <section class="card span2"><h2>Ghi nhớ thông minh & nét viết</h2>
@@ -104,6 +108,7 @@ export function word(root, h) {
     const a = e.target.closest('[data-anim]'); if (a) writers[+a.dataset.anim]?.animateCharacter();
     const q = e.target.closest('[data-quiz]'); if (q) { const i = +q.dataset.quiz; const m = $(`#cm${i}`, root); m.textContent = 'Viết từng nét theo thứ tự…'; writers[i]?.quiz({ onComplete: d => { m.textContent = `Xong! Sai ${d.totalMistakes} lần.`; logActivity(); } }); }
   };
+  const pc = $('#playCore', root); if (pc) pc.onclick = () => { const sents = $$('.core-ex .sent', root); speakSeq(sents.map(el => ({ text: el.dataset.zh, el, onBoundary: k => $$('.tk', el).forEach(t => t.classList.toggle('hl', k >= +t.dataset.i && k < +t.dataset.i + +t.dataset.n)) })), { onItem: k => sents.forEach((s, j) => s.classList.toggle('now', j === k)) }); };
   $('#bSave', root).onclick = () => { store.update(s => s.saved[h] ? delete s.saved[h] : s.saved[h] = true); word(root, h); };
   $('#bHard', root).onclick = () => { store.update(s => s.hard[h] ? delete s.hard[h] : s.hard[h] = true); if (store.s.hard[h]) srsAdd(h); word(root, h); };
   $('#bSrs', root).onclick = () => { srsAdd(h); toast('Đã thêm vào ôn tập'); word(root, h); };

@@ -57,7 +57,7 @@ export function voiceFor(role = 0) {
 
 // Chữ đơn đa âm: trình duyệt hay đọc sai khi đứng một mình → đọc bằng chữ đồng âm có cách đọc cố định
 const SPEAK_AS = { '教': '交', '都': '兜', '只': '指', '为': '位', '差': '岔', '种': '肿', '还': '孩' };
-const fixText = t => (SPEAK_AS[t] || t).replace(/^[A-Z甲乙][：:]\s*/, '');
+const fixText = t => (SPEAK_AS[t] || t).replace(/[A-Z甲乙][：:]\s*/g, '');
 
 let current = null, keep = null;
 export function stop() {

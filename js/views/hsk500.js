@@ -1,6 +1,6 @@
 import { store, srsAdd, logActivity } from '../core/store.js';
-import { hsk30List, READINGS, grammarById, POS, TOPICS, IN30, pick, shuffle } from '../core/dict.js';
-import { esc, say, sentence, icon, toast, $, $$ } from '../core/ui.js';
+import { hsk30List, READINGS, grammarById, POS, TOPICS, IN30, pick, shuffle, curatedExamples } from '../core/dict.js';
+import { esc, say, sentence, exampleHtml, icon, toast, $, $$ } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { speakSeq, stopSeq } from '../core/tts.js';
 
@@ -20,7 +20,7 @@ export function hsk500(root) {
     <div class="chips" id="f30">${[['all', 'Tất cả'], ['todo', 'Chưa thuộc'], ['known', 'Đã thuộc'], ['new', 'Mới so với HSK 2.0']].map(([k, n], i) => `<button class="chip ${i ? '' : 'on'}" data-k="${k}">${n}</button>`).join('')}</div>
     <select id="t30" class="inp sm"><option value="">Mọi chủ đề</option>${Object.entries(TOPICS).map(([k, [n]]) => `<option value="${k}">${n}</option>`).join('')}</select>
   </div>
-  <div class="tbl-wrap"><table class="tbl t500"><thead><tr><th>#</th><th>Chữ Hán</th><th>Pinyin</th><th>Nghĩa tiếng Việt</th><th class="hide-sm">Từ loại</th><th></th><th title="Đã thuộc">✓</th></tr></thead><tbody id="tb"></tbody></table></div>
+  <div class="tbl-wrap"><table class="tbl t500"><thead><tr><th>#</th><th>Chữ Hán</th><th>Pinyin</th><th>Nghĩa tiếng Việt</th><th class="hide-sm">Từ loại</th><th>Ví dụ</th><th title="Đã thuộc">✓</th></tr></thead><tbody id="tb"></tbody></table></div>
   <div class="row gap center" id="pg"></div><div id="qz30"></div>`;
   let filter = 'all', page = 0; const PER = 100;
   const rows = () => {
@@ -35,13 +35,21 @@ export function hsk500(root) {
     $('#tb', root).innerHTML = all.slice(page * PER, page * PER + PER).map(w => `<tr class="${k[w.h] ? 'kn' : ''}">
       <td class="muted">${w.no}</td><td><span class="t-h" lang="zh-CN" data-w="${esc(w.h)}">${esc(w.h)}</span>${w.source === 'hsk30' ? ' <span class="badge hsk30">mới</span>' : ''}</td>
       <td class="t-p">${esc(w.p)}</td><td>${esc(w.vi)}</td><td class="hide-sm muted small">${esc(POS[w.pos] || '')}</td>
-      <td>${say(w.h)}</td><td><input type="checkbox" class="kn-box" data-h="${esc(w.h)}" ${k[w.h] ? 'checked' : ''} aria-label="Đã thuộc ${esc(w.h)}"></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Không có từ phù hợp.</td></tr>';
+      <td class="nowrap">${say(w.h)} <button class="mini ex-btn" data-ex="${esc(w.h)}" aria-expanded="false">5 câu ▾</button></td><td><input type="checkbox" class="kn-box" data-h="${esc(w.h)}" ${k[w.h] ? 'checked' : ''} aria-label="Đã thuộc ${esc(w.h)}"></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Không có từ phù hợp.</td></tr>';
     $('#pg', root).innerHTML = pages > 1 ? [...Array(pages)].map((_, i) => `<button class="chip ${i === page ? 'on' : ''}" data-pg="${i}">${i * PER + 1}–${Math.min(all.length, (i + 1) * PER)}</button>`).join('') : '';
   };
   $('#q30', root).oninput = () => { page = 0; draw(); };
   $('#t30', root).onchange = () => { page = 0; draw(); };
   root.onclick = e => {
     const f = e.target.closest('#f30 .chip'); if (f) { filter = f.dataset.k; page = 0; $$('#f30 .chip', root).forEach(x => x.classList.toggle('on', x === f)); draw(); }
+    const xb = e.target.closest('.ex-btn');
+    if (xb) {
+      const tr = xb.closest('tr'), nx = tr.nextElementSibling;
+      if (nx && nx.classList.contains('ex-row')) { nx.remove(); xb.setAttribute('aria-expanded', 'false'); xb.textContent = '5 câu ▾'; return; }
+      const row = document.createElement('tr'); row.className = 'ex-row';
+      row.innerHTML = `<td></td><td colspan="6"><div class="ex-box">${curatedExamples(xb.dataset.ex).map(x => exampleHtml(x.zh, x.vi)).join('')}</div></td>`;
+      tr.after(row); xb.setAttribute('aria-expanded', 'true'); xb.textContent = '5 câu ▴'; logActivity(); return;
+    }
     const p = e.target.closest('[data-pg]'); if (p) { page = +p.dataset.pg; draw(); $('.tbl-wrap', root).scrollIntoView({ behavior: 'smooth' }); }
   };
   root.onchange = e => { const b = e.target.closest('.kn-box'); if (b) { store.update(s => { s.known30 = s.known30 || {}; if (b.checked) s.known30[b.dataset.h] = true; else delete s.known30[b.dataset.h]; }); b.closest('tr').classList.toggle('kn', b.checked); const n = Object.keys(known()).length; $('#kc', root).textContent = `Đã thuộc ${n}/${list.length} từ`; $('#kb', root).style.width = `${n / list.length * 100}%`; logActivity(); } };

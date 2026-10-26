@@ -316,3 +316,9 @@ body.split .tk { margin: 0 .18em; } body.split .gl { display: block; }
 .reading-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 .gfocus { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; } .gfocus .formula { margin: 0; } .gfocus p { margin: 4px 0 0; }
 .tk.key { background: var(--gold2); color: var(--red); font-weight: 700; box-shadow: inset 0 -2px 0 var(--gold); }
+
+.nowrap { white-space: nowrap; } .ex-btn { vertical-align: middle; }
+.ex-row td { background: var(--bg) !important; padding: 4px 12px 10px !important; }
+.ex-box .sent { padding: 8px 0; } .ex-box .zh { font-size: calc(1.2rem * var(--zh-scale)); }
+.core-ex { border-left: 4px solid var(--jade); }
+.ex-dialog { border-bottom: 1px dashed var(--line); } .ex-dialog .sent { border-bottom: 0; padding: 6px 0; }
