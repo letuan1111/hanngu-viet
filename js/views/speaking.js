@@ -1,8 +1,9 @@
 // Luyện nói theo chủ đề: bài nói mẫu ~300 chữ, bật/tắt pinyin & nghĩa, đổi phông, nghe mẫu, ghi âm và chấm từng chữ
 import { store, logActivity } from '../core/store.js';
-import { SPEAK_GROUPS, SPEAK_ITEMS } from '../data/speaking.js';
-import { segment, charPinyins, isHan } from '../core/dict.js';
-import { esc, icon, $, $$, toast, applyDisplay } from '../core/ui.js';
+import { SPEAK_GROUPS, SPEAK_ITEMS, SPEAK_VOCAB } from '../data/speaking.js';
+import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById } from '../core/dict.js';
+import { esc, icon, $, $$, toast, applyDisplay, say, sentence } from '../core/ui.js';
+import { checkSentence } from '../core/checker.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -78,6 +79,7 @@ export function speakingItem(root, id) {
     <div id="rLive" class="sp-live" aria-live="polite"></div>
     <div id="rOut"></div>
   </section>
+  <div id="study"></div>
   <div class="lesson-nav">${prev ? `<a class="btn ghost" href="#/speaking/${prev.id}">‹ Câu ${prev.id}</a>` : '<span></span>'}${next ? `<a class="btn" href="#/speaking/${next.id}">Câu ${next.id} ›</a>` : ''}</div>`;
 
   const text = $('.sp-text', root), srows = $$('.sp-row', root);
@@ -152,6 +154,7 @@ export function speakingItem(root, id) {
       <p class="muted small">Lưu ý: chấm điểm dựa trên nhận dạng giọng nói của trình duyệt, chỉ mang tính tham khảo. Chữ màu cam thường là chữ đồng âm hoặc cần kiểm tra lại thanh điệu.</p>`;
     out.scrollIntoView({ behavior: 'smooth' });
   };
+  renderStudy($('#study', root), x);
   return `Luyện nói: ${x.q}`;
 }
 
@@ -199,4 +202,157 @@ async function startSession(live, timeEl) {
       if (mr && mr.state !== 'inactive') { mr.onstop = () => setTimeout(finish, 400); mr.stop(); } else setTimeout(finish, 600);
     }),
   };
+}
+
+// ════════════ Từ mới · Cấu trúc · Thẻ lật · Tự đặt câu ════════════
+const knownOf = id => (store.s.spKnown || {})[id] || {};
+function setKnown(id, h, v) { store.update(s => { s.spKnown = s.spKnown || {}; s.spKnown[id] = s.spKnown[id] || {}; s.spKnown[id][h] = v; }); }
+const sentWith = (x, h) => x.s.filter(([zh]) => zh.includes(h));
+
+function renderStudy(box, x) {
+  const v = SPEAK_VOCAB[x.id] || { w: [], g: [] };
+  const words = v.w.map(([h, p, vi]) => ({ h, p, vi }));
+  box.innerHTML = `
+  <section class="card"><div class="row gap wrap" style="justify-content:space-between"><h2>📘 Từ mới trong bài <small class="muted">(${words.length})</small></h2><span class="muted small" id="wkc"></span></div>
+    <div class="tbl-wrap"><table class="tbl nw-tbl"><thead><tr><th>Chữ Hán</th><th>Pinyin</th><th>Nghĩa</th><th></th><th>Trạng thái</th></tr></thead><tbody id="nwb"></tbody></table></div></section>
+  <section class="card"><h2>🧩 Cấu trúc ngữ pháp trong bài <small class="muted">(${v.g.length})</small></h2>
+    <div class="gs-list">${v.g.map(([f, ex, s, gid]) => { const g = gid && grammarById(gid); return `<div class="gs"><div class="gs-f" lang="zh-CN">${esc(f)}</div><div class="gs-x">${esc(ex)}${g ? ` · <a href="#/grammar/${g.id}">Xem bài ngữ pháp</a>` : ''}</div>${sentence(s, x.s.find(([zh]) => zh === s)?.[1] || '')}</div>`; }).join('')}</div></section>
+  <section class="card fc-sec" id="fcSec"><div class="row gap wrap" style="justify-content:space-between"><h2>🃏 Thẻ ghi nhớ</h2>
+    <div class="row gap wrap"><label class="sel">Mặt trước <select id="fcFront"><option value="h">Chữ Hán</option><option value="vi">Nghĩa tiếng Việt</option><option value="au">Nghe âm</option></select></label><label class="chk"><input type="checkbox" id="fcShuf" checked> Trộn thẻ</label></div></div>
+    <div id="fcBox"></div></section>
+  <section class="card" id="msSec"><h2>✍️ Tự đặt 5 câu & ghi âm</h2>
+    <p class="muted small">Chọn một từ, tự viết 5 câu có dùng từ đó, bấm “Kiểm tra” để máy soát lỗi, rồi bấm 🎤 đọc to câu bạn viết – máy so giọng đọc với câu đã viết và cho bạn nghe lại. Câu viết được lưu trên trình duyệt; bản ghi âm chỉ giữ trong phiên này.</p>
+    <label class="sel">Từ <select id="msWord" class="inp"></select></label><div id="msBox"></div></section>`;
+
+  // bảng từ mới
+  const drawTable = () => {
+    const k = knownOf(x.id);
+    $('#nwb', box).innerHTML = words.map(w => `<tr class="${k[w.h] === true ? 'kn' : k[w.h] === false ? 'unk' : ''}"><td><span class="t-h" lang="zh-CN" data-w="${esc(w.h)}">${esc(w.h)}</span></td><td class="t-p">${esc(w.p)}</td><td>${esc(w.vi)}</td><td>${say(w.h)}</td><td>${k[w.h] === true ? '<span class="st ok">✓ Đã thuộc</span>' : k[w.h] === false ? '<span class="st no">✗ Chưa thuộc</span>' : '<span class="muted small">Chưa học</span>'}</td></tr>`).join('');
+    const n = words.filter(w => k[w.h] === true).length;
+    $('#wkc', box).textContent = `Đã thuộc ${n}/${words.length}`;
+  };
+  drawTable();
+
+  // ── thẻ lật ──
+  let deck = [], i = 0, res = {};
+  const start = list => { deck = $('#fcShuf', box).checked ? [...list].sort(() => Math.random() - .5) : [...list]; i = 0; res = {}; drawCard(); };
+  const drawCard = () => {
+    const fb = $('#fcBox', box);
+    if (!deck.length) { fb.innerHTML = '<p class="muted">Bài này chưa có từ mới.</p>'; return; }
+    if (i >= deck.length) return drawSummary();
+    const w = deck[i], mode = $('#fcFront', box).value, ex = sentWith(x, w.h)[0];
+    const yes = Object.values(res).filter(Boolean).length, no = Object.values(res).filter(r => r === false).length;
+    fb.innerHTML = `<div class="ql">
+      <div class="ql-top"><span class="ql-no">✗ ${no}</span><span>${i + 1} / ${deck.length}</span><span class="ql-yes">✓ ${yes}</span></div>
+      <div class="bar"><i style="width:${i / deck.length * 100}%"></i></div>
+      <div class="ql-card" tabindex="0" role="button" aria-label="Bấm để lật thẻ">
+        <div class="ql-inner">
+          <div class="ql-face ql-front">${mode === 'vi' ? `<div class="ql-vi">${esc(w.vi)}</div>` : mode === 'au' ? `<div class="ql-au">${icon('vol')}<span>Bấm loa để nghe lại</span></div>` : `<div class="ql-h" lang="zh-CN">${esc(w.h)}</div>`}<div class="ql-hint">Bấm vào thẻ hoặc phím cách để lật</div></div>
+          <div class="ql-face ql-back"><div class="ql-h sm" lang="zh-CN">${esc(w.h)}</div><div class="ql-p">${esc(w.p)}</div><div class="ql-vi">${esc(w.vi)}</div>
+            ${ex ? `<div class="ql-ex"><div lang="zh-CN">${esc(ex[0])}</div><div class="small muted">${esc(ex[1])}</div></div>` : ''}</div>
+        </div>
+        <button class="say ql-say" data-say="${esc(w.h)}" aria-label="Nghe">${icon('vol')}</button>
+      </div>
+      <div class="ql-btns"><button class="ql-b no" id="qlNo">✗ Chưa thuộc <kbd>←</kbd></button><button class="ql-b yes" id="qlYes">✓ Đã thuộc <kbd>→</kbd></button></div>
+    </div>`;
+    if (mode === 'au') speak(w.h);
+    const card = $('.ql-card', fb);
+    card.onclick = e => { if (e.target.closest('.ql-say')) return; card.classList.toggle('flipped'); if (card.classList.contains('flipped') && mode !== 'au') speak(w.h); };
+    const mark = ok => { res[w.h] = ok; setKnown(x.id, w.h, ok); i++; logActivity(); drawTable(); drawCard(); };
+    $('#qlNo', fb).onclick = () => mark(false); $('#qlYes', fb).onclick = () => mark(true);
+  };
+  const drawSummary = () => {
+    const unk = deck.filter(w => res[w.h] === false), ok = deck.length - unk.length;
+    $('#fcBox', box).innerHTML = `<div class="ql-sum">
+      <div class="sp-sum"><div class="score-ring" style="--p:${Math.round(ok / deck.length * 100)}"><span>${ok}/${deck.length}</span></div>
+      <div><h3>${unk.length ? `Bạn còn ${unk.length} từ chưa thuộc` : 'Tuyệt vời! Bạn đã thuộc hết các từ.'}</h3><p class="muted">${unk.length ? 'Đọc to các câu bên dưới vài lần để nhớ từ trong ngữ cảnh, rồi học lại.' : 'Hãy thử tự đặt câu với các từ mới để nhớ lâu hơn.'}</p>
+      <div class="row gap wrap">${unk.length ? `<button class="btn" id="reUnk">Học lại ${unk.length} từ chưa thuộc</button>` : ''}<button class="btn ghost" id="reAll">Học lại tất cả</button>${unk.length ? '<button class="btn ghost" id="toMs">Tự đặt câu với từ chưa thuộc</button>' : ''}</div></div></div>
+      ${unk.map(w => { const ss = sentWith(x, w.h); const more = examplesFor(w.h, 4).filter(e => !ss.some(s => s[0] === e.zh)).slice(0, 2);
+        return `<div class="unk-w"><div class="unk-h"><span lang="zh-CN" class="t-h" data-w="${esc(w.h)}">${esc(w.h)}</span> <span class="t-p">${esc(w.p)}</span> – ${esc(w.vi)} ${say(w.h)}</div>
+          <div class="muted small">Câu để học thuộc:</div>${ss.map(([zh, vi]) => sentence(zh, vi)).join('')}${more.map(e => sentence(e.zh.replace(/^[AB]：/, ''), e.vi.replace(/^[AB]: /, ''))).join('')}</div>`; }).join('')}
+    </div>`;
+    const q = sel => $(sel, box);
+    if (q('#reUnk')) q('#reUnk').onclick = () => start(unk);
+    q('#reAll').onclick = () => start(words);
+    if (q('#toMs')) q('#toMs').onclick = () => { $('#msWord', box).value = unk[0].h; drawMs(); $('#msSec', box).scrollIntoView({ behavior: 'smooth' }); };
+    drawMsOptions();
+  };
+  $('#fcFront', box).onchange = () => drawCard();
+  $('#fcShuf', box).onchange = () => start(deck.length ? deck : words);
+  const keyh = e => {
+    if (!box.isConnected) return document.removeEventListener('keydown', keyh);
+    if (e.target.matches('input,textarea,select')) return;
+    const card = $('.ql-card', box); if (!card) return;
+    const r = card.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return;
+    if (e.code === 'Space') { e.preventDefault(); card.click(); }
+    if (e.key === 'ArrowLeft') $('#qlNo', box)?.click();
+    if (e.key === 'ArrowRight') $('#qlYes', box)?.click();
+  };
+  document.addEventListener('keydown', keyh);
+  start(words);
+
+  // ── tự đặt câu ──
+  const drawMsOptions = () => {
+    const k = knownOf(x.id), cur = $('#msWord', box).value;
+    const sorted = [...words].sort((a, b) => (k[a.h] === false ? 0 : 1) - (k[b.h] === false ? 0 : 1));
+    $('#msWord', box).innerHTML = sorted.map(w => `<option value="${esc(w.h)}">${k[w.h] === false ? '✗ ' : k[w.h] === true ? '✓ ' : ''}${esc(w.h)} (${esc(w.p)}) – ${esc(w.vi)}</option>`).join('');
+    if (cur) $('#msWord', box).value = cur;
+  };
+  const drawMs = () => {
+    const h = $('#msWord', box).value, w = words.find(z => z.h === h); if (!w) return;
+    const mine = (store.s.mySent || {})[h] || [];
+    const ref = sentWith(x, h)[0];
+    $('#msBox', box).innerHTML = `${ref ? `<div class="ms-ref"><span class="muted small">Câu mẫu trong bài:</span>${sentence(ref[0], ref[1])}</div>` : ''}
+      ${[0, 1, 2, 3, 4].map(n => `<div class="ms-row" data-n="${n}">
+        <span class="ms-no">${n + 1}</span>
+        <div class="ms-main"><input class="inp ms-in" lang="zh-CN" placeholder="Viết câu có từ “${esc(h)}”…" value="${esc(mine[n] || '')}">
+          <div class="ms-py muted small"></div><div class="ms-out"></div></div>
+        <div class="ms-act"><button class="mini ms-chk">Kiểm tra</button><button class="say ms-say" title="Nghe câu của bạn" aria-label="Nghe câu của bạn">${icon('vol')}</button><button class="say ms-rec" title="Ghi âm" aria-label="Ghi âm">${icon('mic')}</button></div>
+      </div>`).join('')}
+      <p class="muted small" id="msDone"></p>`;
+    const done = () => { const arr = (store.s.mySent || {})[h] || []; const n = arr.filter(t => t && t.includes(h)).length; $('#msDone', box).textContent = `Đã viết ${n}/5 câu có dùng “${h}”.`; };
+    $$('.ms-row', box).forEach(row => { const inp = $('.ms-in', row); const upd = () => { $('.ms-py', row).textContent = inp.value.trim() ? sentencePinyin(inp.value.trim()) : ''; }; upd();
+      inp.oninput = () => { upd(); store.update(s => { s.mySent = s.mySent || {}; const a = s.mySent[h] || []; a[+row.dataset.n] = inp.value.trim(); s.mySent[h] = a; }); done(); }; });
+    done();
+  };
+  drawMsOptions(); $('#msWord', box).value = (words.find(w => knownOf(x.id)[w.h] === false) || words[0] || {}).h || ''; drawMs();
+  $('#msWord', box).onchange = drawMs;
+
+  box.addEventListener('click', async e => {
+    const row = e.target.closest('.ms-row'); if (!row) return;
+    const h = $('#msWord', box).value, inp = $('.ms-in', row), t = inp.value.trim(), out = $('.ms-out', row);
+    if (e.target.closest('.ms-say')) { if (t) speak(t); return; }
+    if (e.target.closest('.ms-chk')) {
+      if (!t) { out.innerHTML = '<span class="muted">Hãy viết một câu trước.</span>'; return; }
+      const { issues } = checkSentence(t);
+      out.innerHTML = `${t.includes(h) ? `<span class="ok-t">✓ Có dùng “${esc(h)}”</span>` : `<span class="bad-t">✗ Câu chưa có từ “${esc(h)}”</span>`}
+        ${issues.length ? `<ul class="ms-iss">${issues.map(i => `<li class="${i.info ? 'info' : 'warn'}">${esc(i.msg)}</li>`).join('')}</ul>` : ' <span class="ok-t">· Không phát hiện lỗi phổ biến</span>'}`;
+      return;
+    }
+    const rb = e.target.closest('.ms-rec'); if (!rb) return;
+    if (!t) { out.innerHTML = '<span class="muted">Hãy viết câu trước rồi ghi âm.</span>'; return; }
+    if (rb.classList.contains('rec')) { rb._stop && rb._stop(); return; }
+    rb.classList.add('rec'); out.innerHTML = '<span class="muted">Đang ghi âm… đọc to câu bạn vừa viết' + (SR ? '' : ', bấm lại micro để dừng') + '</span>';
+    try {
+      const r = await recordClip(rb);
+      let html = '';
+      if (r.alts && r.alts.length) { const best = r.alts.map(a => ({ a, ...align(t, a) })).sort((p, q) => q.score - p.score)[0]; html += `<span class="score ${best.score >= 80 ? 'good' : best.score >= 50 ? 'mid' : 'bad'}">${best.score}%</span> <span class="muted small">Máy nghe được:</span> <span lang="zh-CN">${esc(best.a)}</span>`; }
+      else if (SR) html += '<span class="muted">Không nghe rõ, hãy thử lại.</span>';
+      if (r.url) html += `<audio controls src="${r.url}"></audio>`;
+      out.innerHTML = html; logActivity(2);
+    } catch (err) { out.innerHTML = `<span class="bad-t">${esc(err.message)}</span>`; }
+    rb.classList.remove('rec');
+  });
+}
+
+// Ghi một đoạn ngắn: nhận dạng giọng nói (nếu có) + thu âm để nghe lại
+async function recordClip(btn) {
+  let stream = null, mr = null, chunks = [];
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); if (window.MediaRecorder) { mr = new MediaRecorder(stream); mr.ondataavailable = e => e.data.size && chunks.push(e.data); mr.start(); } }
+  catch { if (!SR) throw new Error('Không truy cập được micro. Hãy cho phép quyền micro.'); }
+  const stopRec = () => new Promise(res => { const fin = () => { stream && stream.getTracks().forEach(t => t.stop()); res(chunks.length ? URL.createObjectURL(new Blob(chunks, { type: chunks[0].type || 'audio/webm' })) : ''); }; if (mr && mr.state !== 'inactive') { mr.onstop = fin; mr.stop(); } else fin(); });
+  if (SR) { let alts = []; try { alts = await recognizeOnce(); } finally { var url = await stopRec(); } return { alts, url }; }
+  await new Promise(res => { btn._stop = res; setTimeout(res, 15000); });
+  btn._stop = null;
+  return { alts: [], url: await stopRec() };
 }

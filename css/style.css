@@ -356,3 +356,38 @@ body.split .tk { margin: 0 .18em; } body.split .gl { display: block; }
 .sp-sum { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin: 12px 0; } .sp-sum .score-ring { margin: 0; } .sp-sum audio { width: 100%; max-width: 420px; }
 .weak { padding-left: 18px; } .weak li { padding: 4px 0; } .weak span[lang] { font-size: 1.05rem; }
 @media (max-width: 640px) { .sp-bar { top: 58px; gap: 8px; } .sp-bar .sel select { max-width: 150px; } .sp-text { padding: 4px 10px; } }
+/* ── Từ mới, cấu trúc, thẻ lật kiểu Quizlet, tự đặt câu ── */
+.nw-tbl td, .nw-tbl th { padding: 7px 12px; } .nw-tbl tr.kn td { background: color-mix(in srgb, var(--jade2) 60%, transparent); } .nw-tbl tr.unk td { background: color-mix(in srgb, var(--red2) 50%, transparent); }
+.nw-tbl .say { width: 30px; height: 30px; }
+.st { font-weight: 600; font-size: .85rem; white-space: nowrap; } .st.ok { color: var(--jade); } .st.no { color: var(--red); }
+.gs-list { display: grid; gap: 12px; } .gs { border: 1px solid var(--line); border-left: 4px solid var(--gold); border-radius: 12px; padding: 10px 14px; }
+.gs-f { font: 700 1.15rem var(--zh); color: var(--red); } .gs-x { color: var(--ink2); font-size: .92rem; } .gs .sent { padding: 6px 0 0; border: 0; }
+.ql { max-width: 620px; margin: 6px auto 0; }
+.ql-top { display: flex; justify-content: space-between; font-weight: 600; color: var(--ink2); margin-bottom: 6px; } .ql-no { color: var(--red); } .ql-yes { color: var(--jade); }
+.ql-card { position: relative; perspective: 1400px; height: 300px; margin: 14px 0; cursor: pointer; outline: none; }
+.ql-inner { position: absolute; inset: 0; transition: transform .5s cubic-bezier(.3,.7,.3,1); transform-style: preserve-3d; }
+.ql-card.flipped .ql-inner { transform: rotateY(180deg); }
+.ql-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 22px; background: var(--card); border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(60, 40, 20, .12); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 22px; text-align: center; }
+.ql-back { transform: rotateY(180deg); background: linear-gradient(160deg, var(--card), var(--gold2)); }
+.ql-card:focus-visible .ql-face { outline: 3px solid var(--blue); }
+.ql-h { font: 700 calc(4rem * var(--zh-scale)) / 1.15 var(--zh); } .ql-h.sm { font-size: calc(2.6rem * var(--zh-scale)); }
+.ql-p { color: var(--red); font: 600 1.3rem var(--py); } .ql-vi { font-size: 1.35rem; font-weight: 500; }
+.ql-au { display: grid; justify-items: center; gap: 6px; color: var(--red); } .ql-au .ic { width: 54px; height: 54px; }
+.ql-hint { position: absolute; bottom: 12px; font-size: .78rem; color: var(--muted); }
+.ql-ex { background: var(--paper); border-radius: 12px; padding: 8px 12px; max-width: 100%; } .ql-ex div[lang] { font-size: 1.1rem; }
+.ql-say { position: absolute; top: 12px; right: 12px; z-index: 2; }
+.ql-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ql-b { border: 2px solid; border-radius: 14px; padding: 14px; font: 700 1.05rem var(--ui); cursor: pointer; background: var(--card); transition: .15s; }
+.ql-b kbd { font: 500 .75rem var(--ui); opacity: .6; margin-left: 4px; }
+.ql-b.no { border-color: var(--red); color: var(--red); } .ql-b.no:hover { background: var(--red); color: #fff; }
+.ql-b.yes { border-color: var(--jade); color: var(--jade); } .ql-b.yes:hover { background: var(--jade); color: #fff; }
+.unk-w { border-top: 1px dashed var(--line); padding: 12px 0; } .unk-h { font-size: 1.05rem; margin-bottom: 4px; } .unk-w .sent { padding: 6px 0; border: 0; }
+.ms-ref { background: var(--bg); border-radius: 12px; padding: 4px 12px; margin: 10px 0; } .ms-ref .sent { border: 0; }
+.ms-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.ms-no { width: 28px; height: 28px; border-radius: 50%; background: var(--gold2); color: var(--gold); display: grid; place-items: center; font-weight: 700; flex: none; margin-top: 6px; }
+.ms-main { flex: 1; min-width: 0; } .ms-in { font-family: var(--zh), var(--ui); font-size: 1.15rem; } .ms-py { font-family: var(--py); margin-top: 3px; min-height: 1em; }
+.ms-out { margin-top: 4px; font-size: .92rem; } .ms-out audio { display: block; margin-top: 6px; width: 100%; max-width: 360px; height: 36px; }
+.ms-iss { margin: 4px 0; padding-left: 18px; } .ms-iss .warn { color: var(--red); } .ms-iss .info { color: var(--ink2); }
+.ms-act { display: flex; gap: 6px; align-items: center; margin-top: 4px; } .ms-rec.rec { background: var(--red); color: #fff; animation: pulse 1s infinite; }
+@media (max-width: 640px) { .ql-card { height: 260px; } .ql-h { font-size: 3rem; } .ms-row { flex-wrap: wrap; } .ms-act { margin-left: 38px; } }

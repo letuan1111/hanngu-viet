@@ -6,6 +6,7 @@ import { store } from './store.js';
 import { HSK30_1_ORDER, HSK30_1_NEW } from '../data/hsk30.js';
 import { READINGS } from '../data/readings.js';
 import { EXAMPLES1 } from '../data/examples1.js';
+import { SPEAK_DICT } from '../data/speaking.js';
 
 export { POS, TOPICS, LESSONS, CHAPTERS, GRAMMAR, CHARS, READINGS, EXAMPLES1 };
 export const isHan = c => /\p{Script=Han}/u.test(c);
@@ -26,6 +27,7 @@ export function rebuild() {
   const add = w => { if (!byH.has(w.h)) byH.set(w.h, []); byH.get(w.h).push(w); maxLen = Math.max(maxLen, w.h.length); };
   VOCAB.forEach(add);
   V30_NEW.forEach(add);
+  for (const [h, p, vi] of SPEAK_DICT) if (!byH.has(h)) add({ id: `sp-${h}`, h, p, vi, pos: '', topics: ['coban'], level: 0, source: 'extra' });
   for (const w of store.s.community.words) add({ ...w, source: 'community' });
 }
 rebuild();
