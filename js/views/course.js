@@ -88,10 +88,10 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-writ
 
 function paneVocab(pane, l) {
   const main = l.words.map(entry).filter(Boolean), extra = l.extra.map(entry).filter(Boolean);
-  pane.innerHTML = `<div class="pane-tools"><p class="muted">Bấm vào thẻ để xem chi tiết. Biểu tượng cọ để luyện viết.</p><button class="btn sm" id="addAll">${icon('plus')} Thêm tất cả vào ôn tập</button></div>
+  pane.innerHTML = `<section class="card vs-sec lesson-ql"><h2>🃏 Học từ mới kiểu Quizlet</h2><p class="muted small">Toàn bộ ${main.length + extra.length} từ của bài: danh sách 5 câu ví dụ, thẻ lật, Học, Kiểm tra và trò chơi. Các thẻ từ chi tiết ở bên dưới.</p><div id="lqBox"></div></section>
+    <div class="pane-tools"><p class="muted">Bấm vào thẻ để xem chi tiết. Biểu tượng cọ để luyện viết.</p><button class="btn sm" id="addAll">${icon('plus')} Thêm tất cả vào ôn tập</button></div>
     <div class="wgrid-list">${main.map(wordTile).join('')}</div>
-    ${extra.length ? `<h3 class="sub">Từ HSK ${l.level} cùng chủ đề <span class="badge">Bổ sung</span></h3><div class="wgrid-list">${extra.map(wordTile).join('')}</div>` : ''}
-    <section class="card vs-sec lesson-ql"><h2>🃏 Học từ mới kiểu Quizlet</h2><p class="muted small">Toàn bộ ${main.length + extra.length} từ của bài: danh sách 5 câu ví dụ, thẻ lật, Học, Kiểm tra và trò chơi.</p><div id="lqBox"></div></section>`;
+    ${extra.length ? `<h3 class="sub">Từ HSK ${l.level} cùng chủ đề <span class="badge">Bổ sung</span></h3><div class="wgrid-list">${extra.map(wordTile).join('')}</div>` : ''}`;
   const qlKey = 'L' + l.idx;
   vocabSet($('#lqBox', pane), [...main, ...extra].map(w => ({ h: w.h, p: w.p, vi: w.vi })), {
     id: qlKey, sent: l.d.map(d => [d[1], d[2]]),

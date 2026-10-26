@@ -17,7 +17,7 @@ export function hsk500(root, lvArg) {
   <div class="page-head"><div><p class="eyebrow">Chuẩn HSK 3.0 · cấp ${lv}</p><h1>${TITLE}</h1></div>
     <div class="row gap wrap"><button class="btn sm" id="learn">${icon('plus')} Học 20 từ chưa thuộc</button><button class="btn sm ghost" id="test">Kiểm tra nhanh</button>${lv === 1 ? '<a class="btn sm ghost" href="#/reading">Bài đọc theo cấu trúc</a>' : ''}</div></div>
   <nav class="tabs">${[1, 2, 3].map(l => `<a class="tab ${l === lv ? 'on' : ''}" href="#/hsk30/${l}">HSK ${l} <span class="cnt">${HSK30_ORDER[l].length}</span></a>`).join('')}</nav>
-  <p class="muted small">${lv === 1 ? 'Danh sách cấp 1 theo Tiêu chuẩn trình độ tiếng Trung quốc tế (HSK 3.0, 2021): 500 từ (506 mục do một số từ có biến thể). Bao gồm toàn bộ 150 từ HSK 1 cũ cùng nhiều từ HSK 2–3 cũ.' : `Danh sách từ mới riêng của cấp ${lv} theo HSK 3.0 (2021): ${list.length} mục, không lặp lại từ của cấp dưới. Từ gắn nhãn “mới” là từ không có trong HSK 1–3 cũ (2.0).`} Bấm vào chữ Hán để tra, đánh dấu ✓ những từ đã thuộc. Kéo xuống cuối trang để học kiểu Quizlet theo từng nhóm 20 từ.</p>
+  <p class="muted small">${lv === 1 ? 'Danh sách cấp 1 theo Tiêu chuẩn trình độ tiếng Trung quốc tế (HSK 3.0, 2021): 500 từ (506 mục do một số từ có biến thể). Bao gồm toàn bộ 150 từ HSK 1 cũ cùng nhiều từ HSK 2–3 cũ.' : `Danh sách từ mới riêng của cấp ${lv} theo HSK 3.0 (2021): ${list.length} mục, không lặp lại từ của cấp dưới. Từ gắn nhãn “mới” là từ không có trong HSK 1–3 cũ (2.0).`} Bấm vào chữ Hán để tra, đánh dấu ✓ những từ đã thuộc. Học kiểu Quizlet theo từng nhóm 20 từ ở ngay bên dưới.</p>
   <div class="card lv-sum"><div class="grow"><b id="kc"></b><span class="bar"><i id="kb"></i></span></div></div>
   <div class="filters">
     <input id="q30" class="inp" placeholder="Tìm chữ Hán, pinyin hoặc nghĩa…" style="max-width:340px">
@@ -72,7 +72,7 @@ export function hsk500(root, lvArg) {
   const nG = Math.ceil(list.length / 20);
   qs.innerHTML = `<div class="row gap wrap" style="justify-content:space-between"><h2>🃏 Học kiểu Quizlet</h2><label class="sel">Bộ từ <select id="qlG" class="inp sm"><option value="todo">20 từ chưa thuộc</option><option value="filter">20 từ đầu của danh sách đang lọc</option>${[...Array(nG)].map((_, i) => `<option value="${i}">Nhóm ${i + 1}: từ ${i * 20 + 1}–${Math.min(list.length, i * 20 + 20)}</option>`).join('')}</select></label></div>
     <p class="muted small">Danh sách kèm 5 câu ví dụ, thẻ lật, chế độ Học, Kiểm tra, Ghép thẻ, Sao băng và Đúng hay sai. Từ đánh dấu ✓ ở đây cũng được tích ✓ trong bảng phía trên.</p><div id="qlBox"></div>`;
-  $('#qz30', root).before(qs);
+  $('.lv-sum', root).before(qs);
   const pickSet = () => { const v = $('#qlG', root).value, k = known(); const ws = v === 'todo' ? list.filter(w => !k[w.h]) : v === 'filter' ? rows() : list.slice(+v * 20, +v * 20 + 20); return ws.slice(0, 20).map(w => ({ h: w.h, p: w.p, vi: w.vi })); };
   const startQl = () => vocabSet($('#qlBox', root), pickSet(), { id: `hsk30-${lv}`, sent: [], known: () => known(), setKnown: (h, v) => store.update(s => { s.known30 = s.known30 || {}; if (v) s.known30[h] = true; else delete s.known30[h]; }), onChange: draw });
   $('#qlG', root).onchange = startQl; startQl();
