@@ -14,9 +14,9 @@ const strip = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').repl
 // ── Danh sách chủ đề ──
 export function speakingList(root) {
   const best = store.s.speakBest || {};
-  root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Luyện nói theo chủ đề</p><h1>32 câu hỏi nói thường gặp</h1></div></div>
+  root.innerHTML = `<div class="page-head"><div><h1>Luyện nói theo chủ đề</h1></div></div>
   <p class="muted">Mỗi câu hỏi có một bài nói mẫu khoảng 300 chữ. Đọc với pinyin và nghĩa tiếng Việt, tắt dần khi đã quen, nghe giọng mẫu, rồi ghi âm để máy chấm từng chữ bạn đọc đúng hay sai.</p>
-  ${SPEAK_GROUPS.map(([g, name, ic]) => { const items = SPEAK_ITEMS.filter(x => x.g === g); return `<section class="chapter"><h2><small>${items.length} bài</small>${ic} ${esc(name)}</h2>
+  ${SPEAK_GROUPS.map(([g, name, ic]) => { const items = SPEAK_ITEMS.filter(x => x.g === g); return `<section class="chapter"><h2 class="grp-h">${ic} ${esc(name)} <span class="grp-n">${items.length} bài</span></h2>
     <div class="lesson-list">${items.map(x => `<a class="lesson-item ${best[x.id] >= 80 ? 'done' : ''}" href="#/speaking/${x.id}"><span class="ln">${best[x.id] >= 80 ? icon('check') : x.id}</span><span class="lt"><b lang="zh-CN" class="sp-q">${esc(x.q)}</b><small>${esc(x.qvi)}</small></span>${best[x.id] != null ? `<span class="best">${best[x.id]}%</span>` : ''}</a>`).join('')}</div></section>`; }).join('')}`;
   return 'Luyện nói theo chủ đề';
 }
