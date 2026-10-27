@@ -284,13 +284,15 @@ export async function listenItem(root, id, tab = 'text') {
         <textarea id="lsTxt" class="inp ls-txt" lang="zh-CN" rows="10" placeholder="你好，我叫王明。|Xin chào, tôi tên là Vương Minh.\n我是中国人。\nTôi là người Trung Quốc.">${esc(linesToText(d.lines))}</textarea>
         <div class="row gap wrap"><button class="btn" id="lsSaveTxt">💾 Lưu nội dung</button>
           <label class="btn ghost">📄 Tải file nội dung (.txt, .lrc, .srt)<input type="file" id="lsTxtFile" accept=".txt,.lrc,.srt,.vtt,text/plain" hidden></label>
-          ${SR ? '<button class="btn ghost" id="lsAuto">🎙️ Nhận dạng tự động (thử nghiệm)</button>' : ''}
+          <button class="btn" id="lsAI">🤖 Nhận dạng tự động từ file</button>
+          ${SR ? '<button class="btn ghost" id="lsAuto">🎙️ Nhận dạng qua loa + micro</button>' : ''}
           ${d.lines.length ? '<button class="btn ghost" id="lsCancel">Hủy</button>' : ''}</div>
         <div id="lsAutoBox" class="small"></div></section>`;
       $('#lsSaveTxt', body).onclick = async () => { d.lines = parseTranscript($('#lsTxt', body).value); await save(); toast(d.lines.length ? `Đã lưu ${d.lines.length} câu.` : 'Đã xóa nội dung.'); drawText(false); };
       $('#lsTxtFile', body).onchange = async e => { const f = e.target.files[0]; if (f) $('#lsTxt', body).value = linesToText(parseTranscript(await readText(f))); };
       if ($('#lsCancel', body)) $('#lsCancel', body).onclick = () => drawText(false);
       if ($('#lsAuto', body)) $('#lsAuto', body).onclick = autoTranscribe;
+      $('#lsAI', body).onclick = aiTranscribe;
       return;
     }
     const hasT = d.lines.some(l => l.t != null), hasVi = d.lines.some(l => l.vi);
@@ -346,6 +348,72 @@ export async function listenItem(root, id, tab = 'text') {
     $('#sUndo', box).onclick = () => { if (!marks.length) return; marks.pop(); k--; show(); };
     $('#sStop', box).onclick = () => finish(marks.length > 0 && confirm(`Lưu thời gian cho ${marks.length} câu đã đánh dấu?`));
     show(); box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Nhận dạng thẳng từ file bằng AI chạy trên máy (Whisper) – không cần loa/micro
+  let worker = null;
+  function aiTranscribe() {
+    const out = $('#lsAutoBox', body);
+    const mem = navigator.deviceMemory || 8;
+    out.innerHTML = `<div class="ls-ai card">
+      <p><b>🤖 Nhận dạng tự động bằng AI (Whisper) chạy ngay trên máy bạn</b> – đọc thẳng từ file, không cần loa hay micro, không gửi âm thanh đi đâu. Lần đầu cần tải mô hình về trình duyệt (chỉ một lần), sau đó dùng lại ngay. Kết quả có mốc thời gian, chữ phồn thể được đổi sang giản thể.</p>
+      <div class="row gap wrap"><label class="sel">Mô hình <select id="aiModel">
+        <option value="Xenova/whisper-base">Nhanh – base (~80 MB)</option>
+        <option value="Xenova/whisper-small" ${mem >= 8 ? 'selected' : ''}>Chính xác hơn – small (~250 MB)</option>
+        <option value="Xenova/whisper-tiny">Rất nhanh, kém chính xác – tiny (~40 MB)</option></select></label>
+        <button class="btn sm" id="aiGo">▶ Bắt đầu nhận dạng</button><button class="btn sm ghost" id="aiStop" disabled>Dừng</button></div>
+      <div class="ai-prog" hidden><div class="my-bar"><span id="aiBar"></span></div><span class="small muted" id="aiTxt"></span></div>
+      <div class="sp-live" id="aiLive"></div>
+      <p class="small muted">Nên dùng máy tính và trình duyệt Chrome/Edge bản mới. Bài 5 phút thường mất vài phút để nhận dạng (máy càng mạnh càng nhanh). AI có thể nghe sai tên riêng hoặc từ hiếm – hãy đọc lại và sửa trước khi lưu.</p></div>`;
+    const bar = $('#aiBar', out), txt = $('#aiTxt', out), live = $('#aiLive', out), prog = $('.ai-prog', out);
+    const setP = (f, m) => { prog.hidden = false; bar.style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + '%'; txt.textContent = m; };
+    const got = [];
+    const finish = (ok, msg) => {
+      if (worker) { worker.terminate(); worker = null; }
+      $('#aiGo', out).disabled = false; $('#aiStop', out).disabled = true;
+      if (got.length) {
+        const ta = $('#lsTxt', body);
+        const lines = got.map(g => `[${fmtT(g.t)}] ${/[。！？!?…]$/.test(g.zh) ? g.zh : g.zh + '。'}`).join('\n');
+        ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + lines;
+        ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (msg) txt.innerHTML = msg;
+      if (ok) toast(got.length ? `Đã nhận dạng ${got.length} câu – hãy đọc lại, sửa rồi bấm “Lưu nội dung”.` : 'Không nhận ra lời nói tiếng Trung trong file này.', got.length ? 'good' : 'bad');
+    };
+    $('#aiStop', out).onclick = () => finish(false, 'Đã dừng. Phần đã nhận dạng được chép vào ô nội dung.');
+    $('#aiGo', out).onclick = async () => {
+      got.length = 0; live.innerHTML = '';
+      $('#aiGo', out).disabled = true; $('#aiStop', out).disabled = false;
+      let pcm;
+      try { setP(0, 'Đang đọc file âm thanh…'); pcm = await decode16k(); }
+      catch (e) { finish(false, `<span class="bad-t">Không đọc được file âm thanh (${esc(e.message || e)}). ${d.audioUrl ? 'File từ link có thể bị trang gốc chặn – hãy tải file về máy rồi thêm lại.' : ''}</span>`); return; }
+      try { worker = new Worker(new URL('../workers/asr.js', import.meta.url), { type: 'module' }); }
+      catch { finish(false, '<span class="bad-t">Trình duyệt này chưa hỗ trợ chạy nhận dạng (cần Chrome/Edge/Firefox bản mới).</span>'); return; }
+      const files = {};
+      worker.onmessage = ev => {
+        const m = ev.data;
+        if (m.type === 'stage') setP(0, m.msg);
+        else if (m.type === 'load') { files[m.file] = [m.loaded || 0, m.total || 0]; const L = Object.values(files).reduce((a, x) => a + x[0], 0), T = Object.values(files).reduce((a, x) => a + x[1], 0); setP(T ? L / T : 0, `Đang tải mô hình: ${fmtSize(L)}${T ? ' / ' + fmtSize(T) : ''} (chỉ lần đầu)`); }
+        else if (m.type === 'part') { got.push(...m.lines); setP((m.k + 1) / m.n, `Đã nhận dạng ${m.k + 1}/${m.n} đoạn · ${got.length} câu`); live.innerHTML = got.slice(-5).map(g => `<div lang="zh-CN">[${fmtT(g.t)}] ${esc(g.zh)}</div>`).join(''); }
+        else if (m.type === 'done') { setP(1, '✓ Xong'); finish(true); }
+        else if (m.type === 'error') finish(false, `<span class="bad-t">Lỗi khi nhận dạng: ${esc(m.msg)}. Hãy kiểm tra kết nối mạng (lần đầu cần tải mô hình) hoặc thử mô hình nhỏ hơn.</span>`);
+      };
+      worker.onerror = ev => finish(false, `<span class="bad-t">Không chạy được bộ nhận dạng (${esc(ev.message || 'lỗi')}).</span>`);
+      worker.postMessage({ type: 'run', model: $('#aiModel', out).value, audio: pcm }, [pcm.buffer]);
+    };
+  }
+  // Giải mã file thành âm thanh mono 16 kHz (định dạng Whisper cần)
+  async function decode16k() {
+    const buf = d.audio ? await d.audio.arrayBuffer() : await (await fetch(d.audioUrl)).arrayBuffer();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    const ab = await new Promise((res, rej) => { const p = ctx.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); });
+    ctx.close && ctx.close();
+    const len = Math.ceil(ab.duration * 16000);
+    const off = new OfflineAudioContext(1, len, 16000);
+    const src = off.createBufferSource(); src.buffer = ab; src.connect(off.destination); src.start();
+    const r = await off.startRendering();
+    return new Float32Array(r.getChannelData(0));
   }
 
   // Nhận dạng tự động: phát âm thanh qua loa và nghe lại bằng micro (Chrome/Edge)

@@ -816,3 +816,4 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 @media (max-width: 1400px) and (min-width: 901px) { .nav a { padding: 0 8px; font-size: .9rem; } }
 @media (max-width: 1180px) and (min-width: 901px) { .nav a { padding: 0 6px; font-size: .85rem; } .bt { display: none; } }
 @media (max-width: 900px) { .bottom a { white-space: nowrap; font-size: .68rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; } }
+.ls-ai { background: var(--paper); margin-top: 10px; } .ai-prog { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; } .ai-prog .my-bar { flex: 1; min-width: 160px; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; } .ai-prog .my-bar span { display: block; height: 100%; width: 0; background: var(--jade); transition: width .3s; }
