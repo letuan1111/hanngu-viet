@@ -64,6 +64,7 @@ export function home(root) {
         ['#/vocab', '词', 'Từ vựng', 'Tra từ, nhóm chủ đề, thứ tự nét viết'],
         ['#/grammar', '法', 'Ngữ pháp', 'Thư viện cấu trúc HSK 1–3'],
         ['#/speaking', '说', 'Luyện nói theo chủ đề', '32 bài nói mẫu, ghi âm chấm từng chữ'],
+        ['#/listen', '听', 'Luyện nghe với file của bạn', 'Tải mp3, xem nội dung nghe, làm câu hỏi'],
         ['#/review', '复', 'Ôn tập', 'Thẻ ghi nhớ lặp lại ngắt quãng'],
         ['#/exam', '考', 'Thi thử HSK', 'Đề đúng cấu trúc HSK 1, 2, 3 có tính giờ'],
         ['#/community', '友', 'Góc đóng góp', 'Thêm từ, ví dụ, mẹo của riêng bạn'],

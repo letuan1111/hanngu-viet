@@ -14,6 +14,7 @@ import { progress, settings } from './views/progress.js';
 import { hsk500, readings } from './views/hsk500.js';
 import { speakingList, speakingItem } from './views/speaking.js';
 import { pronounce } from './views/pronounce.js';
+import { listenHome, listenItem } from './views/listen.js';
 
 const routes = [
   [/^\/?$/, home, 'Trang chủ'],
@@ -26,6 +27,8 @@ const routes = [
   [/^\/reading(?:\/([\w-]+))?$/, readings, 'Bài đọc HSK 1'],
   [/^\/speaking$/, speakingList, 'Luyện nói'],
   [/^\/speaking\/(\d+)(?:\/(long))?$/, speakingItem, 'Luyện nói'],
+  [/^\/listen$/, r => { listenHome(r); return 'Luyện nghe'; }, 'Luyện nghe'],
+  [/^\/listen\/([\w-]+)(?:\/(quiz|type))?$/, (r, id, tab) => { listenItem(r, id, tab || 'text'); return 'Luyện nghe'; }, 'Luyện nghe'],
   [/^\/vocab$/, dictionary, 'Từ vựng'],
   [/^\/word\/(.+)$/, word, 'Từ'],
   [/^\/topics(?:\/(\w+))?$/, topics, 'Nhóm từ'],

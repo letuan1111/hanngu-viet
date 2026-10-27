@@ -1,0 +1,440 @@
+// Luyện nghe với file của bạn: tải mp3 lên (lưu trong IndexedDB của trình duyệt), nghe với tốc độ/lặp câu,
+// hiện nội dung nghe (pinyin, nghĩa, đồng bộ thời gian) và câu hỏi đọc hiểu (tự soạn hoặc tạo tự động từ nội dung).
+import { store, logActivity } from '../core/store.js';
+import { segment, isHan, hsk30List, LV30, shuffle } from '../core/dict.js';
+import { esc, icon, $, $$, toast, zhTokens } from '../core/ui.js';
+import { speak, stopSeq, SR } from '../core/tts.js';
+import { typingTrainer, splitSentences } from './typing.js';
+
+// ── Kho dữ liệu (IndexedDB) ──
+const DB = {
+  db: null,
+  open() { return this.db ? Promise.resolve(this.db) : new Promise((res, rej) => { const r = indexedDB.open('hanngu-listen', 1); r.onupgradeneeded = () => r.result.createObjectStore('sets', { keyPath: 'id' }); r.onsuccess = () => res(this.db = r.result); r.onerror = () => rej(r.error); }); },
+  async tx(mode, fn) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('sets', mode), s = t.objectStore('sets'); const r = fn(s); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); }); },
+  all() { return this.tx('readonly', s => s.getAll()); },
+  get(id) { return this.tx('readonly', s => s.get(id)); },
+  put(d) { d.updated = Date.now(); return this.tx('readwrite', s => s.put(d)); },
+  del(id) { return this.tx('readwrite', s => s.delete(id)); },
+};
+const uid = () => 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const fmtT = s => { if (s == null || isNaN(s)) return '--:--'; s = Math.max(0, s); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(1).padStart(4, '0')}`; };
+const fmtSize = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+const AUDIO_RE = /\.(mp3|m4a|aac|wav|ogg|oga|opus|webm|flac|mp4)$/i, TEXT_RE = /\.(txt|lrc|srt|vtt)$/i;
+const baseName = n => n.replace(/\.[^.]+$/, '');
+const readText = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsText(f, 'utf-8'); });
+const durationOf = src => new Promise(res => { const a = new Audio(); a.preload = 'metadata'; a.onloadedmetadata = () => res(isFinite(a.duration) ? a.duration : 0); a.onerror = () => res(0); a.src = src; setTimeout(() => res(0), 8000); });
+
+// ── Đọc nội dung nghe: "câu|nghĩa", LRC [mm:ss.xx], SRT/VTT, hoặc dòng Trung + dòng Việt ──
+const toSec = (m, s) => +m * 60 + +s;
+export function parseTranscript(text) {
+  text = String(text || '').replace(/\r/g, '').replace(/^﻿/, '');
+  const lines = [];
+  // SRT / VTT
+  if (/-->/.test(text)) {
+    for (const blk of text.split(/\n\s*\n/)) {
+      const m = blk.match(/(\d+):(\d{2}):(\d{2})[,.](\d{1,3})\s*-->/) || blk.match(/(?:^|\n)()(\d{1,2}):(\d{2})[,.](\d{1,3})\s*-->/);
+      if (!m) continue;
+      const t = (+m[1] || 0) * 3600 + +m[2] * 60 + +m[3] + +('0.' + m[4]);
+      const body = blk.split('\n').filter(l => l.trim() && !/-->/.test(l) && !/^\d+$/.test(l.trim()) && !/^WEBVTT/.test(l)).join(' ').replace(/<[^>]+>/g, '').trim();
+      if (body) pushLine(lines, body, t);
+    }
+    return lines;
+  }
+  for (let raw of text.split('\n')) {
+    raw = raw.trim(); if (!raw || /^\[(ti|ar|al|by|offset|length):/i.test(raw)) continue;
+    let t = null; const m = raw.match(/^\[(\d{1,3}):(\d{2}(?:\.\d{1,3})?)\]\s*/);
+    if (m) { t = toSec(m[1], m[2]); raw = raw.slice(m[0].length); }
+    if (!raw) continue;
+    pushLine(lines, raw, t);
+  }
+  lines.forEach(l => delete l.g);
+  return lines;
+}
+function pushLine(lines, raw, t) {
+  const bar = raw.indexOf('|');
+  if (bar > 0) { lines.push({ zh: raw.slice(0, bar).trim(), vi: raw.slice(bar + 1).trim(), t }); return; }
+  const prev = lines[lines.length - 1];
+  if (![...raw].some(isHan)) { // dòng không có chữ Hán → nghĩa của dòng trước
+    if (prev && prev.g) { // đoạn vừa bị tách câu mà có bản dịch chung → gộp lại thành một dòng
+      const g = prev.g, grp = lines.filter(l => l.g === g); lines.splice(lines.indexOf(grp[0]), grp.length, { zh: grp.map(l => l.zh).join(''), vi: raw, t: grp[0].t });
+    } else if (prev && !prev.vi) prev.vi = raw; else if (prev) prev.vi += ' ' + raw;
+    return;
+  }
+  lines.forEach(l => delete l.g);
+  // đoạn dài nhiều câu → tách câu (chỉ khi không có mốc thời gian)
+  const parts = t == null ? splitSentences(raw) : [raw], g = parts.length > 1 ? Math.random() : 0;
+  (parts.length ? parts : [raw]).forEach((z, i) => lines.push({ zh: z, vi: '', t: i === 0 ? t : null, ...(g ? { g } : {}) }));
+}
+const linesToText = ls => ls.map(l => `${l.t != null ? `[${fmtT(l.t)}] ` : ''}${l.zh}${l.vi ? '|' + l.vi : ''}`).join('\n');
+
+// ── Câu hỏi: tự soạn ──
+// 1. 他想去哪儿？
+// A. 北京  B. 上海  C. 广州
+// Đáp án: A        (đúng/sai: Đáp án: 对 / 错 / Đúng / Sai)
+// Giải thích: ... (không bắt buộc)
+export function parseQuestions(text) {
+  const qs = []; let cur = null;
+  const flush = () => { if (cur && cur.q) { if (!cur.opts.length) cur.opts = ['对 (Đúng)', '错 (Sai)']; if (cur.ans >= 0 && cur.ans < cur.opts.length) qs.push(cur); else cur.bad = true, qs.push(cur); } cur = null; };
+  for (let ln of String(text || '').replace(/\r/g, '').split('\n')) {
+    ln = ln.trim(); if (!ln) continue;
+    const ans = ln.match(/^(?:đáp án|dap an|答案|key|answer)\s*[:：]?\s*(.+)$/i);
+    const exp = ln.match(/^(?:giải thích|giai thich|解析|explain)\s*[:：]\s*(.+)$/i);
+    if (ans && cur) {
+      const v = ans[1].trim();
+      if (/^[A-Fa-f]/.test(v) && cur.opts.length) cur.ans = v[0].toUpperCase().charCodeAt(0) - 65;
+      else if (/^(对|đúng|dung|√|✓|true|t\b|y)/i.test(v)) { cur.tf = true; cur.ans = 0; }
+      else if (/^(错|sai|×|✗|x\b|false|f\b|n)/i.test(v)) { cur.tf = true; cur.ans = 1; }
+      continue;
+    }
+    if (exp && cur) { cur.exp = exp[1]; continue; }
+    const opt = [...ln.matchAll(/(?:^|\s)([A-Fa-f])\s*[.、:：)）]\s*(.+?)(?=\s+[A-Fa-f]\s*[.、:：)）]|$)/g)];
+    if (opt.length && cur && opt[0].index === 0) { opt.forEach(o => { cur.opts[o[1].toUpperCase().charCodeAt(0) - 65] = o[2].trim(); }); cur.opts = cur.opts.filter(x => x != null); continue; }
+    flush();
+    cur = { q: ln.replace(/^(?:câu\s*)?\d{1,3}\s*[.、:：)）]\s*/i, ''), opts: [], ans: -1, kind: 'own' };
+  }
+  flush();
+  return qs;
+}
+
+// ── Câu hỏi: tạo tự động từ nội dung ──
+function candidates(zh) {
+  return segment(zh).filter(t => t.han && t.w && [...t.t].length >= 1 && !/^(的|了|是|吗|呢|吧|啊|和|在|我|你|他|她|它|们|也|都|很|不)$/.test(t.t))
+    .map(t => ({ h: t.t, lv: LV30.get(t.t) || 3 }));
+}
+let POOL = null;
+const pool = () => POOL || (POOL = [1, 2, 3].flatMap(lv => hsk30List(lv).map(w => ({ h: w.h, lv, vi: w.vi }))));
+function distractors(h, n = 3, avoid = '') {
+  const len = [...h].length, lv = LV30.get(h) || 2;
+  const same = pool().filter(w => [...w.h].length === len && w.h !== h && !avoid.includes(w.h) && Math.abs(w.lv - lv) <= 1);
+  return shuffle(same).slice(0, n).map(w => w.h);
+}
+export function autoQuestions(lines, n = 10) {
+  const L = lines.map((l, i) => ({ ...l, i })).filter(l => [...l.zh].filter(isHan).length >= 4);
+  if (!L.length) return [];
+  const out = [];
+  const withVi = L.filter(l => l.vi);
+  const pickL = shuffle(L);
+  let k = 0;
+  const kinds = ['cloze', 'tf', withVi.length >= 4 ? 'mean' : 'cloze', 'cloze', 'tf'];
+  while (out.length < n && k < pickL.length * 3) {
+    const l = pickL[k % pickL.length], kind = kinds[k % kinds.length]; k++;
+    if (out.some(q => q.src === l.i && q.kind === kind)) continue;
+    const cs = candidates(l.zh);
+    if (kind === 'cloze' && cs.length) {
+      const c = shuffle(cs).sort((a, b) => [...b.h].length - [...a.h].length)[0];
+      const ds = distractors(c.h, 3, l.zh); if (ds.length < 3) continue;
+      const opts = shuffle([c.h, ...ds]);
+      out.push({ kind, q: 'Nghe và chọn từ đúng điền vào chỗ trống: ' + l.zh.replace(c.h, '（　　）'), opts, ans: opts.indexOf(c.h), src: l.i, exp: l.zh + (l.vi ? ' — ' + l.vi : '') });
+    } else if (kind === 'tf' && cs.length) {
+      const truth = Math.random() < 0.5; let s = l.zh;
+      if (!truth) { const c = shuffle(cs)[0], d = distractors(c.h, 1, l.zh)[0]; if (!d) continue; s = l.zh.replace(c.h, d); }
+      out.push({ kind, tf: true, q: `Theo bài nghe, câu sau đúng hay sai? 「${s}」`, opts: ['对 (Đúng)', '错 (Sai)'], ans: truth ? 0 : 1, src: l.i, exp: 'Câu trong bài: ' + l.zh + (l.vi ? ' — ' + l.vi : '') });
+    } else if (kind === 'mean' && l.vi) {
+      const ds = shuffle(withVi.filter(o => o.i !== l.i && o.vi !== l.vi)).slice(0, 3).map(o => o.vi); if (ds.length < 3) continue;
+      const opts = shuffle([l.vi, ...ds]);
+      out.push({ kind, q: `Câu 「${l.zh}」 có nghĩa là gì?`, opts, ans: opts.indexOf(l.vi), src: l.i, exp: l.zh + ' — ' + l.vi });
+    }
+  }
+  return out;
+}
+
+// ════════════ Thư viện bài nghe ════════════
+export async function listenHome(root) {
+  root.innerHTML = `<div class="page-head"><div><h1>🎧 Luyện nghe với file của bạn</h1></div></div>
+  <p class="muted">Tải file nghe (mp3, m4a, wav…) lên để nghe với tốc độ chậm/nhanh, lặp từng câu, xem <b>nội dung nghe</b> có pinyin và nghĩa, rồi làm <b>câu hỏi đọc hiểu</b>. File được lưu ngay trên trình duyệt của bạn (không gửi lên mạng).</p>
+  <section class="card ls-up" id="lsDrop">
+    <h2>⬆️ Thêm bài nghe</h2>
+    <p class="small muted">Kéo thả file vào đây hoặc bấm chọn. Có thể chọn nhiều file cùng lúc; nếu kèm file nội dung cùng tên (<code>.txt</code>, <code>.lrc</code>, <code>.srt</code>) thì nội dung sẽ được gắn tự động.</p>
+    <div class="row gap wrap"><label class="btn">${icon('plus')} Chọn file nghe<input type="file" id="lsFile" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac,.txt,.lrc,.srt,.vtt" multiple hidden></label>
+      <label class="btn ghost">📦 Nhập bài đã xuất (.json)<input type="file" id="lsImp" accept=".json,application/json" hidden></label></div>
+    <details class="vs-det"><summary>🔗 Hoặc dán link file mp3 trên mạng</summary>
+      <div class="row gap wrap" style="margin-top:8px"><input id="lsUrl" class="inp" placeholder="https://…/bai-nghe.mp3" style="flex:1;min-width:220px"><input id="lsUrlName" class="inp" placeholder="Tên bài (không bắt buộc)" style="flex:1;min-width:160px"><button class="btn ghost" id="lsUrlAdd">Thêm</button></div>
+      <p class="small muted">Link phải mở thẳng ra file âm thanh. Link YouTube hãy dùng ở mục Thi thử.</p></details>
+    <div id="lsMsg" class="small"></div>
+  </section>
+  <section class="card"><div class="row gap wrap" style="justify-content:space-between"><h2>📚 Bài nghe của bạn</h2><span class="muted small" id="lsQuota"></span></div><div id="lsList"><p class="muted">Đang tải…</p></div></section>`;
+
+  const draw = async () => {
+    const all = (await DB.all()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+    $('#lsList', root).innerHTML = all.length ? `<div class="ls-list">${all.map(d => `<div class="ls-item">
+      <a class="ls-main" href="#/listen/${d.id}"><span class="ls-ic">🎧</span><span><b>${esc(d.title)}</b><small class="muted">${fmtT(d.duration).replace(/\.\d$/, '')} · ${d.lines?.length ? `${d.lines.length} câu nội dung` : 'chưa có nội dung'} · ${(d.qs?.length || 0)} câu hỏi${d.best != null ? ` · điểm cao nhất ${d.best}%` : ''}${d.size ? ' · ' + fmtSize(d.size) : d.audioUrl ? ' · link' : ''}</small></span></a>
+      <button class="mini ls-del" data-id="${d.id}" title="Xóa bài này">Xóa</button></div>`).join('')}</div>`
+      : '<p class="muted">Chưa có bài nghe nào. Hãy thêm file ở trên.</p>';
+    try { const e = await navigator.storage?.estimate?.(); if (e) $('#lsQuota', root).textContent = `Đã dùng ${fmtSize(e.usage || 0)} trên trình duyệt`; } catch {}
+  };
+  const msg = h => { $('#lsMsg', root).innerHTML = h; };
+  async function addFiles(files) {
+    files = [...files]; const audios = files.filter(f => AUDIO_RE.test(f.name) || f.type.startsWith('audio/')), texts = files.filter(f => TEXT_RE.test(f.name));
+    if (!audios.length) { if (texts.length) msg('<span class="bad-t">Hãy chọn kèm file âm thanh. Muốn thêm nội dung cho bài đã có, hãy mở bài đó.</span>'); return; }
+    let last = null;
+    for (const f of audios) {
+      if (f.size > 200 * 1048576) { msg(`<span class="bad-t">File “${esc(f.name)}” lớn hơn 200 MB, không thêm được.</span>`); continue; }
+      msg(`Đang thêm “${esc(f.name)}”…`);
+      const url = URL.createObjectURL(f), duration = await durationOf(url); URL.revokeObjectURL(url);
+      const tf = texts.find(t => baseName(t.name).toLowerCase() === baseName(f.name).toLowerCase());
+      const d = { id: uid(), title: baseName(f.name), created: Date.now(), audio: f, type: f.type || 'audio/mpeg', size: f.size, duration, lines: tf ? parseTranscript(await readText(tf)) : [], qText: '', qs: [] };
+      try { await DB.put(d); last = d; } catch (e) { msg(`<span class="bad-t">Không lưu được “${esc(f.name)}” (bộ nhớ trình duyệt có thể đã đầy).</span>`); }
+    }
+    if (last) { logActivity(); msg(`<span class="ok-t">Đã thêm ${audios.length} bài.</span>`); if (audios.length === 1) location.hash = '#/listen/' + last.id; else draw(); }
+  }
+  $('#lsFile', root).onchange = e => addFiles(e.target.files);
+  const drop = $('#lsDrop', root);
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); };
+  $('#lsUrlAdd', root).onclick = async () => {
+    const u = $('#lsUrl', root).value.trim(); if (!/^https?:\/\//i.test(u)) { toast('Link phải bắt đầu bằng http:// hoặc https://', 'bad'); return; }
+    msg('Đang kiểm tra link…'); const duration = await durationOf(u);
+    if (!duration) msg('<span class="bad-t">Không mở được file từ link này (có thể link không phải file âm thanh hoặc trang chặn). Vẫn thêm để bạn thử nghe.</span>');
+    const d = { id: uid(), title: $('#lsUrlName', root).value.trim() || decodeURIComponent(u.split('/').pop().split('?')[0]).replace(/\.[^.]+$/, '') || 'Bài nghe', created: Date.now(), audioUrl: u.slice(0, 1000), duration, lines: [], qText: '', qs: [] };
+    await DB.put(d); location.hash = '#/listen/' + d.id;
+  };
+  $('#lsImp', root).onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const j = JSON.parse(await readText(f)); if (j.app !== 'hanngu-listen') throw new Error();
+      let audio = null; if (j.audio) audio = await (await fetch(j.audio)).blob();
+      const d = { id: uid(), title: j.title || 'Bài nghe', created: Date.now(), audio, type: audio?.type, size: audio?.size, audioUrl: j.audioUrl || '', duration: j.duration || 0, lines: j.lines || [], qText: j.qText || '', qs: j.qs || [] };
+      await DB.put(d); toast('Đã nhập bài nghe.', 'good'); location.hash = '#/listen/' + d.id;
+    } catch { toast('File không đúng định dạng bài nghe đã xuất.', 'bad'); }
+  };
+  $('#lsList', root).onclick = async e => { const b = e.target.closest('.ls-del'); if (!b) return; if (!confirm('Xóa bài nghe này khỏi trình duyệt?')) return; await DB.del(b.dataset.id); draw(); };
+  draw();
+  return 'Luyện nghe';
+}
+
+// ════════════ Trang nghe ════════════
+export async function listenItem(root, id, tab = 'text') {
+  root.innerHTML = '<p class="muted">Đang mở bài nghe…</p>';
+  const d = await DB.get(id); if (!d) { root.innerHTML = '<p>Không tìm thấy bài nghe này. <a href="#/listen">Quay lại</a></p>'; return 'Luyện nghe'; }
+  d.lines = d.lines || []; d.qs = d.qs || [];
+  const src = d.audio ? URL.createObjectURL(d.audio) : d.audioUrl;
+  const opt = store.s.listenOpt || { py: true, vi: true, hide: false, rate: 1 };
+  const saveOpt = () => store.update(s => { s.listenOpt = { ...opt }; });
+  root.innerHTML = `<nav class="crumb"><a href="#/listen">Luyện nghe</a> › ${esc(d.title)}</nav>
+  <section class="card ls-player">
+    <div class="row gap wrap" style="justify-content:space-between;align-items:center"><h1 class="ls-title" id="lsTitle" title="Bấm để đổi tên">${esc(d.title)}</h1>
+      <span class="row gap"><button class="mini" id="lsRename">✏️ Đổi tên</button><button class="mini" id="lsExport">📦 Xuất bài</button></span></div>
+    <audio id="lsAudio" controls preload="metadata" src="${esc(src || '')}"></audio>
+    <div class="row gap wrap ls-ctl">
+      <button class="btn sm ghost" id="lsBack" title="Lùi 5 giây">⏪ 5s</button>
+      <button class="btn sm" id="lsPlay">${icon('play')} Phát / Dừng</button>
+      <button class="btn sm ghost" id="lsFwd" title="Tiến 5 giây">5s ⏩</button>
+      <label class="sel">Tốc độ <select id="lsRate">${[0.5, 0.6, 0.75, 0.9, 1, 1.25, 1.5].map(r => `<option value="${r}" ${r === (opt.rate || 1) ? 'selected' : ''}>${r}x</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" id="lsLoop"> Lặp câu đang nghe</label>
+      <span class="muted small" id="lsNow"></span>
+    </div>
+    <p class="muted small">Phím tắt khi không gõ chữ: <kbd>Space</kbd> phát/dừng · <kbd>←</kbd>/<kbd>→</kbd> lùi/tiến 5 giây · <kbd>R</kbd> nghe lại câu hiện tại.</p>
+  </section>
+  <div class="tabs ls-tabs" role="tablist">
+    <a class="tab ${tab === 'text' ? 'on' : ''}" href="#/listen/${d.id}">📄 Nội dung nghe</a>
+    <a class="tab ${tab === 'quiz' ? 'on' : ''}" href="#/listen/${d.id}/quiz">❓ Câu hỏi đọc hiểu <small class="muted">(${d.qs.length})</small></a>
+    <a class="tab ${tab === 'type' ? 'on' : ''}" href="#/listen/${d.id}/type">⌨️ Nghe – gõ lại</a>
+  </div>
+  <div id="lsBody"></div>`;
+
+  const au = $('#lsAudio', root);
+  au.playbackRate = opt.rate || 1;
+  au.onerror = () => { $('#lsNow', root).innerHTML = '<span class="bad-t">Không phát được âm thanh này.</span>'; };
+  const timed = () => d.lines.map((l, i) => ({ ...l, i })).filter(l => l.t != null).sort((a, b) => a.t - b.t);
+  const curLine = () => { const T = timed(), t = au.currentTime; let c = null; for (const l of T) { if (l.t <= t + 0.05) c = l; else break; } return c; };
+  const lineEnd = i => { const T = timed(), k = T.findIndex(l => l.i === i); return k >= 0 && T[k + 1] ? T[k + 1].t : (au.duration || Infinity); };
+  let stopAt = null, loopStart = 0;
+  const playLine = i => { const l = d.lines[i]; if (!l || l.t == null) return false; au.currentTime = loopStart = l.t; stopAt = lineEnd(i); au.play(); return true; };
+  $('#lsBack', root).onclick = () => { au.currentTime = Math.max(0, au.currentTime - 5); };
+  $('#lsFwd', root).onclick = () => { au.currentTime = Math.min(au.duration || 1e9, au.currentTime + 5); };
+  $('#lsPlay', root).onclick = () => { if (!$('#lsLoop', root).checked) stopAt = null; au.paused ? au.play() : au.pause(); };
+  $('#lsRate', root).onchange = e => { au.playbackRate = opt.rate = +e.target.value; saveOpt(); };
+  au.ontimeupdate = () => {
+    const c = curLine();
+    $('#lsNow', root).textContent = `${fmtT(au.currentTime)} / ${fmtT(au.duration)}${c ? ` · câu ${c.i + 1}` : ''}`;
+    $$('.ls-line', root).forEach(el => el.classList.toggle('now', !!c && +el.dataset.i === c.i));
+    const loop = $('#lsLoop', root).checked;
+    if (stopAt != null && au.currentTime >= stopAt - 0.03) { if (loop) au.currentTime = loopStart; else { au.pause(); stopAt = null; } }
+    else if (loop && stopAt == null && c && !au.paused) { stopAt = lineEnd(c.i); loopStart = c.t; }
+  };
+  au.onplay = () => { stopSeq(); };
+  const keyH = e => {
+    if (!document.body.contains(au)) { document.removeEventListener('keydown', keyH); return; }
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === 'Space') { e.preventDefault(); stopAt = null; au.paused ? au.play() : au.pause(); }
+    else if (e.key === 'ArrowLeft') au.currentTime = Math.max(0, au.currentTime - 5);
+    else if (e.key === 'ArrowRight') au.currentTime += 5;
+    else if (e.key === 'r' || e.key === 'R') { const c = curLine(); if (c) playLine(c.i); }
+  };
+  document.addEventListener('keydown', keyH);
+  const save = () => DB.put(d);
+  $('#lsRename', root).onclick = async () => { const n = prompt('Tên bài nghe:', d.title); if (n && n.trim()) { d.title = n.trim().slice(0, 120); await save(); $('#lsTitle', root).textContent = d.title; } };
+  $('#lsExport', root).onclick = async () => {
+    const j = { app: 'hanngu-listen', v: 1, title: d.title, duration: d.duration, audioUrl: d.audioUrl || '', lines: d.lines, qText: d.qText || '', qs: d.qs };
+    if (d.audio) { if (d.audio.size > 60 * 1048576 && !confirm('File âm thanh lớn, file xuất sẽ rất nặng. Vẫn xuất?')) return; j.audio = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(d.audio); }); }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(j)], { type: 'application/json' })); a.download = `${d.title.replace(/[\\/:*?"<>|]/g, '_')}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    toast('Đã xuất bài (gồm âm thanh, nội dung và câu hỏi) – gửi file này cho bạn bè rồi bấm “Nhập bài đã xuất”.');
+  };
+  if (!d.duration && src) au.addEventListener('loadedmetadata', () => { if (isFinite(au.duration)) { d.duration = au.duration; save(); } }, { once: true });
+
+  const body = $('#lsBody', root);
+  if (tab === 'quiz') drawQuiz(); else if (tab === 'type') drawType(); else drawText();
+
+  // ── Nội dung nghe ──
+  function drawText(edit = !d.lines.length) {
+    if (edit) {
+      body.innerHTML = `<section class="card"><h2>📝 Nhập nội dung nghe</h2>
+        <p class="small muted">Dán lời của bài nghe. Mỗi câu một dòng, có thể kèm nghĩa sau dấu <code>|</code> hoặc ở dòng tiếng Việt ngay bên dưới. Hỗ trợ dòng có mốc thời gian dạng LRC <code>[00:12.5] 你好！|Xin chào!</code> và file phụ đề <code>.srt</code>. Đoạn văn dài sẽ được tự tách thành câu.</p>
+        <textarea id="lsTxt" class="inp ls-txt" lang="zh-CN" rows="10" placeholder="你好，我叫王明。|Xin chào, tôi tên là Vương Minh.\n我是中国人。\nTôi là người Trung Quốc.">${esc(linesToText(d.lines))}</textarea>
+        <div class="row gap wrap"><button class="btn" id="lsSaveTxt">💾 Lưu nội dung</button>
+          <label class="btn ghost">📄 Tải file nội dung (.txt, .lrc, .srt)<input type="file" id="lsTxtFile" accept=".txt,.lrc,.srt,.vtt,text/plain" hidden></label>
+          ${SR ? '<button class="btn ghost" id="lsAuto">🎙️ Nhận dạng tự động (thử nghiệm)</button>' : ''}
+          ${d.lines.length ? '<button class="btn ghost" id="lsCancel">Hủy</button>' : ''}</div>
+        <div id="lsAutoBox" class="small"></div></section>`;
+      $('#lsSaveTxt', body).onclick = async () => { d.lines = parseTranscript($('#lsTxt', body).value); await save(); toast(d.lines.length ? `Đã lưu ${d.lines.length} câu.` : 'Đã xóa nội dung.'); drawText(false); };
+      $('#lsTxtFile', body).onchange = async e => { const f = e.target.files[0]; if (f) $('#lsTxt', body).value = linesToText(parseTranscript(await readText(f))); };
+      if ($('#lsCancel', body)) $('#lsCancel', body).onclick = () => drawText(false);
+      if ($('#lsAuto', body)) $('#lsAuto', body).onclick = autoTranscribe;
+      return;
+    }
+    const hasT = d.lines.some(l => l.t != null), hasVi = d.lines.some(l => l.vi);
+    body.innerHTML = `<section class="card">
+      <div class="row gap wrap ls-bar">
+        <label class="sw"><input type="checkbox" id="oPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
+        ${hasVi ? `<label class="sw"><input type="checkbox" id="oVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>` : ''}
+        <label class="sw" title="Nghe trước, bấm vào câu để hiện chữ"><input type="checkbox" id="oHide" ${opt.hide ? 'checked' : ''}><span></span> Ẩn chữ (nghe trước)</label>
+        <span class="grow"></span>
+        <button class="mini" id="lsSync">⏱️ ${hasT ? 'Đồng bộ lại thời gian' : 'Đồng bộ câu với âm thanh'}</button>
+        <button class="mini" id="lsEdit">✏️ Sửa nội dung</button>
+      </div>
+      ${hasT ? '<p class="small muted">Bấm ▶ ở mỗi câu để nghe riêng câu đó; câu đang phát được tô màu.</p>' : '<p class="note small">Nội dung chưa có mốc thời gian. Bấm “Đồng bộ câu với âm thanh”, nghe và bấm phím <kbd>Enter</kbd> mỗi khi một câu mới bắt đầu – sau đó bạn có thể bấm vào từng câu để nghe lại và lặp câu.</p>'}
+      <div id="lsSyncBox"></div>
+      <div class="ls-text ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'} ${opt.hide ? 'hide-zh' : ''}">${d.lines.map((l, i) => `<div class="ls-line" data-i="${i}">
+        <button class="ls-t" ${l.t == null ? 'disabled' : ''} title="Nghe câu này">${l.t != null ? '▶ ' + fmtT(l.t).replace(/\.\d$/, '') : (i + 1)}</button>
+        <div class="ls-body"><div class="zh" lang="zh-CN">${zhTokens(l.zh)}</div>${l.vi ? `<div class="vi">${esc(l.vi)}</div>` : ''}</div>
+        <button class="say ls-tts" title="Nghe giọng máy đọc câu này" aria-label="Giọng máy đọc">${icon('vol')}</button></div>`).join('')}</div>
+      <p class="muted small">Bấm vào một từ để tra nghĩa. ${d.lines.length} câu · ${[...d.lines.map(l => l.zh).join('')].filter(isHan).length} chữ Hán.</p>
+    </section>`;
+    const txt = $('.ls-text', body);
+    $('#oPy', body).onchange = e => { opt.py = e.target.checked; txt.classList.toggle('no-py', !opt.py); saveOpt(); };
+    if ($('#oVi', body)) $('#oVi', body).onchange = e => { opt.vi = e.target.checked; txt.classList.toggle('no-vi', !opt.vi); saveOpt(); };
+    $('#oHide', body).onchange = e => { opt.hide = e.target.checked; txt.classList.toggle('hide-zh', opt.hide); $$('.ls-line', body).forEach(x => x.classList.remove('shown')); saveOpt(); };
+    $('#lsEdit', body).onclick = () => drawText(true);
+    $('#lsSync', body).onclick = startSync;
+    txt.onclick = e => {
+      const ln = e.target.closest('.ls-line'); if (!ln) return; const i = +ln.dataset.i;
+      if (e.target.closest('.ls-t')) { playLine(i); return; }
+      if (e.target.closest('.ls-tts')) { au.pause(); speak(d.lines[i].zh); return; }
+      if (txt.classList.contains('hide-zh') && !ln.classList.contains('shown')) { ln.classList.add('shown'); e.stopPropagation(); }
+    };
+  }
+
+  // Đồng bộ thời gian: nghe và bấm Enter khi mỗi câu bắt đầu
+  function startSync() {
+    const box = $('#lsSyncBox', body); let k = 0; const marks = [];
+    box.innerHTML = `<div class="ls-sync card"><p><b>Đồng bộ thời gian</b> – bấm <b>Bắt đầu</b>, khi nghe thấy câu nào bắt đầu thì bấm nút lớn (hoặc phím <kbd>Enter</kbd>).</p>
+      <div class="ls-snext" lang="zh-CN"></div>
+      <div class="row gap wrap"><button class="btn" id="sGo">${icon('play')} Bắt đầu từ đầu</button><button class="btn big" id="sMark" disabled>⏎ Câu này bắt đầu</button><button class="btn ghost" id="sUndo" disabled>↶ Lùi 1 câu</button><button class="btn ghost" id="sStop">Xong / Hủy</button></div>
+      <p class="small muted" id="sInfo"></p></div>`;
+    const show = () => { $('.ls-snext', box).innerHTML = k < d.lines.length ? `Câu ${k + 1}/${d.lines.length}: ${esc(d.lines[k].zh)}` : '✓ Đã đánh dấu hết các câu.'; $('#sInfo', box).textContent = marks.length ? `Đã đánh dấu ${marks.length} câu, câu gần nhất lúc ${fmtT(marks[marks.length - 1])}.` : ''; };
+    const finish = async saveIt => {
+      document.removeEventListener('keydown', kh); au.pause();
+      if (saveIt && marks.length) { d.lines.forEach((l, i) => { l.t = i < marks.length ? +marks[i].toFixed(2) : null; }); await save(); toast(`Đã lưu thời gian cho ${marks.length} câu.`, 'good'); }
+      drawText(false);
+    };
+    const mark = () => { if (k >= d.lines.length) return; marks.push(au.currentTime); k++; show(); $('#sUndo', box).disabled = false; if (k >= d.lines.length) setTimeout(() => finish(true), 600); };
+    const kh = e => { if (e.key === 'Enter') { e.preventDefault(); if (!$('#sMark', box).disabled) mark(); } };
+    document.addEventListener('keydown', kh);
+    $('#sGo', box).onclick = () => { marks.length = 0; k = 0; stopAt = null; au.currentTime = 0; au.play(); $('#sMark', box).disabled = false; show(); };
+    $('#sMark', box).onclick = mark;
+    $('#sUndo', box).onclick = () => { if (!marks.length) return; marks.pop(); k--; show(); };
+    $('#sStop', box).onclick = () => finish(marks.length > 0 && confirm(`Lưu thời gian cho ${marks.length} câu đã đánh dấu?`));
+    show(); box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Nhận dạng tự động: phát âm thanh qua loa và nghe lại bằng micro (Chrome/Edge)
+  function autoTranscribe() {
+    const out = $('#lsAutoBox', body);
+    out.innerHTML = `<div class="note">Máy sẽ <b>phát bài nghe qua loa</b> và dùng <b>micro</b> để nhận dạng lời nói (cần Chrome/Edge, cho phép micro, phòng yên tĩnh, bật loa vừa đủ – không dùng tai nghe). Kết quả chỉ để tham khảo, hãy sửa lại cho đúng rồi bấm “Lưu nội dung”. Mỗi câu nhận được sẽ kèm mốc thời gian.</div>
+      <div class="row gap"><button class="btn sm" id="aGo">🎙️ Bắt đầu nhận dạng</button><button class="btn sm ghost" id="aStop" disabled>Dừng</button></div><div class="sp-live" id="aLive"></div>`;
+    let r = null, running = false, segStart = null; const got = [];
+    const live = $('#aLive', out);
+    const stop = () => { running = false; try { r && r.stop(); } catch {} au.pause(); $('#aGo', out).disabled = false; $('#aStop', out).disabled = true;
+      if (got.length) { const ta = $('#lsTxt', body); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + got.map(g => `[${fmtT(g.t)}] ${g.zh}`).join('\n'); toast(`Đã nhận dạng ${got.length} câu – hãy kiểm tra lại rồi lưu.`); } };
+    const begin = () => {
+      if (!running) return;
+      r = new SR(); r.lang = 'zh-CN'; r.continuous = true; r.interimResults = true;
+      r.onresult = e => { let interim = ''; for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript.trim(); if (segStart == null) segStart = Math.max(0, au.currentTime - 1); if (e.results[i].isFinal) { if (t) got.push({ zh: t.replace(/\s+/g, ''), t: segStart }); segStart = null; } else interim += t; }
+        live.innerHTML = got.slice(-4).map(g => `<div lang="zh-CN">[${fmtT(g.t)}] ${esc(g.zh)}</div>`).join('') + (interim ? `<div class="muted" lang="zh-CN">${esc(interim)}</div>` : ''); };
+      r.onerror = e => { if (e.error === 'not-allowed') { toast('Bạn chưa cho phép dùng micro.', 'bad'); stop(); } };
+      r.onend = () => { if (running) setTimeout(begin, 120); };
+      try { r.start(); } catch {}
+    };
+    $('#aGo', out).onclick = () => { running = true; got.length = 0; au.currentTime = 0; au.playbackRate = 1; au.play(); begin(); $('#aGo', out).disabled = true; $('#aStop', out).disabled = false; live.innerHTML = '<span class="muted">Đang nghe…</span>'; };
+    $('#aStop', out).onclick = stop;
+    au.addEventListener('ended', () => { if (running) setTimeout(stop, 1500); });
+  }
+
+  // ── Câu hỏi đọc hiểu ──
+  function drawQuiz(mode = d.qs.length ? 'do' : 'edit') {
+    if (mode === 'edit') {
+      body.innerHTML = `<section class="card"><h2>✍️ Soạn câu hỏi</h2>
+        <p class="small muted">Mỗi câu hỏi: dòng câu hỏi, các dòng đáp án <code>A.</code> <code>B.</code> <code>C.</code> (có thể viết trên cùng một dòng), rồi dòng <code>Đáp án: B</code>. Câu đúng/sai thì không cần đáp án A/B, chỉ ghi <code>Đáp án: 对</code> hoặc <code>Đáp án: 错</code>. Có thể thêm dòng <code>Giải thích: …</code>.</p>
+        <textarea id="qTxt" class="inp ls-txt" lang="zh-CN" rows="12" placeholder="1. 他明天去哪儿？\nA. 北京  B. 上海  C. 广州\nĐáp án: A\n\n2. 他是老师。\nĐáp án: 错\nGiải thích: 他是医生。">${esc(d.qText || '')}</textarea>
+        <div class="row gap wrap"><button class="btn" id="qSave">💾 Lưu câu hỏi</button>
+          <button class="btn ghost" id="qAuto" ${d.lines.length ? '' : 'disabled title="Cần có nội dung nghe trước"'}>✨ Tạo câu hỏi tự động từ nội dung</button>
+          ${d.qs.length ? '<button class="btn ghost" id="qCancel">Hủy</button>' : ''}</div>
+        <div id="qMsg" class="small"></div>
+        ${d.lines.length ? '' : `<p class="note small">Chưa có nội dung nghe nên chưa tạo câu hỏi tự động được. <a href="#/listen/${d.id}">Thêm nội dung nghe</a> trước, hoặc tự soạn câu hỏi ở trên.</p>`}</section>`;
+      $('#qSave', body).onclick = async () => {
+        const t = $('#qTxt', body).value, qs = parseQuestions(t), bad = qs.filter(q => q.bad);
+        if (bad.length) { $('#qMsg', body).innerHTML = `<span class="bad-t">Chưa rõ đáp án của: ${bad.map(q => '“' + esc(q.q.slice(0, 30)) + '”').join(', ')}. Hãy thêm dòng “Đáp án: …”.</span>`; return; }
+        d.qText = t; d.qs = [...qs, ...d.qs.filter(q => q.kind !== 'own')]; await save(); toast(`Đã lưu ${qs.length} câu hỏi tự soạn.`); drawQuiz('do'); updTab();
+      };
+      $('#qAuto', body).onclick = async () => { const auto = autoQuestions(d.lines, 10); if (!auto.length) { $('#qMsg', body).innerHTML = '<span class="bad-t">Nội dung quá ngắn để tạo câu hỏi.</span>'; return; } d.qText = $('#qTxt', body).value; d.qs = [...parseQuestions(d.qText).filter(q => !q.bad), ...auto]; await save(); toast(`Đã tạo ${auto.length} câu hỏi tự động.`); drawQuiz('do'); updTab(); };
+      if ($('#qCancel', body)) $('#qCancel', body).onclick = () => drawQuiz('do');
+      return;
+    }
+    const qs = d.qs, ans = {};
+    const kindLb = { own: '', cloze: 'Điền từ', tf: 'Đúng/Sai', mean: 'Nghĩa câu' };
+    body.innerHTML = `<section class="card">
+      <div class="row gap wrap" style="justify-content:space-between"><h2>❓ Câu hỏi đọc hiểu <small class="muted">(${qs.length})</small></h2>
+        <span class="row gap wrap"><button class="mini" id="qEdit">✏️ Soạn / sửa câu hỏi</button>${d.lines.length ? '<button class="mini" id="qNew">✨ Đổi bộ câu hỏi tự động</button>' : ''}</span></div>
+      <p class="small muted">Nghe bài (có thể nghe nhiều lần ở trình phát phía trên) rồi chọn đáp án. ${d.best != null ? `Điểm cao nhất: <b>${d.best}%</b>.` : ''}</p>
+      <ol class="ls-qs">${qs.map((q, n) => `<li class="ls-q" data-n="${n}">
+        <div class="ls-qq">${kindLb[q.kind] ? `<span class="tag">${kindLb[q.kind]}</span> ` : ''}<span lang="zh-CN">${esc(q.q)}</span></div>
+        <div class="ls-opts">${q.opts.map((o, k) => `<button class="ls-opt" data-k="${k}"><b>${q.tf ? '' : String.fromCharCode(65 + k) + '.'}</b> <span lang="zh-CN">${esc(o)}</span></button>`).join('')}</div>
+        <div class="ls-exp" hidden>${q.exp ? `<span class="muted small">${esc(q.exp)}</span>` : ''} ${q.src != null && d.lines[q.src]?.t != null ? `<button class="mini ls-hear" data-i="${q.src}">▶ Nghe lại đoạn này</button>` : ''}</div>
+      </li>`).join('')}</ol>
+      <div class="row gap wrap"><button class="btn" id="qSubmit">Nộp bài</button><button class="btn ghost" id="qReset">Làm lại</button></div>
+      <div id="qRes"></div></section>`;
+    $('#qEdit', body).onclick = () => drawQuiz('edit');
+    if ($('#qNew', body)) $('#qNew', body).onclick = async () => { d.qs = [...d.qs.filter(q => q.kind === 'own'), ...autoQuestions(d.lines, 10)]; await save(); drawQuiz('do'); updTab(); };
+    let done = false;
+    body.onclick = e => {
+      const h = e.target.closest('.ls-hear'); if (h) { playLine(+h.dataset.i); return; }
+      const b = e.target.closest('.ls-opt'); if (!b || done) return;
+      const li = b.closest('.ls-q'); ans[li.dataset.n] = +b.dataset.k;
+      $$('.ls-opt', li).forEach(x => x.classList.toggle('sel', x === b));
+    };
+    $('#qSubmit', body).onclick = async () => {
+      if (done) return;
+      const left = qs.length - Object.keys(ans).length;
+      if (left && !confirm(`Còn ${left} câu chưa trả lời. Vẫn nộp bài?`)) return;
+      done = true; let ok = 0;
+      $$('.ls-q', body).forEach(li => { const q = qs[+li.dataset.n], a = ans[li.dataset.n]; if (a === q.ans) ok++;
+        $$('.ls-opt', li).forEach(x => { const k = +x.dataset.k; x.classList.toggle('right', k === q.ans); x.classList.toggle('wrong', k === a && a !== q.ans); x.disabled = true; });
+        li.classList.add(a === q.ans ? 'ok' : 'no'); $('.ls-exp', li).hidden = false; });
+      const sc = qs.length ? Math.round(ok / qs.length * 100) : 0;
+      const prev = d.best; d.best = Math.max(d.best || 0, sc); await save(); logActivity(3);
+      $('#qRes', body).innerHTML = `<div class="sp-sum"><div class="score-ring" style="--p:${sc}"><span>${sc}%</span></div><div><h3>Đúng ${ok}/${qs.length} câu</h3><p class="muted small">${prev != null && sc > prev ? '🎉 Điểm cao mới!' : ''} Các câu sai có giải thích và nút nghe lại đoạn liên quan.</p></div></div>`;
+      $('#qRes', body).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    $('#qReset', body).onclick = () => drawQuiz('do');
+  }
+  function updTab() { const t = $$('.ls-tabs .tab', root)[1]; if (t) t.innerHTML = `❓ Câu hỏi đọc hiểu <small class="muted">(${d.qs.length})</small>`; }
+
+  // ── Nghe – gõ lại ──
+  function drawType() {
+    if (!d.lines.length) { body.innerHTML = `<section class="card"><p class="note">Cần có nội dung nghe để luyện gõ. <a href="#/listen/${d.id}">Thêm nội dung nghe</a>.</p></section>`; return; }
+    body.innerHTML = `<section class="card ty-sec"><h2>⌨️ Nghe – gõ lại</h2><p class="small muted">Nghe từng câu ở trình phát phía trên (bấm <kbd>R</kbd> để nghe lại câu hiện tại nếu đã đồng bộ thời gian) rồi gõ lại câu đó. Gõ đúng đến đâu chữ mẫu biến mất đến đó.</p><div id="lsTy"></div></section>`;
+    typingTrainer($('#lsTy', body), { key: 'ls' + d.id, sentences: d.lines.map(l => [l.zh, l.vi || '']) });
+  }
+  return `Luyện nghe: ${d.title}`;
+}

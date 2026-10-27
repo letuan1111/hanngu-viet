@@ -777,3 +777,42 @@ h1 { font-weight: 800; letter-spacing: -.025em; } h2 { font-weight: 700; letter-
 .my-sp .my-stx { color: var(--ink2); }
 .my-sp .my-st .mini { align-self: flex-start; margin-top: 3px; white-space: normal; text-align: left; }
 .sp-mode { justify-content: center; margin: 12px 0 0; }
+
+/* Luyện nghe */
+.ls-up.over { outline: 3px dashed var(--red); outline-offset: -6px; background: var(--gold2); }
+.ls-list { display: grid; gap: 8px; }
+.ls-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; background: var(--card); }
+.ls-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none !important; }
+.ls-main span:last-child { display: flex; flex-direction: column; min-width: 0; } .ls-main b { overflow-wrap: anywhere; }
+.ls-ic { font-size: 1.6rem; }
+.ls-title { font-size: 1.35rem; margin: 0; cursor: default; overflow-wrap: anywhere; }
+.ls-player audio { width: 100%; margin: 10px 0 6px; }
+.ls-ctl { align-items: center; }
+.ls-bar { align-items: center; margin-bottom: 8px; }
+.ls-text { margin-top: 6px; }
+.ls-line { display: flex; gap: 10px; align-items: flex-start; padding: 10px 6px; border-bottom: 1px dashed var(--line); border-radius: 8px; }
+.ls-line.now { background: linear-gradient(90deg, var(--gold2), transparent); }
+.ls-line .ls-body { flex: 1; min-width: 0; }
+.ls-line .zh { font-size: 1.3rem; line-height: 2.1; }
+.ls-line .vi { color: var(--ink2); }
+.ls-t { flex: none; min-width: 64px; border: 1px solid var(--line); background: var(--paper); border-radius: 99px; padding: 3px 8px; font: 600 .78rem var(--ui); color: var(--red); cursor: pointer; margin-top: 8px; }
+.ls-t:disabled { color: var(--muted); cursor: default; }
+.ls-text.no-py rt { visibility: hidden; } .ls-text.no-vi .vi { display: none; }
+.ls-text .gl { display: none; }
+.ls-text.hide-zh .ls-line:not(.shown) .ls-body { filter: blur(7px); cursor: pointer; user-select: none; }
+.ls-txt { width: 100%; box-sizing: border-box; font-family: var(--zh); font-size: 1.05rem; line-height: 1.7; resize: vertical; }
+.ls-sync { margin: 10px 0; background: var(--paper); }
+.ls-snext { font-size: 1.35rem; margin: 8px 0 12px; font-family: var(--zh); }
+.btn.big { font-size: 1.05rem; padding: 12px 22px; }
+.ls-qs { padding-left: 22px; } .ls-q { margin: 14px 0; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.ls-qq { font-size: 1.08rem; margin-bottom: 8px; }
+.ls-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ls-opt { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 8px 14px; cursor: pointer; font: 1rem var(--ui); color: var(--ink); text-align: left; }
+.ls-opt:hover { border-color: var(--red); } .ls-opt.sel { border-color: var(--ink); background: var(--gold2); }
+.ls-opt.right { border-color: var(--jade); background: var(--jade2); } .ls-opt.wrong { border-color: var(--red); background: #fde8e6; }
+.ls-exp { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font: .8rem var(--ui); background: var(--paper); }
+.ls-exp[hidden] { display: none; }
+@media (max-width: 1400px) and (min-width: 901px) { .nav a { padding: 0 8px; font-size: .9rem; } }
+@media (max-width: 1180px) and (min-width: 901px) { .nav a { padding: 0 6px; font-size: .85rem; } .bt { display: none; } }
+@media (max-width: 900px) { .bottom a { white-space: nowrap; font-size: .68rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; } }
