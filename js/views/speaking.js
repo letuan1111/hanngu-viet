@@ -2,11 +2,12 @@
 import { store, logActivity } from '../core/store.js';
 import { SPEAK_GROUPS, SPEAK_ITEMS, SPEAK_VOCAB, SPEAK_STRUCT, SPEAK_FOCUS, SPEAK_INTRO } from '../data/speaking.js';
 import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById } from '../core/dict.js';
-import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml } from '../core/ui.js';
+import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml, zhTokens } from '../core/ui.js';
 import { checkSentence } from '../core/checker.js';
 import { vocabSet, ex5 } from './vocabset.js';
 import { typingTrainer, splitSentences } from './typing.js';
 import { SPEAK_LONG } from '../data/speaking-long.js';
+import { AI_MODELS, aiPreload, aiClip, aiLong, toPcm16k, recordVoice, onAIStatus } from '../core/ai.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -101,6 +102,18 @@ export function speakingItem(root, id, mode) {
     <div id="rLive" class="sp-live" aria-live="polite"></div>
     <div id="rOut"></div>
   </section>
+  <section class="card sp-ai">
+    <h2>🤖 AI ghi âm – xem bạn nói gì</h2>
+    <p class="muted small">Bấm <b>Bắt đầu nói</b> rồi nói: đọc bài mẫu, đọc bài bạn tự viết, hoặc tự trả lời câu hỏi bằng lời của mình. <b>AI Whisper chạy ngay trên máy</b> sẽ nghe lại và <b>ghi ra chữ bạn nói</b> (kèm pinyin, nghĩa). Chọn so sánh để máy tô màu từng chữ đúng/sai. Không cần Chrome, không gửi âm thanh đi đâu (lần đầu cần tải mô hình).</p>
+    <div class="row gap wrap ls-sbar">
+      <label class="sel">AI <select id="aiModelSel">${AI_MODELS.map(([v, n]) => `<option value="${v}" ${v === (store.s.aiModel || AI_MODELS[0][0]) ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label class="sel">So sánh với <select id="aiCmp"><option value="sample">Bài mẫu đang xem</option><option value="mine">Bài nói của bạn (tự viết)</option><option value="none">Không so sánh – chỉ ghi ra tôi nói gì</option></select></label>
+      <label class="chk"><input type="checkbox" id="aiAuto" checked> Tự dừng khi im lặng 3 giây</label>
+    </div>
+    <div class="row gap wrap" style="align-items:center"><button class="btn big" id="aiGo">🎤 Bắt đầu nói</button><span class="tp-vu"><span id="aiVu"></span></span><span class="muted" id="aiTime"></span></div>
+    <div class="small ai-status" id="aiStat"></div>
+    <div id="aiOut"></div>
+  </section>
   <section class="card ty-sec"><h2>⌨️ Luyện gõ lại bài đọc</h2>
     <p class="muted small">Gõ lại từng câu của bài: gõ đúng đến chữ nào, chữ đó biến mất khỏi câu mẫu; gõ xong một câu sẽ tự chuyển sang câu tiếp. Đồng hồ tính tốc độ theo chữ/phút và từ/phút.</p>
     <div id="typing"></div></section>
@@ -183,6 +196,50 @@ export function speakingItem(root, id, mode) {
   typingTrainer($('#typing', root), { key: 'sp' + bk, sentences: x.s });
   renderStudy($('#study', root), x0);
   renderMySpeech($('#mySp', root), x0);
+  bindAI();
+  // ── AI ghi âm: ghi ra người học nói gì, so với bài mẫu / bài tự viết ──
+  function bindAI() {
+    const go = $('#aiGo', root), out = $('#aiOut', root), stat = $('#aiStat', root), vu = $('#aiVu', root), tm = $('#aiTime', root);
+    const off = onAIStatus(h => { if (document.body.contains(stat)) stat.innerHTML = h; else off(); });
+    $('#aiModelSel', root).onchange = e => store.update(s => { s.aiModel = e.target.value; });
+    let ctl = null;
+    go.onclick = async () => {
+      if (ctl) { ctl.stop(); return; }
+      stopSeq(); const model = $('#aiModelSel', root).value; aiPreload(model);
+      try { ctl = await recordVoice({ maxSec: 180, silenceSec: $('#aiAuto', root).checked ? 3 : 0, onLevel: v => { vu.style.width = Math.min(100, v / 0.15 * 100) + '%'; }, onTime: t => { tm.textContent = `⏺ ${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`; } }); }
+      catch { toast('Cần cho phép dùng micro.', 'bad'); return; }
+      go.classList.add('rec'); go.textContent = '⏹ Đang ghi – bấm để dừng'; out.innerHTML = '';
+      const { blob, voiced } = await ctl.done; ctl = null;
+      go.classList.remove('rec'); go.textContent = '🎤 Bắt đầu nói'; vu.style.width = '0';
+      const url = URL.createObjectURL(blob), audioH = `<audio controls src="${url}"></audio>`;
+      if (!voiced) { out.innerHTML = `<p class="bad-t">Không nghe thấy giọng nói – hãy nói to hơn, gần micro.</p>${audioH}`; tm.textContent = ''; return; }
+      out.innerHTML = `<p class="muted">🤖 AI đang nghe bản ghi…</p>${audioH}`;
+      let lines;
+      try { lines = await aiLong(await toPcm16k(await blob.arrayBuffer()), model, { onPart: (k, n) => { out.firstElementChild.textContent = `🤖 AI đang nghe… ${k}/${n} đoạn`; } }); }
+      catch (e) { out.innerHTML = `<p class="bad-t">AI không nghe được (${esc(e.message || e)}).</p>${audioH}`; return; }
+      tm.textContent = '';
+      const said = lines.map(l => l.zh).join('');
+      if (!said) { out.innerHTML = `<p class="bad-t">AI không nhận ra chữ nào rõ ràng.</p>${audioH}`; return; }
+      const sents = splitSentences(said).length ? splitSentences(said) : [said];
+      let cmpH = '';
+      const mode = $('#aiCmp', root).value;
+      const rowsEl = mode === 'sample' ? srows : mode === 'mine' ? $$('#myPrev .sp-row', root) : [];
+      if (mode !== 'none' && rowsEl.length) {
+        const all = rowsEl.map(r => r.dataset.zh).join(''), r = align(all, said);
+        let from = 0;
+        rowsEl.forEach(el => { const n = $$('.cz', el).length, m = r.marks.slice(from, from + n); from += n; paint(el, m); const sc = n ? Math.round((m.filter(v => v === 'ok').length + m.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; const rs = $('.sp-res', el); if (rs) rs.innerHTML = badge(sc); });
+        cmpH = `<div class="sp-sum"><div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div><div><p>So với ${mode === 'sample' ? 'bài mẫu' : 'bài bạn tự viết'}: đúng <b>${r.ok}</b> chữ · gần đúng <b>${r.tone}</b>. Các chữ đã được tô màu trong ${mode === 'sample' ? 'bài mẫu ở trên' : 'phần xem trước bài của bạn'}.</p></div></div>`;
+        if (mode === 'sample') store.update(s => { s.speakBest = s.speakBest || {}; s.speakBest[bk] = Math.max(s.speakBest[bk] || 0, r.score); });
+      } else if (mode === 'mine') cmpH = '<p class="note small">Bạn chưa viết “Bài nói của bạn” ở phía dưới nên chưa so sánh được.</p>';
+      out.innerHTML = `<div class="at-res"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><b>🗣️ AI nghe được bạn nói (${[...said].filter(isHan).length} chữ):</b><span class="row gap"><button class="mini" id="aiCopy">📋 Sao chép</button><button class="mini" id="aiDraft">📝 Đưa vào “Bài nói của bạn”</button></span></div>
+        ${sents.map(z => `<div class="sent at-said"><div class="sent-body"><div class="zh">${zhTokens(z)}</div></div><div class="sent-act"><button class="say ai-say" data-z="${esc(z)}" title="Nghe máy đọc câu này" aria-label="Nghe">${icon('vol')}</button></div></div>`).join('')}
+        <div class="small muted">Giọng của bạn:</div>${audioH}${cmpH}</div>`;
+      logActivity(3);
+      out.onclick = e => { const b = e.target.closest('.ai-say'); if (b) speak(b.dataset.z); };
+      $('#aiCopy', out).onclick = async () => { try { await navigator.clipboard.writeText(said); toast('Đã sao chép.'); } catch { toast('Không sao chép được.', 'bad'); } };
+      $('#aiDraft', out).onclick = () => { const pts = $$('.my-ptxt', root); if (!pts.length) return; if (pts.some(t => t.value.trim()) && !confirm('Thay nội dung “Bài nói của bạn” bằng lời bạn vừa nói (chia đều vào 5 phần)?')) return; const per = Math.ceil(sents.length / pts.length) || 1; pts.forEach((t, k) => { t.value = sents.slice(k * per, k * per + per).join(''); t.dispatchEvent(new Event('input')); }); $('#mySp', root).scrollIntoView({ behavior: 'smooth' }); toast('Đã đưa vào Bài nói của bạn – hãy sửa lại cho đúng.'); };
+    };
+  }
   return `Luyện nói: ${x.q}${long ? ' (bài 200 chữ)' : ''}`;
 }
 
@@ -351,7 +408,7 @@ function renderMySpeech(box, x) {
       <div class="my-stlist">${allSt.filter(t => !focusSt.some(f => f.id === t.id)).map(t => stCard(t, t.ex)).join('')}</div>
     </details>
     <div class="my-parts">${parts.map((p, k) => { const st = structsIn(model[k].map(s => s[0])); return `<div class="my-part" data-k="${k}">
-      <div class="my-ph"><span class="sp-pn">${NUM[k]}</span> <b>${esc(p)}</b> <span class="muted small my-pc"></span></div>
+      <div class="my-ph"><span class="sp-pn">${NUM[k]}</span> <b>${esc(p)}</b> <span class="muted small my-pc"></span><span class="grow"></span><button class="mini my-dict" title="Nói thay vì gõ – AI ghi ra chữ vào ô này">🎤 Nói để AI ghi</button></div>
       ${st.length ? `<div class="my-pst"><span class="muted small">Cấu trúc gợi ý:</span> ${st.map(t => `<button class="chip sm my-frame" lang="zh-CN" data-frame="${esc(t.frame)}" title="${esc(t.vi)} – bấm để chèn khung câu">${esc(t.f)}</button>`).join('')}</div>` : ''}
       <details class="my-model"><summary>Xem câu mẫu</summary><p class="small muted">Khung 3 câu:</p><div class="ex-box">${model[k].map(([zh, vi]) => exampleHtml(zh, vi)).join('')}</div>${longPart(k).length ? `<p class="small muted">Trong bài hoàn chỉnh ~200 chữ:</p><div class="ex-box">${longPart(k).map(([zh, vi]) => exampleHtml(zh, vi)).join('')}</div>` : ''}<span class="row gap wrap"><button class="mini my-use">Dùng khung 3 câu làm nháp</button>${longPart(k).length ? '<button class="mini my-use" data-long="1">Dùng đoạn 200 chữ làm nháp</button>' : ''}</span></details>
       <textarea class="inp my-ptxt" lang="zh-CN" rows="3" placeholder="${esc(st.slice(0, 3).map(t => t.frame).join('') || '……。……。……。')}">${esc(m.parts[k] || '')}</textarea>
@@ -415,7 +472,27 @@ function renderMySpeech(box, x) {
     const us = e.target.closest('.my-use'); if (us) { const part = us.closest('.my-part'), ta = $('.my-ptxt', part), k = +part.dataset.k; if (ta.value.trim() && !confirm('Thay nội dung phần này bằng câu mẫu?')) return; ta.value = (us.dataset.long ? longPart(k) : model[k]).map(s => s[0]).join(''); autosave(); ta.focus(); toast('Đã chép câu mẫu – hãy sửa lại cho đúng với bản thân bạn.'); return; }
     const ch = e.target.closest('.my-chip'); if (ch) { insert(active, ch.dataset.h); return; }
     const sy = e.target.closest('.my-say'); if (sy) { const el = sy.closest('.sp-row'); speak(el.dataset.zh, { el }); }
+    const dc = e.target.closest('.my-dict'); if (dc) dictate(dc);
   });
+  // Nói thay vì gõ: AI Whisper nghe và ghi chữ vào phần đang viết
+  let dictCtl = null;
+  async function dictate(btn) {
+    if (dictCtl) { dictCtl.stop(); return; }
+    const ta = $('.my-ptxt', btn.closest('.my-part')), model = store.s.aiModel || AI_MODELS[0][0];
+    aiPreload(model);
+    try { dictCtl = await recordVoice({ maxSec: 60, silenceSec: 2 }); } catch { toast('Cần cho phép dùng micro.', 'bad'); return; }
+    btn.classList.add('rec'); btn.textContent = '⏹ Đang nghe… bấm để dừng';
+    const { blob, voiced } = await dictCtl.done; dictCtl = null;
+    btn.classList.remove('rec');
+    if (!voiced) { btn.textContent = '🎤 Nói để AI ghi'; toast('Không nghe thấy giọng nói.', 'bad'); return; }
+    btn.textContent = '🤖 AI đang ghi…'; btn.disabled = true;
+    try {
+      const lines = await aiLong(await toPcm16k(await blob.arrayBuffer()), model);
+      let t = lines.map(l => l.zh).join(''); if (t && !/[。！？!?…]$/.test(t)) t += '。';
+      if (t) { ta.value = (ta.value.trim() ? ta.value.trim() : '') + t; autosave(); toast('AI đã ghi lời bạn nói vào ô – hãy kiểm tra lại.'); } else toast('AI không nhận ra chữ nào rõ ràng.', 'bad');
+    } catch (e) { toast('AI không chạy được: ' + (e.message || e), 'bad'); }
+    finally { btn.disabled = false; btn.textContent = '🎤 Nói để AI ghi'; }
+  }
 
   const drawVers = () => {
     const v = mineOf(x.id).versions || [];
