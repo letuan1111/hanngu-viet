@@ -646,12 +646,131 @@ export async function listenItem(root, id, tab = 'text') {
     };
   }
 
+  // ── File nghe chạy liền, đến khoảng trống có sẵn trong file thì tự ghi âm câu trả lời ──
+  const gapHtml = () => `<section class="card ls-gapc">
+    <h2>📼 Chạy file nghe – tự ghi âm câu trả lời trong khoảng trống</h2>
+    <p class="small muted">Dùng cho file có sẵn khoảng lặng để người học trả lời (như đề thi nói, bài “nghe và nhắc lại”). Máy dò các <b>khoảng trống</b> trong file, rồi <b>phát file liền một mạch</b>: khi file im lặng, máy <b>tự ghi âm</b> câu bạn nói, file nói tiếp thì tự dừng ghi. Sau đó AI Whisper (chạy trên máy) nghe lại câu hỏi và câu trả lời của bạn.</p>
+    <div class="row gap wrap ls-sbar">
+      <label class="sel">Kiểu bài <select id="gpMode"><option value="repeat">Nghe và nhắc lại – chấm đọc đúng từng chữ</option><option value="answer">Nghe câu hỏi và trả lời – ghi lại, AI cho biết bạn nói gì</option></select></label>
+      <label class="sel">Khoảng trống dài từ <select id="gpMin"><option value="1.2">1,2 giây</option><option value="2" selected>2 giây</option><option value="3">3 giây</option><option value="5">5 giây</option></select></label>
+      <label class="sel">AI <select id="gpModel"><option value="Xenova/whisper-base">Whisper base (~80 MB)</option><option value="Xenova/whisper-small">Whisper small – chuẩn hơn (~250 MB)</option><option value="Xenova/whisper-tiny">Whisper tiny (~40 MB)</option></select></label>
+    </div>
+    <div class="row gap wrap"><button class="btn" id="gpGo">▶ Chạy file và ghi âm câu trả lời</button><button class="btn ghost" id="gpStop" disabled>⏹ Dừng</button><button class="btn ghost" id="gpScan">🔍 Chỉ dò khoảng trống</button></div>
+    <div class="small" id="gpInfo"></div>
+    <div class="ls-tl" id="gpTl" hidden></div>
+    <div class="tp-gap" id="gpBanner" hidden><div class="tp-lbl">🎤 Đến lượt bạn – hãy trả lời <span class="tp-vu"><span id="gpVu"></span></span> <span id="gpLeft"></span></div><div class="my-bar"><span id="gpBar"></span></div></div>
+    <div class="small ai-status"></div>
+    <ol class="ls-gres" id="gpRes"></ol>
+  </section>`;
+  let gapPcm = null, gapSlots = null;
+  async function scanGaps(minGap) {
+    if (!gapPcm) gapPcm = await decode16k();
+    const a = gapPcm, F = 800; // 50 ms / khung
+    const e = []; for (let i = 0; i + F <= a.length; i += F) { let s = 0; for (let j = i; j < i + F; j += 2) s += a[j] * a[j]; e.push(Math.sqrt(s / (F / 2))); }
+    const sorted = [...e].sort((x, y) => x - y), floor = sorted[Math.floor(sorted.length * 0.1)] || 0, peak = sorted[Math.floor(sorted.length * 0.95)] || 0.1;
+    const thr = Math.max(0.006, floor + (peak - floor) * 0.12);
+    const speech = e.map(v => v > thr);
+    const slots = []; let firstSpeech = speech.indexOf(true);
+    if (firstSpeech < 0) return [];
+    let i = firstSpeech;
+    while (i < speech.length) {
+      while (i < speech.length && speech[i]) i++;
+      const s0 = i; while (i < speech.length && !speech[i]) i++;
+      const len = (i - s0) * 0.05;
+      if (len >= minGap) slots.push({ a: s0 * 0.05 + 0.1, b: i >= speech.length ? Math.min(s0 * 0.05 + 30, i * 0.05) : i * 0.05 - 0.05 });
+    }
+    // đoạn file nói trước mỗi khoảng trống = câu hỏi / câu mẫu
+    slots.forEach((sl, k) => { sl.qa = k ? slots[k - 1].b : firstSpeech * 0.05; sl.qb = sl.a; });
+    return slots;
+  }
+  function drawTimeline(slots) {
+    const tl = $('#gpTl', body), dur = au.duration || (gapPcm ? gapPcm.length / 16000 : 1);
+    tl.hidden = false;
+    tl.innerHTML = slots.map((s, k) => `<span class="ls-slot" style="left:${s.a / dur * 100}%;width:${Math.max(0.4, (s.b - s.a) / dur * 100)}%" title="Khoảng trống ${k + 1}: ${fmtT(s.a)}–${fmtT(s.b)}"></span>`).join('') + '<span class="ls-head" id="gpHead"></span>';
+  }
+  function bindGap() {
+    const info = $('#gpInfo', body), res = $('#gpRes', body);
+    let running = false, rec = null;
+    const doScan = async () => {
+      info.textContent = 'Đang dò khoảng trống trong file…';
+      try { gapSlots = await scanGaps(+$('#gpMin', body).value); }
+      catch (e) { info.innerHTML = `<span class="bad-t">Không đọc được file âm thanh (${esc(e.message || e)}).</span>`; return null; }
+      if (!gapSlots.length) { info.innerHTML = '<span class="bad-t">Không tìm thấy khoảng trống nào đủ dài. Hãy chọn “khoảng trống dài từ” ngắn hơn, hoặc dùng chế độ “Băng chạy liên tục” bên dưới (máy tự chèn khoảng trống).</span>'; return null; }
+      info.innerHTML = `Tìm thấy <b>${gapSlots.length}</b> khoảng trống để trả lời (vạch đỏ trên thanh thời gian).`;
+      drawTimeline(gapSlots); return gapSlots;
+    };
+    $('#gpScan', body).onclick = doScan;
+    $('#gpMin', body).onchange = () => { gapSlots = null; };
+    $('#gpStop', body).onclick = () => { running = false; au.pause(); };
+    $('#gpGo', body).onclick = async () => {
+      if (running) return;
+      const slots = gapSlots || await doScan(); if (!slots) return;
+      let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { toast('Cần cho phép dùng micro để ghi âm câu trả lời.', 'bad'); return; }
+      const model = $('#gpModel', body).value, mode = $('#gpMode', body).value;
+      aiWorker().postMessage({ type: 'preload', model });
+      running = true; $('#gpGo', body).disabled = true; $('#gpStop', body).disabled = false;
+      res.innerHTML = slots.map((s, k) => `<li class="ls-gr" data-k="${k}"><div class="ls-gq"><b>Câu ${k + 1}</b> <button class="mini gp-q" data-k="${k}">▶ Nghe lại đoạn trong file (${fmtT(s.qa).replace(/\.\d$/, '')})</button> <span class="small muted gp-qt"></span></div><div class="ls-ga small muted">Chưa đến lượt</div></li>`).join('');
+      $('#lsLoop', root).checked = false; stopAt = null; au.playbackRate = 1; au.currentTime = Math.max(0, slots[0].qa - 0.3);
+      const banner = $('#gpBanner', body), bar = $('#gpBar', body), vu = $('#gpVu', body), left = $('#gpLeft', body), head = $('#gpHead', body);
+      const ac = new (window.AudioContext || window.webkitAudioContext)(), an = ac.createAnalyser(); an.fftSize = 1024; ac.createMediaStreamSource(stream).connect(an); const buf = new Float32Array(an.fftSize);
+      let k = 0;
+      const startRec = () => { const mr = new MediaRecorder(stream), ch = []; mr.ondataavailable = e => e.data.size && ch.push(e.data); mr.start(); rec = { mr, ch, k, voiced: 0 }; banner.hidden = false; const row = $(`.ls-gr[data-k="${k}"]`, res); row.classList.add('now'); $('.ls-ga', row).textContent = '🎤 Đang ghi âm câu trả lời…'; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+      const stopRec = () => { if (!rec) return; const r = rec; rec = null; banner.hidden = true; r.mr.onstop = () => handleAnswer(r, slots[r.k], model, mode); r.mr.stop(); };
+      await au.play().catch(() => {});
+      await new Promise(done => {
+        const loop = () => {
+          if (!running) { stopRec(); return done(); }
+          const t = au.currentTime, dur = au.duration || 1;
+          if (head) head.style.left = (t / dur * 100) + '%';
+          const s = slots[k];
+          if (s && !rec && t >= s.a && t < s.b) startRec();
+          if (rec) {
+            const sl = slots[rec.k]; an.getFloatTimeDomainData(buf); let e = 0; for (const v of buf) e += v * v; const rm = Math.sqrt(e / buf.length); if (rm > 0.02) rec.voiced++;
+            vu.style.width = Math.min(100, rm / 0.15 * 100) + '%'; bar.style.width = Math.min(100, (t - sl.a) / (sl.b - sl.a) * 100) + '%'; left.textContent = `còn ${Math.max(0, sl.b - t).toFixed(0)} giây`;
+            if (t >= sl.b) { stopRec(); k++; }
+          } else if (s && t >= s.b) k++;
+          if (au.ended || (au.paused && !rec && t > 0 && !running)) { stopRec(); return done(); }
+          if (au.ended) { stopRec(); return done(); }
+          if (k >= slots.length && !rec) { return done(); }
+          requestAnimationFrame(loop);
+        };
+        loop();
+      });
+      running = false; ac.close(); setTimeout(() => stream.getTracks().forEach(t => t.stop()), 500);
+      $('#gpGo', body).disabled = false; $('#gpStop', body).disabled = true; banner.hidden = true;
+    };
+    res.onclick = e => { const b = e.target.closest('.gp-q'); if (b && gapSlots) { const s = gapSlots[+b.dataset.k]; au.currentTime = s.qa; stopAt = s.qb; au.play(); } };
+  }
+  async function handleAnswer(r, slot, model, mode) {
+    const row = $(`.ls-gr[data-k="${r.k}"]`, body); if (!row) return;
+    row.classList.remove('now');
+    const blob = new Blob(r.ch, { type: r.ch[0]?.type || 'audio/webm' }), url = URL.createObjectURL(blob);
+    const out = $('.ls-ga', row);
+    // câu hỏi/câu mẫu: lấy từ nội dung nghe (nếu có mốc thời gian), nếu không thì cho AI nghe đoạn đó trong file
+    const fromLines = d.lines.filter(l => l.t != null && l.t >= slot.qa - 0.5 && l.t < slot.qb).map(l => l.zh).join('');
+    let target = fromLines;
+    if (!target && gapPcm) target = await askAI(gapPcm.slice(Math.floor(slot.qa * 16000), Math.floor(slot.qb * 16000)), model);
+    $('.gp-qt', row).innerHTML = target ? `File: <span lang="zh-CN">${esc(target)}</span>` : '';
+    if (r.voiced < 4) { out.innerHTML = `<span class="muted">Không nghe thấy bạn trả lời.</span> <audio controls src="${url}"></audio>`; return; }
+    out.innerHTML = `🤖 AI đang nghe câu trả lời… <audio controls src="${url}"></audio>`;
+    const said = await askAI(await pcm16k(await blob.arrayBuffer()), model);
+    if (!said) { out.innerHTML = `<span class="muted">AI không nghe ra chữ nào rõ ràng.</span> <audio controls src="${url}"></audio>`; return; }
+    if (mode === 'repeat' && target) {
+      const al = align(target, said), sc = sentenceChars(target, 0);
+      out.innerHTML = `<div>${badge(al.score)} <span class="muted">Bạn nói (AI nghe):</span> <span lang="zh-CN">${esc(said)}</span> <audio controls src="${url}"></audio></div><div class="sp-text" style="--sp-size:1.25rem"><div class="sp-row gp-tg"><div class="sp-body"><div class="sp-zh" lang="zh-CN">${sc.html}</div></div></div></div>`;
+      paint($('.gp-tg', out), al.marks);
+    } else {
+      out.innerHTML = `<div><span class="muted">Câu trả lời của bạn (AI nghe):</span></div><div class="zh at-said" style="font-size:1.25rem;line-height:2.1">${zhTokens(said)}</div><audio controls src="${url}"></audio>`;
+    }
+    logActivity();
+  }
+
   function drawSpeak() {
-    if (!d.lines.length) { body.innerHTML = aiTestHtml() + `<section class="card"><p class="note">Cần có nội dung nghe để luyện nói lại theo bài. <a href="#/listen/${d.id}">Thêm nội dung nghe</a> (có thể dùng 🤖 Nhận dạng tự động). Bạn vẫn có thể thử AI nhận giọng ở trên.</p></section>`; bindAiTest(); return; }
+    if (!d.lines.length) { body.innerHTML = gapHtml() + aiTestHtml() + `<section class="card"><p class="note">Cần có nội dung nghe để luyện nói lại theo bài. <a href="#/listen/${d.id}">Thêm nội dung nghe</a> (có thể dùng 🤖 Nhận dạng tự động). Bạn vẫn có thể dùng hai mục ở trên.</p></section>`; bindGap(); bindAiTest(); return; }
     d.speak = d.speak || {};
     let base = 0;
     const hasT = d.lines.some(l => l.t != null);
-    body.innerHTML = aiTestHtml() + `<section class="card">
+    body.innerHTML = gapHtml() + aiTestHtml() + `<section class="card">
       <h2>🎤 Nghe – nói lại</h2>
       <p class="small muted">Nghe từng câu rồi nói lại. Ở chế độ <b>tự động</b>, máy phát câu ${hasT ? 'trong file' : 'bằng giọng máy đọc (nên đồng bộ thời gian để dùng giọng thật trong file)'}, sau đó <b>tự ghi âm</b> giọng bạn và <b>chấm đúng/sai từng chữ</b>: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>, rồi chuyển sang câu tiếp theo.</p>
       ${SR ? '' : '<p class="note small">Trình duyệt này chưa có nhận dạng giọng nói sẵn – hãy dùng chế độ “Băng chạy liên tục” (AI Whisper chấm) hoặc mở bằng Chrome/Edge.</p>'}
@@ -816,7 +935,7 @@ export async function listenItem(root, id, tab = 'text') {
     };
     $('#tpStop', body).onclick = () => { tape = false; cancel && cancel(); };
     summary();
-    bindAiTest();
+    bindGap(); bindAiTest();
   }
   const badge = sc => `<span class="score ${sc >= 80 ? 'good' : sc >= 50 ? 'mid' : 'bad'}">${sc}%</span>`;
   const paint = (el, marks) => $$('.cz', el).forEach((c, j) => { c.classList.remove('ok', 'tone', 'miss', 'hl'); if (marks[j]) c.classList.add(marks[j]); });
