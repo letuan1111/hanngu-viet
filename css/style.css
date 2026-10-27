@@ -822,3 +822,11 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .ls-sp .sp-res audio { height: 32px; vertical-align: middle; max-width: 100%; }
 .ls-vout { margin-top: 6px; } .ls-vans.rec, .sp-rec1.rec { background: var(--red); color: #fff; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: .6; } }
+.ls-tape { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; background: var(--paper); margin: 10px 0 14px; }
+.ls-tape h3 { margin: 2px 0 4px; }
+.tp-gap { margin: 10px 0; padding: 10px; border-radius: 10px; background: var(--red2); }
+.tp-lbl { font-weight: 600; color: var(--red); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.tp-vu { display: inline-block; width: 90px; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; } .tp-vu span { display: block; height: 100%; width: 0; background: var(--jade); }
+.tp-gap .my-bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; } .tp-gap .my-bar span { display: block; height: 100%; width: 0; background: var(--red); }
+.tp-gap { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: 18px; width: min(560px, calc(100vw - 32px)); box-shadow: 0 6px 24px rgba(0,0,0,.18); border: 1px solid var(--red); background: var(--paper); }
+@media (max-width: 860px) { .tp-gap { bottom: 72px; } }

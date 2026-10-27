@@ -24,20 +24,54 @@ function cuts(a) {
 }
 const rms = x => { let e = 0; for (let i = 0; i < x.length; i += 4) e += x[i] * x[i]; return Math.sqrt(e / (x.length / 4 || 1)); };
 
+let loading = null, loadingM = '';
+function load(model) {
+  if (asr && cur === model) return Promise.resolve();
+  if (loading && loadingM === model) return loading;
+  loadingM = model; loading = load0(model).finally(() => { loading = null; });
+  return loading;
+}
+async function load0(model) {
+  if (!tf) { self.postMessage({ type: 'stage', msg: 'Đang tải thư viện nhận dạng…' }); tf = await import(TF); tf.env.allowLocalModels = false; }
+  if (!asr || cur !== model) {
+    self.postMessage({ type: 'stage', msg: 'Đang tải mô hình (chỉ lần đầu)…' });
+    asr = await tf.pipeline('automatic-speech-recognition', model, {
+      dtype: 'q8', device: 'wasm',
+      progress_callback: p => { if (p.status === 'progress') self.postMessage({ type: 'load', file: p.file, loaded: p.loaded, total: p.total }); },
+    });
+    cur = model;
+    self.postMessage({ type: 'ready', model });
+  }
+  try { const m = await import('../../vendor/opencc-t2cn.js'); conv = m.Converter({ from: 'hk', to: 'cn' }); } catch {}
+}
+
+// Hàng đợi: các đoạn ghi âm ngắn của người học được nhận dạng lần lượt
+const queue = []; let busy = false;
+async function pump() {
+  if (busy) return; busy = true;
+  while (queue.length) {
+    const { id, audio, model } = queue.shift();
+    try {
+      await load(model);
+      let text = '';
+      if (audio.length > SR * 0.3 && rms(audio) > 0.003) {
+        const out = await asr(audio, { language: 'chinese', task: 'transcribe' });
+        text = conv(String(out.text || '').trim());
+        if (JUNK.test(text) || !/\p{Script=Han}/u.test(text)) text = '';
+      }
+      self.postMessage({ type: 'clip', id, text });
+    } catch (err) { self.postMessage({ type: 'clip', id, text: '', error: String((err && err.message) || err) }); }
+  }
+  busy = false;
+}
+
 self.onmessage = async e => {
-  const { type, audio, model } = e.data || {};
+  const { type, audio, model, id } = e.data || {};
+  if (type === 'clip') { queue.push({ id, audio, model }); pump(); return; }
+  if (type === 'preload') { try { await load(model); } catch (err) { self.postMessage({ type: 'error', msg: String((err && err.message) || err) }); } return; }
   if (type !== 'run') return;
   try {
-    if (!tf) { self.postMessage({ type: 'stage', msg: 'Đang tải thư viện nhận dạng…' }); tf = await import(TF); tf.env.allowLocalModels = false; }
-    if (!asr || cur !== model) {
-      self.postMessage({ type: 'stage', msg: 'Đang tải mô hình (chỉ lần đầu)…' });
-      asr = await tf.pipeline('automatic-speech-recognition', model, {
-        dtype: 'q8', device: 'wasm',
-        progress_callback: p => { if (p.status === 'progress') self.postMessage({ type: 'load', file: p.file, loaded: p.loaded, total: p.total }); },
-      });
-      cur = model;
-    }
-    try { const m = await import('../../vendor/opencc-t2cn.js'); conv = m.Converter({ from: 'hk', to: 'cn' }); } catch {}
+    await load(model);
     const cs = cuts(audio);
     self.postMessage({ type: 'stage', msg: `Đang nhận dạng ${cs.length} đoạn…`, n: cs.length });
     for (let k = 0; k < cs.length; k++) {
