@@ -67,8 +67,19 @@ function render() {
       return;
     }
   }
-  root.innerHTML = '<div class="empty"><h2>Không tìm thấy trang</h2><a class="btn" href="#/">Về trang chủ</a></div>';
+  // Có thể trình duyệt đang giữ bản cũ của web (chưa có trang mới) → tự xóa bộ nhớ đệm và tải lại một lần
+  let tried = false; try { tried = sessionStorage.getItem('hv-reload') === path; } catch {}
+  if (!tried) { try { sessionStorage.setItem('hv-reload', path); } catch {} hardReload(); return; }
+  root.innerHTML = '<div class="empty"><h2>Không tìm thấy trang</h2><p class="muted">Nếu bạn vừa mở một mục mới, hãy bấm “Tải lại bản mới nhất”.</p><div class="row gap" style="justify-content:center"><button class="btn" id="hvReload">🔄 Tải lại bản mới nhất</button><a class="btn ghost" href="#/">Về trang chủ</a></div></div>';
+  $('#hvReload').onclick = hardReload;
 }
+
+async function hardReload() {
+  try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch {}
+  try { const rs = await navigator.serviceWorker?.getRegistrations?.(); if (rs) await Promise.all(rs.map(r => r.update())); } catch {}
+  location.reload();
+}
+try { if (sessionStorage.getItem('hv-reload') && sessionStorage.getItem('hv-reload') !== location.hash.slice(1)) sessionStorage.removeItem('hv-reload'); } catch {}
 
 applyDisplay();
 initGlobalEvents();
