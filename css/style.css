@@ -817,3 +817,8 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 @media (max-width: 1180px) and (min-width: 901px) { .nav a { padding: 0 6px; font-size: .85rem; } .bt { display: none; } }
 @media (max-width: 900px) { .bottom a { white-space: nowrap; font-size: .68rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; } }
 .ls-ai { background: var(--paper); margin-top: 10px; } .ai-prog { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; } .ai-prog .my-bar { flex: 1; min-width: 160px; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; } .ai-prog .my-bar span { display: block; height: 100%; width: 0; background: var(--jade); transition: width .3s; }
+.ls-sbar { align-items: center; margin: 8px 0; } .inp.sm { padding: 3px 6px; font-size: .9rem; }
+.ls-sp.hide-zh .sp-row:not(.shown):not(:has(.ok, .tone, .miss)) .sp-zh, .ls-sp.hide-zh .sp-row:not(.shown) .sp-vi { filter: blur(7px); }
+.ls-sp .sp-res audio { height: 32px; vertical-align: middle; max-width: 100%; }
+.ls-vout { margin-top: 6px; } .ls-vans.rec, .sp-rec1.rec { background: var(--red); color: #fff; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .6; } }

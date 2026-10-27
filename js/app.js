@@ -28,7 +28,7 @@ const routes = [
   [/^\/speaking$/, speakingList, 'Luyện nói'],
   [/^\/speaking\/(\d+)(?:\/(long))?$/, speakingItem, 'Luyện nói'],
   [/^\/listen$/, r => { listenHome(r); return 'Luyện nghe'; }, 'Luyện nghe'],
-  [/^\/listen\/([\w-]+)(?:\/(quiz|type))?$/, (r, id, tab) => { listenItem(r, id, tab || 'text'); return 'Luyện nghe'; }, 'Luyện nghe'],
+  [/^\/listen\/([\w-]+)(?:\/(quiz|type|speak))?$/, (r, id, tab) => { listenItem(r, id, tab || 'text'); return 'Luyện nghe'; }, 'Luyện nghe'],
   [/^\/vocab$/, dictionary, 'Từ vựng'],
   [/^\/word\/(.+)$/, word, 'Từ'],
   [/^\/topics(?:\/(\w+))?$/, topics, 'Nhóm từ'],

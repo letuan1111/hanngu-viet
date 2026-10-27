@@ -31,7 +31,7 @@ export function speakingList(root) {
 }
 
 // Hiển thị câu theo từng chữ (để tô màu kết quả), gom chữ theo từ để tra nghĩa
-function sentenceChars(zh, base) {
+export function sentenceChars(zh, base) {
   const arr = charPinyins([...zh].filter(isHan).join('')) || [];
   let k = 0, html = '';
   for (const t of segment(zh)) {
@@ -45,7 +45,7 @@ function sentenceChars(zh, base) {
 }
 
 // So khớp chữ đọc được với văn bản: đúng chữ/đúng âm = đúng; cùng âm khác thanh = sai thanh; còn lại = thiếu/sai
-function align(target, said) {
+export function align(target, said) {
   const T = [...target].filter(isHan), S = [...said].filter(isHan);
   if (!T.length) return { marks: [], score: 0 };
   const tp = charPinyins(T.join('')) || T, sp = charPinyins(S.join('')) || S;
@@ -187,7 +187,7 @@ export function speakingItem(root, id, mode) {
 }
 
 // Nhận dạng một câu (trả về các phương án)
-function recognizeOnce() {
+export function recognizeOnce() {
   return new Promise((res, rej) => {
     if (!SR) return rej(new Error('Trình duyệt không hỗ trợ nhận dạng giọng nói (hãy dùng Chrome hoặc Edge).'));
     stopSeq();
@@ -315,7 +315,7 @@ function renderStudy(box, x) {
 }
 
 // Ghi một đoạn ngắn: nhận dạng giọng nói (nếu có) + thu âm để nghe lại
-async function recordClip(btn) {
+export async function recordClip(btn) {
   let stream = null, mr = null, chunks = [];
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); if (window.MediaRecorder) { mr = new MediaRecorder(stream); mr.ondataavailable = e => e.data.size && chunks.push(e.data); mr.start(); } }
   catch { if (!SR) throw new Error('Không truy cập được micro. Hãy cho phép quyền micro.'); }

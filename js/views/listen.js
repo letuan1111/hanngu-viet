@@ -5,6 +5,7 @@ import { segment, isHan, hsk30List, LV30, shuffle } from '../core/dict.js';
 import { esc, icon, $, $$, toast, zhTokens } from '../core/ui.js';
 import { speak, stopSeq, SR } from '../core/tts.js';
 import { typingTrainer, splitSentences } from './typing.js';
+import { sentenceChars, align, recognizeOnce, recordClip } from './speaking.js';
 
 // ── Kho dữ liệu (IndexedDB) ──
 const DB = {
@@ -229,6 +230,7 @@ export async function listenItem(root, id, tab = 'text') {
   <div class="tabs ls-tabs" role="tablist">
     <a class="tab ${tab === 'text' ? 'on' : ''}" href="#/listen/${d.id}">📄 Nội dung nghe</a>
     <a class="tab ${tab === 'quiz' ? 'on' : ''}" href="#/listen/${d.id}/quiz">❓ Câu hỏi đọc hiểu <small class="muted">(${d.qs.length})</small></a>
+    <a class="tab ${tab === 'speak' ? 'on' : ''}" href="#/listen/${d.id}/speak">🎤 Nghe – nói lại</a>
     <a class="tab ${tab === 'type' ? 'on' : ''}" href="#/listen/${d.id}/type">⌨️ Nghe – gõ lại</a>
   </div>
   <div id="lsBody"></div>`;
@@ -274,7 +276,7 @@ export async function listenItem(root, id, tab = 'text') {
   if (!d.duration && src) au.addEventListener('loadedmetadata', () => { if (isFinite(au.duration)) { d.duration = au.duration; save(); } }, { once: true });
 
   const body = $('#lsBody', root);
-  if (tab === 'quiz') drawQuiz(); else if (tab === 'type') drawType(); else drawText();
+  if (tab === 'quiz') drawQuiz(); else if (tab === 'type') drawType(); else if (tab === 'speak') drawSpeak(); else drawText();
 
   // ── Nội dung nghe ──
   function drawText(edit = !d.lines.length) {
@@ -467,7 +469,8 @@ export async function listenItem(root, id, tab = 'text') {
       <p class="small muted">Nghe bài (có thể nghe nhiều lần ở trình phát phía trên) rồi chọn đáp án. ${d.best != null ? `Điểm cao nhất: <b>${d.best}%</b>.` : ''}</p>
       <ol class="ls-qs">${qs.map((q, n) => `<li class="ls-q" data-n="${n}">
         <div class="ls-qq">${kindLb[q.kind] ? `<span class="tag">${kindLb[q.kind]}</span> ` : ''}<span lang="zh-CN">${esc(q.q)}</span></div>
-        <div class="ls-opts">${q.opts.map((o, k) => `<button class="ls-opt" data-k="${k}"><b>${q.tf ? '' : String.fromCharCode(65 + k) + '.'}</b> <span lang="zh-CN">${esc(o)}</span></button>`).join('')}</div>
+        <div class="ls-opts">${q.opts.map((o, k) => `<button class="ls-opt" data-k="${k}"><b>${q.tf ? '' : String.fromCharCode(65 + k) + '.'}</b> <span lang="zh-CN">${esc(o)}</span></button>`).join('')}${SR ? `<button class="say ls-vans" title="Trả lời bằng giọng nói" aria-label="Trả lời bằng giọng nói">${icon('mic')}</button>` : ''}</div>
+        <div class="ls-vout small"></div>
         <div class="ls-exp" hidden>${q.exp ? `<span class="muted small">${esc(q.exp)}</span>` : ''} ${q.src != null && d.lines[q.src]?.t != null ? `<button class="mini ls-hear" data-i="${q.src}">▶ Nghe lại đoạn này</button>` : ''}</div>
       </li>`).join('')}</ol>
       <div class="row gap wrap"><button class="btn" id="qSubmit">Nộp bài</button><button class="btn ghost" id="qReset">Làm lại</button></div>
@@ -477,6 +480,7 @@ export async function listenItem(root, id, tab = 'text') {
     let done = false;
     body.onclick = e => {
       const h = e.target.closest('.ls-hear'); if (h) { playLine(+h.dataset.i); return; }
+      const v = e.target.closest('.ls-vans'); if (v && !done) { voiceAnswer(v.closest('.ls-q')); return; }
       const b = e.target.closest('.ls-opt'); if (!b || done) return;
       const li = b.closest('.ls-q'); ans[li.dataset.n] = +b.dataset.k;
       $$('.ls-opt', li).forEach(x => x.classList.toggle('sel', x === b));
@@ -495,7 +499,126 @@ export async function listenItem(root, id, tab = 'text') {
       $('#qRes', body).scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
     $('#qReset', body).onclick = () => drawQuiz('do');
+    // Trả lời bằng giọng nói: đọc đáp án (hoặc “A/B/C”, “对/错”), máy chọn phương án khớp nhất
+    async function voiceAnswer(li) {
+      const q = qs[+li.dataset.n], out = $('.ls-vout', li), mic = $('.ls-vans', li);
+      if (mic.classList.contains('rec')) return;
+      au.pause(); mic.classList.add('rec'); out.innerHTML = '<span class="muted">Đang nghe… hãy nói đáp án của bạn</span>';
+      try {
+        const alts = await recognizeOnce();
+        if (!alts.length) { out.innerHTML = '<span class="muted">Không nghe rõ, hãy thử lại.</span>'; return; }
+        let best = { k: -1, sc: 0, a: alts[0] };
+        for (const a of alts) {
+          const t = a.replace(/\s/g, '');
+          q.opts.forEach((o, k) => {
+            let sc = align(o.replace(/\s*\(.*\)$/, ''), t).score;
+            const letter = String.fromCharCode(65 + k);
+            if (!q.tf && new RegExp(`^(${letter}|${letter.toLowerCase()}|选${letter}|答案是?${letter})[。.]?$`).test(t)) sc = 100;
+            if (q.tf && k === 0 && /^(对|是|对的|正确|是的|没错)[。！]?$/.test(t)) sc = 100;
+            if (q.tf && k === 1 && /^(错|不对|错的|错误|不是|不正确)[。！]?$/.test(t)) sc = 100;
+            if (sc > best.sc) best = { k, sc, a };
+          });
+        }
+        if (best.k >= 0 && best.sc >= 50) {
+          ans[li.dataset.n] = best.k; $$('.ls-opt', li).forEach(x => x.classList.toggle('sel', +x.dataset.k === best.k));
+          out.innerHTML = `🎤 Máy nghe được: <span lang="zh-CN">${esc(best.a)}</span> → chọn <b>${q.tf ? esc(q.opts[best.k]) : String.fromCharCode(65 + best.k)}</b>`;
+        } else out.innerHTML = `🎤 Máy nghe được: <span lang="zh-CN">${esc(alts[0])}</span> – chưa khớp phương án nào, hãy nói lại rõ hơn hoặc bấm chọn.`;
+      } catch (err) { out.innerHTML = `<span class="bad-t">${esc(err.message)}</span>`; }
+      finally { mic.classList.remove('rec'); }
+    }
   }
+
+  // ── Nghe – nói lại (shadowing): nghe từng câu, máy tự ghi âm và chấm đọc đúng từng chữ ──
+  function drawSpeak() {
+    if (!d.lines.length) { body.innerHTML = `<section class="card"><p class="note">Cần có nội dung nghe để luyện nói lại. <a href="#/listen/${d.id}">Thêm nội dung nghe</a> (có thể dùng 🤖 Nhận dạng tự động).</p></section>`; return; }
+    d.speak = d.speak || {};
+    let base = 0;
+    const hasT = d.lines.some(l => l.t != null);
+    body.innerHTML = `<section class="card">
+      <h2>🎤 Nghe – nói lại</h2>
+      <p class="small muted">Nghe từng câu rồi nói lại. Ở chế độ <b>tự động</b>, máy phát câu ${hasT ? 'trong file' : 'bằng giọng máy đọc (nên đồng bộ thời gian để dùng giọng thật trong file)'}, sau đó <b>tự ghi âm</b> giọng bạn và <b>chấm đúng/sai từng chữ</b>: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>, rồi chuyển sang câu tiếp theo.</p>
+      ${SR ? '' : '<p class="note small">Trình duyệt này chưa hỗ trợ nhận dạng giọng nói nên chỉ ghi âm để bạn tự nghe lại, không chấm điểm. Hãy dùng Chrome hoặc Edge để được chấm tự động.</p>'}
+      <div class="row gap wrap ls-sbar">
+        <button class="btn" id="spAuto">▶ Luyện tự động từ câu <input id="spFrom" type="number" min="1" max="${d.lines.length}" value="1" class="inp sm" style="width:64px" onclick="event.stopPropagation()"></button>
+        <button class="btn ghost" id="spStop" disabled>⏹ Dừng</button>
+        <label class="chk"><input type="checkbox" id="spRetry" checked> Đọc lại câu dưới 60%</label>
+        <label class="chk"><input type="checkbox" id="spHide"> Ẩn chữ khi nghe</label>
+        <label class="sw"><input type="checkbox" id="spPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
+      </div>
+      <div id="spSum"></div>
+      <div class="sp-text ls-sp ${opt.py ? '' : 'no-py'}" style="--sp-size:1.4rem">${d.lines.map((l, i) => { const r = sentenceChars(l.zh, base); base += r.n; return `<div class="sp-row" data-i="${i}">
+        <div class="sp-body"><div class="sp-zh" lang="zh-CN">${r.html}</div>${l.vi ? `<div class="sp-vi">${esc(l.vi)}</div>` : ''}<div class="sp-res">${d.speak[i] != null ? badge(d.speak[i]) + ' <span class="muted small">lần trước</span>' : ''}</div></div>
+        <div class="sp-act"><button class="say sp-hear" title="Nghe câu gốc" aria-label="Nghe câu gốc">${icon('play')}</button><button class="say sp-rec1" title="Ghi âm câu này" aria-label="Ghi âm câu này">${icon('mic')}</button></div></div>`; }).join('')}</div>
+    </section>`;
+    const rows = $$('.ls-sp .sp-row', body);
+    $('#spPy', body).onchange = e => { opt.py = e.target.checked; $('.ls-sp', body).classList.toggle('no-py', !opt.py); saveOpt(); };
+    $('#spHide', body).onchange = e => $('.ls-sp', body).classList.toggle('hide-zh', e.target.checked);
+    let running = false, cancel = null;
+    const hear = i => new Promise(res => {
+      const l = d.lines[i];
+      $('#lsLoop', root).checked = false;
+      if (l.t != null && src) { const h = () => { au.removeEventListener('pause', h); res(); }; au.addEventListener('pause', h); playLine(i); cancel = () => { au.pause(); }; }
+      else { au.pause(); speak(l.zh, { onEnd: res }); cancel = () => { stopSeq(); res(); }; setTimeout(res, 20000); }
+    });
+    const durOf = i => { const l = d.lines[i]; return l.t != null ? Math.max(2, lineEnd(i) - l.t) : [...l.zh].filter(isHan).length * 0.35 + 1; };
+    async function rec(i) {
+      const el = rows[i], out = $('.sp-res', el), mic = $('.sp-rec1', el);
+      mic.classList.add('rec'); el.classList.add('now'); out.innerHTML = '<span class="muted">🎤 Đang ghi âm… hãy nói lại câu này</span>';
+      const fake = {}; if (!SR) setTimeout(() => fake._stop && fake._stop(), (durOf(i) * 1.6 + 1.5) * 1000);
+      try {
+        const r = await recordClip(fake);
+        const audioH = r.url ? `<audio controls src="${r.url}"></audio>` : '';
+        if (!SR) { out.innerHTML = `<span class="muted small">Nghe lại giọng bạn để so với câu gốc:</span> ${audioH}`; return null; }
+        const bestA = (r.alts || []).map(a => ({ a, ...align(d.lines[i].zh, a) })).sort((x, y) => y.score - x.score)[0];
+        if (!bestA) { paint(el, []); out.innerHTML = `<span class="muted">Không nghe rõ giọng nói.</span> ${audioH}`; return 0; }
+        paint(el, bestA.marks);
+        d.speak[i] = Math.max(d.speak[i] || 0, bestA.score);
+        out.innerHTML = `${badge(bestA.score)} <span class="muted small">Máy nghe được:</span> <span lang="zh-CN">${esc(bestA.a)}</span> ${audioH}`;
+        logActivity();
+        return bestA.score;
+      } catch (err) { out.innerHTML = `<span class="bad-t">${esc(err.message)}</span>`; return null; }
+      finally { mic.classList.remove('rec'); }
+    }
+    const summary = () => {
+      const sc = Object.values(d.speak); if (!sc.length) return;
+      const avg = Math.round(sc.reduce((a, b) => a + b, 0) / sc.length), weak = Object.entries(d.speak).filter(([, v]) => v < 70).map(([i]) => +i);
+      d.speakAvg = avg; save();
+      $('#spSum', body).innerHTML = `<div class="sp-sum"><div class="score-ring" style="--p:${avg}"><span>${avg}%</span></div><div><h3>Đã luyện ${sc.length}/${d.lines.length} câu · trung bình ${avg}%</h3>
+        ${weak.length ? `<p class="small">Câu nên luyện lại: ${weak.map(i => `<a href="#" data-goto="${i}">${i + 1}</a>`).join(', ')}</p>` : '<p class="ok-t small">Không có câu nào dưới 70%. Giỏi lắm!</p>'}</div></div>`;
+    };
+    $('#spAuto', body).onclick = async () => {
+      if (running) return;
+      running = true; $('#spAuto', body).disabled = true; $('#spStop', body).disabled = false;
+      const from = Math.min(d.lines.length, Math.max(1, +$('#spFrom', body).value || 1)) - 1;
+      for (let i = from; i < d.lines.length && running; i++) {
+        rows.forEach(r => r.classList.remove('now')); rows[i].classList.add('now'); rows[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        let tries = 0, sc;
+        do {
+          $('.sp-res', rows[i]).innerHTML = '<span class="muted">🔊 Nghe câu gốc…</span>';
+          await hear(i); if (!running) break;
+          await new Promise(r => setTimeout(r, 250));
+          sc = await rec(i); tries++;
+          if (running && sc != null && sc < 60 && $('#spRetry', body).checked && tries < 2) { $('.sp-res', rows[i]).insertAdjacentHTML('beforeend', ' <span class="muted small">– nghe lại và đọc thêm một lần</span>'); await new Promise(r => setTimeout(r, 1200)); }
+          else break;
+        } while (running);
+        $('#spFrom', body).value = Math.min(d.lines.length, i + 2);
+        await new Promise(r => setTimeout(r, 600));
+      }
+      running = false; $('#spAuto', body).disabled = false; $('#spStop', body).disabled = true; rows.forEach(r => r.classList.remove('now'));
+      await save(); summary();
+    };
+    $('#spStop', body).onclick = () => { running = false; cancel && cancel(); };
+    body.onclick = async e => {
+      const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); const el = rows[+g.dataset.goto]; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash-row'); setTimeout(() => el.classList.remove('flash-row'), 1600); return; }
+      const row = e.target.closest('.sp-row'); if (!row || running) return; const i = +row.dataset.i;
+      if (e.target.closest('.sp-hear')) { hear(i); return; }
+      if (e.target.closest('.sp-rec1')) { if ($('.sp-rec1', row).classList.contains('rec')) return; await rec(i); await save(); summary(); return; }
+      if ($('.ls-sp', body).classList.contains('hide-zh')) row.classList.toggle('shown');
+    };
+    summary();
+  }
+  const badge = sc => `<span class="score ${sc >= 80 ? 'good' : sc >= 50 ? 'mid' : 'bad'}">${sc}%</span>`;
+  const paint = (el, marks) => $$('.cz', el).forEach((c, j) => { c.classList.remove('ok', 'tone', 'miss', 'hl'); if (marks[j]) c.classList.add(marks[j]); });
   function updTab() { const t = $$('.ls-tabs .tab', root)[1]; if (t) t.innerHTML = `❓ Câu hỏi đọc hiểu <small class="muted">(${d.qs.length})</small>`; }
 
   // ── Nghe – gõ lại ──
