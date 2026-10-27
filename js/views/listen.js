@@ -1,7 +1,7 @@
 // Luyện nghe với file của bạn: tải mp3 lên (lưu trong IndexedDB của trình duyệt), nghe với tốc độ/lặp câu,
 // hiện nội dung nghe (pinyin, nghĩa, đồng bộ thời gian) và câu hỏi đọc hiểu (tự soạn hoặc tạo tự động từ nội dung).
 import { store, logActivity } from '../core/store.js';
-import { segment, isHan, hsk30List, LV30, shuffle } from '../core/dict.js';
+import { segment, isHan, hsk30List, LV30, shuffle, sentencePinyin } from '../core/dict.js';
 import { esc, icon, $, $$, toast, zhTokens } from '../core/ui.js';
 import { speak, stopSeq, SR } from '../core/tts.js';
 import { typingTrainer, splitSentences } from './typing.js';
@@ -651,16 +651,17 @@ export async function listenItem(root, id, tab = 'text') {
     <h2>📼 Chạy file nghe – tự ghi âm câu trả lời trong khoảng trống</h2>
     <p class="small muted">Dùng cho file có sẵn khoảng lặng để người học trả lời (như đề thi nói, bài “nghe và nhắc lại”). Máy dò các <b>khoảng trống</b> trong file, rồi <b>phát file liền một mạch</b>: khi file im lặng, máy <b>tự ghi âm</b> câu bạn nói, file nói tiếp thì tự dừng ghi. Sau đó AI Whisper (chạy trên máy) nghe lại câu hỏi và câu trả lời của bạn.</p>
     <div class="row gap wrap ls-sbar">
-      <label class="sel">Kiểu bài <select id="gpMode"><option value="repeat">Nghe và nhắc lại – chấm đọc đúng từng chữ</option><option value="answer">Nghe câu hỏi và trả lời – ghi lại, AI cho biết bạn nói gì</option></select></label>
+      <label class="sel">Kiểu bài <select id="gpMode"><option value="answer">Nghe câu hỏi rồi trả lời – AI ghi ra bạn nói gì</option><option value="repeat">Nghe và nhắc lại – chấm đọc đúng từng chữ</option></select></label>
       <label class="sel">Khoảng trống dài từ <select id="gpMin"><option value="1.2">1,2 giây</option><option value="2" selected>2 giây</option><option value="3">3 giây</option><option value="5">5 giây</option></select></label>
       <label class="sel">AI <select id="gpModel"><option value="Xenova/whisper-base">Whisper base (~80 MB)</option><option value="Xenova/whisper-small">Whisper small – chuẩn hơn (~250 MB)</option><option value="Xenova/whisper-tiny">Whisper tiny (~40 MB)</option></select></label>
     </div>
     <div class="row gap wrap"><button class="btn" id="gpGo">▶ Chạy file và ghi âm câu trả lời</button><button class="btn ghost" id="gpStop" disabled>⏹ Dừng</button><button class="btn ghost" id="gpScan">🔍 Chỉ dò khoảng trống</button></div>
     <div class="small" id="gpInfo"></div>
     <div class="ls-tl" id="gpTl" hidden></div>
-    <div class="tp-gap" id="gpBanner" hidden><div class="tp-lbl">🎤 Đến lượt bạn – hãy trả lời <span class="tp-vu"><span id="gpVu"></span></span> <span id="gpLeft"></span></div><div class="my-bar"><span id="gpBar"></span></div></div>
+    <div class="tp-gap" id="gpBanner" hidden><div class="tp-lbl">🎤 Đến lượt bạn – hãy nói <span class="tp-vu"><span id="gpVu"></span></span> <span id="gpLeft"></span></div><div class="my-bar"><span id="gpBar"></span></div></div>
     <div class="small ai-status"></div>
     <ol class="ls-gres" id="gpRes"></ol>
+    <div id="gpSum"></div>
   </section>`;
   let gapPcm = null, gapSlots = null;
   async function scanGaps(minGap) {
@@ -708,7 +709,7 @@ export async function listenItem(root, id, tab = 'text') {
       let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { toast('Cần cho phép dùng micro để ghi âm câu trả lời.', 'bad'); return; }
       const model = $('#gpModel', body).value, mode = $('#gpMode', body).value;
       aiWorker().postMessage({ type: 'preload', model });
-      running = true; $('#gpGo', body).disabled = true; $('#gpStop', body).disabled = false;
+      running = true; $('#gpGo', body).disabled = true; $('#gpStop', body).disabled = false; answers = []; drawAnswers();
       res.innerHTML = slots.map((s, k) => `<li class="ls-gr" data-k="${k}"><div class="ls-gq"><b>Câu ${k + 1}</b> <button class="mini gp-q" data-k="${k}">▶ Nghe lại đoạn trong file (${fmtT(s.qa).replace(/\.\d$/, '')})</button> <span class="small muted gp-qt"></span></div><div class="ls-ga small muted">Chưa đến lượt</div></li>`).join('');
       $('#lsLoop', root).checked = false; stopAt = null; au.playbackRate = 1; au.currentTime = Math.max(0, slots[0].qa - 0.3);
       const banner = $('#gpBanner', body), bar = $('#gpBar', body), vu = $('#gpVu', body), left = $('#gpLeft', body), head = $('#gpHead', body);
@@ -741,6 +742,19 @@ export async function listenItem(root, id, tab = 'text') {
     };
     res.onclick = e => { const b = e.target.closest('.gp-q'); if (b && gapSlots) { const s = gapSlots[+b.dataset.k]; au.currentTime = s.qa; stopAt = s.qb; au.play(); } };
   }
+  let answers = [];
+  // Tổng hợp: AI ghi ra người học đã trả lời gì ở từng câu
+  function drawAnswers() {
+    const box = $('#gpSum', body); if (!box) return;
+    const list = answers.map((x, k) => x && { ...x, k }).filter(Boolean);
+    if (!list.length) { box.innerHTML = ''; return; }
+    d.lastAnswers = list; save();
+    box.innerHTML = `<div class="gp-sum"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><h3>📝 Bạn đã trả lời (AI ghi lại)</h3><span class="row gap"><button class="mini" id="gpCopy">📋 Sao chép</button><button class="mini" id="gpDl">⬇️ Tải .txt</button></span></div>
+      <ol>${list.map(x => `<li value="${x.k + 1}">${x.q ? `<div class="small muted" lang="zh-CN">Câu hỏi: ${esc(x.q)}</div>` : ''}<div lang="zh-CN">${x.a ? esc(x.a) : '<span class="muted">(không trả lời)</span>'}</div><div class="small muted py-line">${x.a ? esc(sentencePinyin(x.a)) : ''}</div></li>`).join('')}</ol></div>`;
+    const txt = () => `${d.title}\n\n` + list.map(x => `Câu ${x.k + 1}${x.q ? ` – ${x.q}` : ''}\n${x.a || '(không trả lời)'}\n${x.a ? sentencePinyin(x.a) : ''}`).join('\n\n');
+    $('#gpCopy', box).onclick = async () => { try { await navigator.clipboard.writeText(txt()); toast('Đã sao chép.'); } catch { toast('Không sao chép được.', 'bad'); } };
+    $('#gpDl', box).onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt()], { type: 'text/plain;charset=utf-8' })); a.download = `tra-loi-${d.title.replace(/[\\/:*?"<>|]/g, '_')}.txt`; a.click(); };
+  }
   async function handleAnswer(r, slot, model, mode) {
     const row = $(`.ls-gr[data-k="${r.k}"]`, body); if (!row) return;
     row.classList.remove('now');
@@ -749,9 +763,9 @@ export async function listenItem(root, id, tab = 'text') {
     // câu hỏi/câu mẫu: lấy từ nội dung nghe (nếu có mốc thời gian), nếu không thì cho AI nghe đoạn đó trong file
     const fromLines = d.lines.filter(l => l.t != null && l.t >= slot.qa - 0.5 && l.t < slot.qb).map(l => l.zh).join('');
     let target = fromLines;
-    if (!target && gapPcm) target = await askAI(gapPcm.slice(Math.floor(slot.qa * 16000), Math.floor(slot.qb * 16000)), model);
+    if (!target && gapPcm && mode === 'repeat') target = await askAI(gapPcm.slice(Math.floor(slot.qa * 16000), Math.floor(slot.qb * 16000)), model);
     $('.gp-qt', row).innerHTML = target ? `File: <span lang="zh-CN">${esc(target)}</span>` : '';
-    if (r.voiced < 4) { out.innerHTML = `<span class="muted">Không nghe thấy bạn trả lời.</span> <audio controls src="${url}"></audio>`; return; }
+    if (r.voiced < 4) { out.innerHTML = `<span class="muted">Không nghe thấy bạn trả lời.</span> <audio controls src="${url}"></audio>`; answers[r.k] = { q: target || '', a: '', t: slot.qa }; drawAnswers(); return; }
     out.innerHTML = `🤖 AI đang nghe câu trả lời… <audio controls src="${url}"></audio>`;
     const said = await askAI(await pcm16k(await blob.arrayBuffer()), model);
     if (!said) { out.innerHTML = `<span class="muted">AI không nghe ra chữ nào rõ ràng.</span> <audio controls src="${url}"></audio>`; return; }
@@ -760,8 +774,10 @@ export async function listenItem(root, id, tab = 'text') {
       out.innerHTML = `<div>${badge(al.score)} <span class="muted">Bạn nói (AI nghe):</span> <span lang="zh-CN">${esc(said)}</span> <audio controls src="${url}"></audio></div><div class="sp-text" style="--sp-size:1.25rem"><div class="sp-row gp-tg"><div class="sp-body"><div class="sp-zh" lang="zh-CN">${sc.html}</div></div></div></div>`;
       paint($('.gp-tg', out), al.marks);
     } else {
-      out.innerHTML = `<div><span class="muted">Câu trả lời của bạn (AI nghe):</span></div><div class="zh at-said" style="font-size:1.25rem;line-height:2.1">${zhTokens(said)}</div><audio controls src="${url}"></audio>`;
+      out.innerHTML = `<div class="gp-ans"><span class="gp-lb">🗣️ Bạn nói:</span><div class="zh at-said" lang="zh-CN">${zhTokens(said)}</div></div><audio controls src="${url}"></audio>`;
     }
+    answers[r.k] = { q: target || '', a: said, t: slot.qa };
+    drawAnswers();
     logActivity();
   }
 
@@ -778,6 +794,7 @@ export async function listenItem(root, id, tab = 'text') {
         <h3>📼 Băng chạy liên tục – có khoảng trống để bạn nói</h3>
         <p class="small muted">Băng phát từng câu, sau mỗi câu <b>tự dừng một khoảng</b> (dài theo độ dài câu) để bạn nói lại. Trong khoảng trống máy <b>tự ghi âm</b>, nói xong thì tự chạy tiếp. Bản ghi của bạn được <b>AI Whisper chạy ngay trên máy</b> nghe lại và chấm đúng/sai từng chữ – không cần Chrome, không gửi âm thanh đi đâu (lần đầu cần tải mô hình).</p>
         <div class="row gap wrap ls-sbar">
+          <label class="sel">Kiểu <select id="tpMode"><option value="repeat">Nhắc lại câu vừa nghe – chấm từng chữ</option><option value="answer">Câu vừa nghe là câu hỏi – tôi trả lời, AI ghi ra tôi nói gì</option></select></label>
           <label class="sel">Khoảng trống <select id="tpGap"><option value="1">bằng độ dài câu</option><option value="1.5" selected>1,5 lần câu</option><option value="2">2 lần câu</option><option value="3">3 lần câu</option></select></label>
           <label class="sel">AI chấm <select id="tpModel"><option value="Xenova/whisper-base">base – nhanh (~80 MB)</option><option value="Xenova/whisper-small">small – chuẩn hơn (~250 MB)</option><option value="Xenova/whisper-tiny">tiny – rất nhanh (~40 MB)</option></select></label>
           <label class="chk"><input type="checkbox" id="tpEarly" checked> Nói xong thì chạy tiếp ngay</label>
@@ -866,9 +883,10 @@ export async function listenItem(root, id, tab = 'text') {
     };
     // ── Băng chạy liên tục + AI Whisper chấm ──
     let tape = false, stream = null;
-    const scoreFromAI = (i, text, url) => {
+    const scoreFromAI = (i, text, url, mode) => {
       const el = rows[i], out = $('.sp-res', el), audioH = url ? `<audio controls src="${url}"></audio>` : '';
       if (!text) { paint(el, []); out.innerHTML = `<span class="muted">AI không nghe thấy lời nói rõ ràng.</span> ${audioH}`; return; }
+      if (mode === 'answer') { out.innerHTML = `<div class="gp-ans"><span class="gp-lb">🗣️ Bạn trả lời:</span><div class="zh at-said" lang="zh-CN">${zhTokens(text)}</div></div>${audioH}`; d.tapeAnswers = d.tapeAnswers || {}; d.tapeAnswers[i] = text; save(); return; }
       const r = align(d.lines[i].zh, text);
       paint(el, r.marks); d.speak[i] = Math.max(d.speak[i] || 0, r.score);
       out.innerHTML = `${badge(r.score)} <span class="muted small">🤖 AI nghe được:</span> <span lang="zh-CN">${esc(text)}</span> ${audioH}`;
@@ -910,21 +928,22 @@ export async function listenItem(root, id, tab = 'text') {
       const model = $('#tpModel', body).value;
       aiWorker().postMessage({ type: 'preload', model });
       tape = true; $('#tpGo', body).disabled = true; $('#tpStop', body).disabled = false; $('#spAuto', body).disabled = true;
-      const mult = +$('#tpGap', body).value;
+      const mult = +$('#tpGap', body).value, tmode = $('#tpMode', body).value;
+      $('#tpGapBox .tp-lbl', body).firstChild.textContent = tmode === 'answer' ? '🎤 Đến lượt bạn – hãy trả lời câu hỏi ' : '🎤 Đến lượt bạn – nói lại câu vừa nghe ';
       const from = Math.min(d.lines.length, Math.max(1, +$('#tpFrom', body).value || 1)) - 1;
       for (let i = from; i < d.lines.length && tape; i++) {
         rows.forEach(r => r.classList.remove('now')); rows[i].classList.add('now'); rows[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
         $('.sp-res', rows[i]).innerHTML = '<span class="muted">🔊 Đang phát…</span>';
         await hear(i); if (!tape) break;
-        const gap = Math.max(3, durOf(i) * mult + 1.2);
+        const gap = tmode === 'answer' ? 5 + 5 * mult : Math.max(3, durOf(i) * mult + 1.2);
         $('.sp-res', rows[i]).innerHTML = '<span class="muted">🎤 Đang ghi âm câu trả lời…</span>';
         const { blob, voiced } = await recordGap(gap);
         const url = URL.createObjectURL(blob);
         if (!voiced) { $('.sp-res', rows[i]).innerHTML = `<span class="muted">Không nghe thấy bạn nói ở câu này.</span> <audio controls src="${url}"></audio>`; }
         else {
-          $('.sp-res', rows[i]).innerHTML = `<span class="muted">🤖 AI đang chấm…</span> <audio controls src="${url}"></audio>`;
+          $('.sp-res', rows[i]).innerHTML = `<span class="muted">🤖 AI đang nghe bản ghi…</span> <audio controls src="${url}"></audio>`;
           const idx = i;
-          blob.arrayBuffer().then(pcm16k).then(pcm => askAI(pcm, model)).then(text => scoreFromAI(idx, text, url))
+          blob.arrayBuffer().then(pcm16k).then(pcm => askAI(pcm, model)).then(text => scoreFromAI(idx, text, url, tmode))
             .catch(() => { $('.sp-res', rows[idx]).innerHTML = `<span class="muted">Không đọc được bản ghi.</span> <audio controls src="${url}"></audio>`; });
         }
         $('#tpFrom', body).value = Math.min(d.lines.length, i + 2);
