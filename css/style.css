@@ -840,3 +840,7 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .gp-ans .zh { font-size: 1.3rem; line-height: 2.1; }
 .gp-sum { margin-top: 12px; padding: 10px 14px; border: 1px solid var(--jade); border-radius: var(--r); background: var(--jade2); } .gp-sum h3 { margin: 0; } .gp-sum li { margin: 6px 0; } .gp-sum li > div[lang] { font-size: 1.15rem; }
 .gp-ans .zh, .ls-ga .gp-ans { color: var(--ink); } .ls-ga:has(.gp-ans) { color: var(--ink); }
+.rec-a { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; vertical-align: middle; max-width: 100%; } .rec-a audio { max-width: 100%; } .rec-gone { margin-left: 4px; }
+.ty-ai { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: var(--r); background: var(--paper); }
+.ty-ai p { margin: 6px 0; } .ty-aiRes { margin-top: 6px; } .ty-aiL { margin: 4px 0; } .ty-aiZ { font-family: var(--zh); font-size: 1.35rem; letter-spacing: .02em; }
+.ty-mic.rec { background: var(--red); color: #fff; animation: pulse 1s infinite; }

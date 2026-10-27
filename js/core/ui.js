@@ -3,6 +3,15 @@ import { tokensWithPinyin, entry, lookup, examplesFor, collocations, charPinyin,
 import { speak } from './tts.js';
 import { RADICALS } from '../data/radicals.js';
 
+// Bản ghi âm của người học: trình phát + nút xóa (xóa khỏi trang và giải phóng bộ nhớ)
+export const recAudio = url => url ? `<span class="rec-a"><audio controls src="${url}"></audio><button class="mini rec-del" type="button" title="Xóa bản ghi này" aria-label="Xóa bản ghi này">🗑️ Xóa</button></span>` : '';
+if (typeof document !== 'undefined') document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.rec-del'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const w = b.closest('.rec-a'), a = w && w.querySelector('audio');
+  if (a) { try { a.pause(); if (a.src.startsWith('blob:')) URL.revokeObjectURL(a.src); } catch {} }
+  if (w) w.outerHTML = '<span class="muted small rec-gone">🗑️ Đã xóa bản ghi</span>';
+}, true);
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];

@@ -2,6 +2,21 @@
 // - recordVoice: ghi âm đến khi im lặng / bấm dừng / hết giờ
 // - toPcm16k: đổi file ghi âm sang âm thanh mono 16 kHz
 // - aiClip: nhận dạng đoạn ngắn (≤ 30 giây) ; aiLong: nhận dạng đoạn dài (tự cắt đoạn)
+import { charPinyins, isHan } from './dict.js';
+const strip = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ü/g, 'v');
+// So khớp chữ người học đọc với câu mẫu: ok = đúng chữ/đúng âm, tone = đúng âm sai thanh, miss = thiếu/sai
+export function alignZh(target, said) {
+  const T = [...target].filter(isHan), S = [...said].filter(isHan);
+  if (!T.length) return { marks: [], score: 0, ok: 0, tone: 0 };
+  const tp = charPinyins(T.join('')) || T, sp = charPinyins(S.join('')) || S;
+  const sim = (i, j) => T[i] === S[j] || tp[i] === sp[j] ? 2 : strip(tp[i]) === strip(sp[j]) ? 1 : 0;
+  const n = T.length, m = S.length, dp = Array.from({ length: n + 1 }, () => new Int16Array(m + 1));
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) { const x = sim(i - 1, j - 1); dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1], x ? dp[i - 1][j - 1] + x : 0); }
+  const marks = Array(n).fill('miss'); let i = n, j = m;
+  while (i > 0 && j > 0) { const x = sim(i - 1, j - 1); if (x && dp[i][j] === dp[i - 1][j - 1] + x) { marks[i - 1] = x === 2 ? 'ok' : 'tone'; i--; j--; } else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--; }
+  const ok = marks.filter(v => v === 'ok').length, tone = marks.filter(v => v === 'tone').length;
+  return { marks, score: Math.round((ok + tone * 0.5) / n * 100), ok, tone };
+}
 export const AI_MODELS = [
   ['Xenova/whisper-base', 'Whisper base – nhanh (~80 MB)'],
   ['Xenova/whisper-small', 'Whisper small – chuẩn hơn (~250 MB)'],

@@ -2,7 +2,7 @@
 import { store, logActivity } from '../core/store.js';
 import { SPEAK_GROUPS, SPEAK_ITEMS, SPEAK_VOCAB, SPEAK_STRUCT, SPEAK_FOCUS, SPEAK_INTRO } from '../data/speaking.js';
 import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById } from '../core/dict.js';
-import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml, zhTokens } from '../core/ui.js';
+import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml, zhTokens, recAudio } from '../core/ui.js';
 import { checkSentence } from '../core/checker.js';
 import { vocabSet, ex5 } from './vocabset.js';
 import { typingTrainer, splitSentences } from './typing.js';
@@ -174,8 +174,8 @@ export function speakingItem(root, id, mode) {
     const { transcript, audioUrl } = await rec.stop(); rec = null;
     $('#rLive', root).innerHTML = '';
     const out = $('#rOut', root);
-    if (!SR) { out.innerHTML = audioUrl ? `<p>Nghe lại giọng của bạn:</p><audio controls src="${audioUrl}"></audio>` : ''; return; }
-    if (!transcript.trim()) { out.innerHTML = '<p class="bad-t">Không nhận được giọng nói. Hãy kiểm tra micro và đọc to, rõ hơn.</p>' + (audioUrl ? `<audio controls src="${audioUrl}"></audio>` : ''); return; }
+    if (!SR) { out.innerHTML = audioUrl ? `<p>Nghe lại giọng của bạn:</p>${recAudio(audioUrl)}` : ''; return; }
+    if (!transcript.trim()) { out.innerHTML = '<p class="bad-t">Không nhận được giọng nói. Hãy kiểm tra micro và đọc to, rõ hơn.</p>' + (audioUrl ? `${recAudio(audioUrl)}` : ''); return; }
     const all = x.s.map(s => s[0]).join('');
     const r = align(all, transcript);
     const per = srows.map(el => { const from = +el.dataset.from, n = +el.dataset.n; const m = r.marks.slice(from, from + n); paint(el, m); const sc = n ? Math.round((m.filter(v => v === 'ok').length + m.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; $('.sp-res', el).innerHTML = badge(sc); return { el, sc, i: +el.dataset.i }; });
@@ -186,7 +186,7 @@ export function speakingItem(root, id, mode) {
       <div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div>
       <div><h3>${r.score >= 85 ? 'Rất tốt! Phát âm rõ ràng.' : r.score >= 65 ? 'Khá tốt, luyện thêm vài câu nữa nhé.' : 'Cần luyện thêm – hãy nghe mẫu rồi đọc chậm, rõ từng chữ.'}</h3>
         <p>Đọc đúng <b>${r.ok}</b>/${total} chữ · gần đúng <b>${r.tone}</b> · thiếu/sai <b>${total - r.ok - r.tone}</b>. Điểm cao nhất: <b>${store.s.speakBest[bk]}%</b></p>
-        ${audioUrl ? `<p class="small muted">Nghe lại giọng của bạn rồi so với giọng mẫu:</p><audio controls src="${audioUrl}"></audio>` : ''}
+        ${audioUrl ? `<p class="small muted">Nghe lại giọng của bạn rồi so với giọng mẫu:</p>${recAudio(audioUrl)}` : ''}
       </div></div>
       ${weak.length ? `<h3 class="sub">Câu nên luyện lại (${weak.length})</h3><ul class="weak">${weak.map(p => `<li><a href="#" data-goto="${p.i}">Câu ${p.i + 1}: <span lang="zh-CN">${esc(x.s[p.i][0])}</span></a> ${badge(p.sc)}</li>`).join('')}</ul>` : '<p class="ok-t">Không có câu nào dưới 70%. Giỏi lắm!</p>'}
       <details class="small"><summary>Văn bản máy nghe được</summary><p lang="zh-CN">${esc(transcript)}</p></details>
@@ -211,7 +211,7 @@ export function speakingItem(root, id, mode) {
       go.classList.add('rec'); go.textContent = '⏹ Đang ghi – bấm để dừng'; out.innerHTML = '';
       const { blob, voiced } = await ctl.done; ctl = null;
       go.classList.remove('rec'); go.textContent = '🎤 Bắt đầu nói'; vu.style.width = '0';
-      const url = URL.createObjectURL(blob), audioH = `<audio controls src="${url}"></audio>`;
+      const url = URL.createObjectURL(blob), audioH = `${recAudio(url)}`;
       if (!voiced) { out.innerHTML = `<p class="bad-t">Không nghe thấy giọng nói – hãy nói to hơn, gần micro.</p>${audioH}`; tm.textContent = ''; return; }
       out.innerHTML = `<p class="muted">🤖 AI đang nghe bản ghi…</p>${audioH}`;
       let lines;
@@ -231,11 +231,12 @@ export function speakingItem(root, id, mode) {
         cmpH = `<div class="sp-sum"><div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div><div><p>So với ${mode === 'sample' ? 'bài mẫu' : 'bài bạn tự viết'}: đúng <b>${r.ok}</b> chữ · gần đúng <b>${r.tone}</b>. Các chữ đã được tô màu trong ${mode === 'sample' ? 'bài mẫu ở trên' : 'phần xem trước bài của bạn'}.</p></div></div>`;
         if (mode === 'sample') store.update(s => { s.speakBest = s.speakBest || {}; s.speakBest[bk] = Math.max(s.speakBest[bk] || 0, r.score); });
       } else if (mode === 'mine') cmpH = '<p class="note small">Bạn chưa viết “Bài nói của bạn” ở phía dưới nên chưa so sánh được.</p>';
-      out.innerHTML = `<div class="at-res"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><b>🗣️ AI nghe được bạn nói (${[...said].filter(isHan).length} chữ):</b><span class="row gap"><button class="mini" id="aiCopy">📋 Sao chép</button><button class="mini" id="aiDraft">📝 Đưa vào “Bài nói của bạn”</button></span></div>
+      out.innerHTML = `<div class="at-res"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><b>🗣️ AI nghe được bạn nói (${[...said].filter(isHan).length} chữ):</b><span class="row gap"><button class="mini" id="aiCopy">📋 Sao chép</button><button class="mini" id="aiDraft">📝 Đưa vào “Bài nói của bạn”</button><button class="mini" id="aiClr">🗑️ Xóa</button></span></div>
         ${sents.map(z => `<div class="sent at-said"><div class="sent-body"><div class="zh">${zhTokens(z)}</div></div><div class="sent-act"><button class="say ai-say" data-z="${esc(z)}" title="Nghe máy đọc câu này" aria-label="Nghe">${icon('vol')}</button></div></div>`).join('')}
         <div class="small muted">Giọng của bạn:</div>${audioH}${cmpH}</div>`;
       logActivity(3);
       out.onclick = e => { const b = e.target.closest('.ai-say'); if (b) speak(b.dataset.z); };
+      $('#aiClr', out).onclick = () => { $$('audio', out).forEach(a => { try { URL.revokeObjectURL(a.src); } catch {} }); out.innerHTML = ''; rowsEl.forEach(el => { paint(el, []); const rs = $('.sp-res', el); if (rs) rs.innerHTML = ''; }); };
       $('#aiCopy', out).onclick = async () => { try { await navigator.clipboard.writeText(said); toast('Đã sao chép.'); } catch { toast('Không sao chép được.', 'bad'); } };
       $('#aiDraft', out).onclick = () => { const pts = $$('.my-ptxt', root); if (!pts.length) return; if (pts.some(t => t.value.trim()) && !confirm('Thay nội dung “Bài nói của bạn” bằng lời bạn vừa nói (chia đều vào 5 phần)?')) return; const per = Math.ceil(sents.length / pts.length) || 1; pts.forEach((t, k) => { t.value = sents.slice(k * per, k * per + per).join(''); t.dispatchEvent(new Event('input')); }); $('#mySp', root).scrollIntoView({ behavior: 'smooth' }); toast('Đã đưa vào Bài nói của bạn – hãy sửa lại cho đúng.'); };
     };
@@ -364,7 +365,7 @@ function renderStudy(box, x) {
       let html = '';
       if (r.alts && r.alts.length) { const best = r.alts.map(a => ({ a, ...align(t, a) })).sort((p, q) => q.score - p.score)[0]; html += `<span class="score ${best.score >= 80 ? 'good' : best.score >= 50 ? 'mid' : 'bad'}">${best.score}%</span> <span class="muted small">Máy nghe được:</span> <span lang="zh-CN">${esc(best.a)}</span>`; }
       else if (SR) html += '<span class="muted">Không nghe rõ, hãy thử lại.</span>';
-      if (r.url) html += `<audio controls src="${r.url}"></audio>`;
+      if (r.url) html += `${recAudio(r.url)}`;
       out.innerHTML = html; logActivity(2);
     } catch (err) { out.innerHTML = `<span class="bad-t">${esc(err.message)}</span>`; }
     rb.classList.remove('rec');
@@ -550,7 +551,7 @@ function renderMySpeech(box, x) {
     if (!rec) return;
     $('#myRStop', box).disabled = true; $('#myRStart', box).disabled = false;
     const { transcript, audioUrl } = await rec.stop(); rec = null; $('#myRLive', box).innerHTML = '';
-    const out = $('#myROut', box), audio = audioUrl ? `<p class="small muted">Nghe lại giọng của bạn:</p><audio controls src="${audioUrl}"></audio>` : '';
+    const out = $('#myROut', box), audio = audioUrl ? `<p class="small muted">Nghe lại giọng của bạn:</p>${recAudio(audioUrl)}` : '';
     if (!SR || !transcript.trim()) { out.innerHTML = (SR ? '<p class="bad-t">Không nhận được giọng nói. Hãy kiểm tra micro và đọc to, rõ hơn.</p>' : '') + audio; return; }
     const rows = $$('#myPrev .sp-row', box), all = rows.map(r => r.dataset.zh).join(''), r = align(all, transcript);
     let from = 0;

@@ -1,8 +1,9 @@
 // Luyện gõ lại bài đọc: chạy từng câu, gõ đúng đến đâu chữ biến mất đến đó; có đồng hồ, chữ/phút, từ/phút, độ chính xác
 import { store, logActivity } from '../core/store.js';
 import { segment, charPinyins, isHan } from '../core/dict.js';
-import { esc, icon, $, toast } from '../core/ui.js';
+import { esc, icon, $, $$, toast, recAudio } from '../core/ui.js';
 import { speak } from '../core/tts.js';
+import { AI_MODELS, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
 
 const tone = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v');
 const isKeyable = c => isHan(c) || /[0-9a-zA-Z]/.test(c);
@@ -86,8 +87,16 @@ export function typingTrainer(el, o) {
       <div class="bar"><i class="ty-bar" style="width:0"></i></div>
       <div class="ty-stage"><div class="ty-cur" lang="zh-CN" aria-live="polite"></div><div class="ty-vi"></div><div class="ty-next" lang="zh-CN"></div></div>
       <div class="ty-inrow"><input class="inp ty-inp" ${mode === 'han' ? 'lang="zh-CN"' : ''} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${mode === 'han' ? 'Gõ chữ Hán của câu trên…' : 'Gõ pinyin của câu trên, ví dụ: wo jiao xiaoming'}">
-        <button class="say ty-say" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button></div>
+        <button class="say ty-say" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button><button class="say ty-mic" title="Đọc to câu này – AI chấm phát âm" aria-label="Đọc to câu này để AI chấm">${icon('mic')}</button></div>
       <div class="row gap wrap ty-btns"><button class="mini ty-skip">Bỏ qua câu này</button><button class="mini ty-reset">↺ Bắt đầu lại</button><span class="muted small">${mode === 'han' ? 'Dấu câu được bỏ qua tự động. Đồng hồ chạy khi bạn gõ phím đầu tiên.' : 'Không cần gõ dấu thanh và dấu câu; “ü” gõ là v hoặc u.'}</span></div>
+      <div class="ty-ai">
+        <div class="row gap wrap" style="align-items:center"><b>🤖 AI chấm đọc</b>
+          <button class="btn sm ty-rd1">${icon('mic')} Đọc câu này</button><button class="btn sm ghost ty-rdall">${icon('mic')} Đọc cả đoạn</button>
+          <label class="sel small">AI <select class="ty-model">${AI_MODELS.map(([v, n]) => `<option value="${v}" ${v === (store.s.aiModel || AI_MODELS[0][0]) ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <span class="tp-vu"><span class="ty-vu"></span></span><span class="muted small ty-aiT"></span></div>
+        <p class="muted small">Đọc to câu đang gõ (hoặc cả đoạn), nói xong im khoảng 1,5 giây là máy tự dừng. AI Whisper chạy ngay trên máy nghe lại và tô màu từng chữ: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>.</p>
+        <div class="small ai-status ty-aiS"></div><div class="ty-aiOut"></div>
+      </div>
       <div class="ty-out"></div>`;
     const inp = $('.ty-inp', run), cur = $('.ty-cur', run);
     const kOf = u => mode === 'han' ? u.kh : u.kp;
@@ -142,6 +151,43 @@ export function typingTrainer(el, o) {
       update(true);
     }
     $('.ty-say', run).onclick = () => data[si] && speak(data[si].zh);
+    // ── AI chấm đọc: đọc to câu đang gõ hoặc cả đoạn ──
+    const aiOut = $('.ty-aiOut', run), aiS = $('.ty-aiS', run);
+    const offS = onAIStatus(h => { if (aiS.isConnected) aiS.innerHTML = h; else offS(); });
+    $('.ty-model', run).onchange = e => store.update(s => { s.aiModel = e.target.value; });
+    let ctl = null, busyBtn = null;
+    const colored = (zh, marks) => { let k = 0; return [...zh].map(c => isHan(c) ? `<span class="cz ${marks[k++] || ''}">${esc(c)}</span>` : `<span class="pn">${esc(c)}</span>`).join(''); };
+    const badgeH = sc => `<span class="score ${sc >= 80 ? 'good' : sc >= 50 ? 'mid' : 'bad'}">${sc}%</span>`;
+    async function readCheck(btn, targets) {
+      if (ctl) { ctl.stop(); return; }
+      if (!targets.length) return;
+      const model = $('.ty-model', run).value; aiPreload(model);
+      try { ctl = await recordVoice({ maxSec: targets.length > 1 ? 240 : 40, silenceSec: targets.length > 1 ? 2.5 : 1.5, onLevel: v => { $('.ty-vu', run).style.width = Math.min(100, v / 0.15 * 100) + '%'; }, onTime: t => { $('.ty-aiT', run).textContent = `⏺ ${t.toFixed(0)} giây`; } }); }
+      catch { toast('Cần cho phép dùng micro.', 'bad'); return; }
+      busyBtn = btn; const lbl = btn.innerHTML; btn.classList.add('rec'); btn.innerHTML = '⏹ Đang nghe – bấm để dừng';
+      $('.ty-mic', run).classList.add('rec');
+      aiOut.innerHTML = `<p class="muted">🎤 Hãy đọc to: <span lang="zh-CN">${esc(targets.length > 1 ? targets[0] + '…' : targets[0])}</span></p>`;
+      const { blob, voiced } = await ctl.done; ctl = null;
+      btn.classList.remove('rec'); btn.innerHTML = lbl; $('.ty-mic', run).classList.remove('rec'); $('.ty-vu', run).style.width = '0'; $('.ty-aiT', run).textContent = '';
+      const url = URL.createObjectURL(blob);
+      if (!voiced) { aiOut.innerHTML = `<p class="bad-t">Không nghe thấy giọng đọc – hãy đọc to hơn, gần micro.</p>${recAudio(url)}`; return; }
+      aiOut.innerHTML = `<p class="muted">🤖 AI đang nghe bản ghi…</p>${recAudio(url)}`;
+      let said = '';
+      try { said = (await aiLong(await toPcm16k(await blob.arrayBuffer()), model)).map(l => l.zh).join(''); }
+      catch (e) { aiOut.innerHTML = `<p class="bad-t">AI không chạy được (${esc(e.message || e)}).</p>${recAudio(url)}`; return; }
+      if (!said) { aiOut.innerHTML = `<p class="bad-t">AI không nhận ra chữ nào rõ ràng.</p>${recAudio(url)}`; return; }
+      const all = targets.join(''), r = alignZh(all, said);
+      let k0 = 0;
+      const per = targets.map(z => { const n = [...z].filter(isHan).length, m = r.marks.slice(k0, k0 + n); k0 += n; const sc = n ? Math.round((m.filter(v => v === 'ok').length + m.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; return { z, m, sc }; });
+      aiOut.innerHTML = `<div class="ty-aiRes"><div class="row gap wrap" style="align-items:center">${badgeH(r.score)} <span>Đúng <b>${r.ok}</b> · gần đúng <b>${r.tone}</b> / ${r.marks.length} chữ</span><span class="grow"></span><button class="mini ty-aiClr">🗑️ Xóa</button></div>
+        <div class="ty-aiLines">${per.map(p => `<div class="ty-aiL"><span lang="zh-CN" class="ty-aiZ">${colored(p.z, p.m)}</span> ${targets.length > 1 ? badgeH(p.sc) : ''}</div>`).join('')}</div>
+        <div class="small"><span class="muted">🤖 AI nghe được:</span> <span lang="zh-CN">${esc(said)}</span></div>${recAudio(url)}</div>`;
+      $('.ty-aiClr', aiOut).onclick = () => { try { URL.revokeObjectURL(url); } catch {} aiOut.innerHTML = ''; };
+      logActivity(2);
+    }
+    $('.ty-rd1', run).onclick = e => readCheck(e.currentTarget, data[si] ? [data[si].zh] : []);
+    $('.ty-mic', run).onclick = () => readCheck($('.ty-rd1', run), data[si] ? [data[si].zh] : []);
+    $('.ty-rdall', run).onclick = e => readCheck(e.currentTarget, data.map(x => x.zh));
     $('.ty-skip', run).onclick = () => { si++; if (si >= data.length) finish(); else drawSentence(); inp.focus(); };
     $('.ty-reset', run).onclick = () => { start(); $('.ty-inp', el)?.focus(); };
     function finish() {
