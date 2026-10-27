@@ -139,6 +139,31 @@ export function autoQuestions(lines, n = 10) {
   return out;
 }
 
+// Ghi âm đến khi người nói im lặng ~1,2 giây (hoặc hết maxSec / bấm dừng)
+async function recordSilence(stream, maxSec, onLevel, setStop) {
+  const mr = new MediaRecorder(stream), chunks = []; mr.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const ac = new (window.AudioContext || window.webkitAudioContext)(), an = ac.createAnalyser(); an.fftSize = 1024;
+  ac.createMediaStreamSource(stream).connect(an); const buf = new Float32Array(an.fftSize);
+  mr.start();
+  const t0 = performance.now(); let voiced = 0, lastVoice = 0, noise = 0.01, n = 0, stop = false;
+  setStop && setStop(() => { stop = true; });
+  await new Promise(res => {
+    const tick = () => {
+      const el = (performance.now() - t0) / 1000;
+      an.getFloatTimeDomainData(buf); let e = 0; for (const v of buf) e += v * v; const rm = Math.sqrt(e / buf.length);
+      if (el < 0.3) noise = (noise * n + rm) / ++n;
+      if (rm > Math.max(0.015, noise * 3)) { voiced++; lastVoice = el; }
+      onLevel && onLevel(rm);
+      if (stop || el >= maxSec || (voiced > 6 && el - lastVoice > 1.2 && el > 1.2)) return res();
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  await new Promise(res => { mr.onstop = res; mr.stop(); });
+  ac.close();
+  return { blob: new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' }), voiced: voiced > 3 };
+}
+
 // ════════════ Thư viện bài nghe ════════════
 export async function listenHome(root) {
   root.innerHTML = `<div class="page-head"><div><h1>🎧 Luyện nghe với file của bạn</h1></div></div>
@@ -276,7 +301,6 @@ export async function listenItem(root, id, tab = 'text') {
   if (!d.duration && src) au.addEventListener('loadedmetadata', () => { if (isFinite(au.duration)) { d.duration = au.duration; save(); } }, { once: true });
 
   const body = $('#lsBody', root);
-  if (tab === 'quiz') drawQuiz(); else if (tab === 'type') drawType(); else if (tab === 'speak') drawSpeak(); else drawText();
 
   // ── Nội dung nghe ──
   function drawText(edit = !d.lines.length) {
@@ -532,12 +556,102 @@ export async function listenItem(root, id, tab = 'text') {
   }
 
   // ── Nghe – nói lại (shadowing): nghe từng câu, máy tự ghi âm và chấm đọc đúng từng chữ ──
+  // AI Whisper dùng chung cho chấm băng và thử nhận giọng
+  const setAI = h => $$('.ai-status', body).forEach(x => { x.innerHTML = h; });
+  let aw = null; const waiting = new Map(); let seq = 0;
+  const aiWorker = () => {
+    if (aw) return aw;
+    aw = new Worker(new URL('../workers/asr.js', import.meta.url), { type: 'module' });
+    const files = {};
+    aw.onmessage = ev => { const m = ev.data;
+      if (m.type === 'load') { files[m.file] = [m.loaded || 0, m.total || 0]; const L = Object.values(files).reduce((a, x) => a + x[0], 0), T = Object.values(files).reduce((a, x) => a + x[1], 0); setAI(`🤖 Đang tải AI chấm: ${fmtSize(L)}${T ? ' / ' + fmtSize(T) : ''} (chỉ lần đầu) – bạn cứ luyện, bài sẽ được chấm khi tải xong.`); }
+      else if (m.type === 'ready') setAI('<span class="ok-t">🤖 AI chấm đã sẵn sàng.</span>');
+      else if (m.type === 'error') setAI(`<span class="bad-t">Không tải được AI chấm (${esc(m.msg)}). Bản ghi vẫn được giữ để bạn tự nghe lại; có thể dùng cách chấm bằng trình duyệt bên dưới.</span>`);
+      else if (m.type === 'clip') { const w = waiting.get(m.id); if (w) { waiting.delete(m.id); if (m.error && !m.text) setAI(`<span class="bad-t">AI chấm gặp lỗi: ${esc(m.error)}</span>`); w(m.text); } }
+    };
+    aw.onerror = ev => { setAI(`<span class="bad-t">Không chạy được AI chấm (${esc(ev.message || 'lỗi')}).</span>`); };
+    return aw;
+  };
+  const askAI = (pcm, model) => new Promise(res => { const id = ++seq; waiting.set(id, res); aiWorker().postMessage({ type: 'clip', id, audio: pcm, model }, [pcm.buffer]); });
+
+  // ── Thử AI nhận giọng: nói bất kỳ câu nào, xem AI nghe ra chữ gì (và so với câu muốn đọc) ──
+  const aiTestHtml = () => `<section class="card ai-test">
+    <h2>🧪 Thử AI nhận giọng đọc</h2>
+    <p class="small muted">Bấm 🎤 rồi đọc một câu tiếng Trung bất kỳ – AI sẽ ghi lại và cho biết nó <b>nghe ra chữ gì</b> (kèm pinyin, nghĩa). Nếu chọn hoặc gõ <b>câu muốn đọc</b>, máy so sánh và tô màu từng chữ đúng/sai. Nói xong im lặng khoảng 1 giây là máy tự dừng.</p>
+    <div class="row gap wrap ls-sbar">
+      <label class="sel">AI nghe <select id="atEng">
+        <option value="Xenova/whisper-base">Whisper base – chạy trên máy (~80 MB)</option>
+        <option value="Xenova/whisper-small">Whisper small – chuẩn hơn (~250 MB)</option>
+        <option value="Xenova/whisper-tiny">Whisper tiny – rất nhanh (~40 MB)</option>
+        ${SR ? '<option value="sr">Nhận dạng của trình duyệt (Chrome/Edge, cần mạng)</option>' : ''}</select></label>
+      ${d.lines.length ? `<label class="sel">Câu trong bài <select id="atPick"><option value="">— đọc tự do —</option>${d.lines.map((l, i) => `<option value="${i}">${i + 1}. ${esc(l.zh.slice(0, 24))}${l.zh.length > 24 ? '…' : ''}</option>`).join('')}</select></label>` : ''}
+    </div>
+    <input id="atTarget" class="inp" lang="zh-CN" placeholder="Câu bạn muốn đọc (không bắt buộc) – ví dụ: 你好，我叫小明。" style="width:100%;box-sizing:border-box">
+    <div class="row gap wrap" style="align-items:center;margin-top:10px"><button class="btn big" id="atRec">🎤 Bấm để nói</button><span class="tp-vu"><span id="atVu"></span></span><span class="small muted" id="atInfo"></span></div>
+    <div class="small ai-status"></div>
+    <div id="atOut"></div>
+    <details class="vs-det" id="atHisD" hidden><summary>🕘 Các lần thử trước</summary><div id="atHis"></div></details>
+  </section>`;
+  function bindAiTest() {
+    const eng = $('#atEng', body), tg = $('#atTarget', body), btn = $('#atRec', body), info = $('#atInfo', body), out = $('#atOut', body), vu = $('#atVu', body);
+    try { const v = store.s.listenOpt?.aiEng; if (v && [...eng.options].some(o => o.value === v)) eng.value = v; } catch {}
+    eng.onchange = () => { opt.aiEng = eng.value; saveOpt(); };
+    if ($('#atPick', body)) $('#atPick', body).onchange = e => { const i = e.target.value; tg.value = i === '' ? '' : d.lines[+i].zh; };
+    const hist = [];
+    let active = false, stopNow = null;
+    const render = (said, url, ms, engName) => {
+      const target = tg.value.trim();
+      let cmp = '';
+      if (target && said) {
+        const r = align(target, said), sc = sentenceChars(target, 0);
+        cmp = `<div class="at-cmp"><div class="small muted">So với câu muốn đọc ${badge(r.score)} – đúng ${r.ok}, gần đúng ${r.tone}:</div><div class="sp-text" style="--sp-size:1.4rem"><div class="sp-row at-tg"><div class="sp-body"><div class="sp-zh" lang="zh-CN">${sc.html}</div></div></div></div></div>`;
+        setTimeout(() => paint($('.at-tg', out), r.marks), 0);
+      }
+      out.innerHTML = `<div class="at-res">
+        <div class="small muted">🤖 ${esc(engName)} nghe ra${ms ? ` (sau ${(ms / 1000).toFixed(1)} giây)` : ''}:</div>
+        ${said ? `<div class="sent at-said"><div class="sent-body"><div class="zh">${zhTokens(said)}</div></div><div class="sent-act"><button class="say at-say" title="Nghe giọng máy đọc câu AI nghe được" aria-label="Giọng máy đọc">${icon('vol')}</button></div></div>` : '<p class="bad-t">AI không nghe ra chữ nào – hãy nói to, rõ hơn và gần micro.</p>'}
+        ${url ? `<div class="small muted">Giọng của bạn:</div><audio controls src="${url}"></audio>` : ''}
+        ${cmp}</div>`;
+      $('.at-say', out) && ($('.at-say', out).onclick = () => speak(said));
+      hist.unshift({ said, target, at: new Date().toLocaleTimeString('vi-VN') });
+      $('#atHisD', body).hidden = false;
+      $('#atHis', body).innerHTML = hist.slice(0, 10).map(h => `<div class="small"><b>${h.at}</b> · <span lang="zh-CN">${esc(h.said || '(không nghe ra)')}</span>${h.target ? ` <span class="muted">← muốn đọc:</span> <span lang="zh-CN">${esc(h.target)}</span>` : ''}</div>`).join('');
+    };
+    btn.onclick = async () => {
+      if (active) { stopNow && stopNow(); return; }
+      au.pause(); active = true; btn.classList.add('rec'); btn.textContent = '⏹ Đang nghe… bấm để dừng';
+      const e = eng.value; out.innerHTML = '';
+      try {
+        if (e === 'sr') {
+          info.textContent = 'Trình duyệt đang nghe…';
+          const fake = {}; stopNow = () => fake._stop && fake._stop();
+          const r = await recordClip(fake);
+          const said = (r.alts || [])[0] || '';
+          render(said ? said : '', r.url, 0, 'Trình duyệt');
+        } else {
+          let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { throw new Error('Cần cho phép dùng micro.'); }
+          aiWorker().postMessage({ type: 'preload', model: e });
+          info.textContent = 'Đang ghi âm…';
+          const { blob, voiced } = await recordSilence(stream, 15, lv => { vu.style.width = Math.min(100, lv / 0.15 * 100) + '%'; }, f => { stopNow = f; });
+          stream.getTracks().forEach(t => t.stop()); vu.style.width = '0';
+          const url = URL.createObjectURL(blob);
+          if (!voiced) { render('', url, 0, 'Whisper'); return; }
+          info.textContent = '🤖 AI đang nghe lại bản ghi…'; const t0 = performance.now();
+          const said = await askAI(await pcm16k(await blob.arrayBuffer()), e);
+          render(said, url, performance.now() - t0, 'Whisper');
+        }
+        logActivity();
+      } catch (err) { out.innerHTML = `<p class="bad-t">${esc(err.message || err)}</p>`; }
+      finally { active = false; stopNow = null; btn.classList.remove('rec'); btn.textContent = '🎤 Bấm để nói'; info.textContent = ''; }
+    };
+  }
+
   function drawSpeak() {
-    if (!d.lines.length) { body.innerHTML = `<section class="card"><p class="note">Cần có nội dung nghe để luyện nói lại. <a href="#/listen/${d.id}">Thêm nội dung nghe</a> (có thể dùng 🤖 Nhận dạng tự động).</p></section>`; return; }
+    if (!d.lines.length) { body.innerHTML = aiTestHtml() + `<section class="card"><p class="note">Cần có nội dung nghe để luyện nói lại theo bài. <a href="#/listen/${d.id}">Thêm nội dung nghe</a> (có thể dùng 🤖 Nhận dạng tự động). Bạn vẫn có thể thử AI nhận giọng ở trên.</p></section>`; bindAiTest(); return; }
     d.speak = d.speak || {};
     let base = 0;
     const hasT = d.lines.some(l => l.t != null);
-    body.innerHTML = `<section class="card">
+    body.innerHTML = aiTestHtml() + `<section class="card">
       <h2>🎤 Nghe – nói lại</h2>
       <p class="small muted">Nghe từng câu rồi nói lại. Ở chế độ <b>tự động</b>, máy phát câu ${hasT ? 'trong file' : 'bằng giọng máy đọc (nên đồng bộ thời gian để dùng giọng thật trong file)'}, sau đó <b>tự ghi âm</b> giọng bạn và <b>chấm đúng/sai từng chữ</b>: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>, rồi chuyển sang câu tiếp theo.</p>
       ${SR ? '' : '<p class="note small">Trình duyệt này chưa có nhận dạng giọng nói sẵn – hãy dùng chế độ “Băng chạy liên tục” (AI Whisper chấm) hoặc mở bằng Chrome/Edge.</p>'}
@@ -551,7 +665,7 @@ export async function listenItem(root, id, tab = 'text') {
         </div>
         <div class="row gap wrap"><button class="btn" id="tpGo">▶ Chạy băng từ câu <input id="tpFrom" type="number" min="1" max="${d.lines.length}" value="1" class="inp sm" style="width:64px" onclick="event.stopPropagation()"></button><button class="btn ghost" id="tpStop" disabled>⏹ Dừng băng</button></div>
         <div class="tp-gap" id="tpGapBox" hidden><div class="tp-lbl">🎤 Đến lượt bạn – nói lại câu vừa nghe <span class="tp-vu"><span id="tpVu"></span></span></div><div class="my-bar"><span id="tpBar"></span></div></div>
-        <div class="small" id="tpAI"></div>
+        <div class="small ai-status" id="tpAI"></div>
       </div>
       <h3 class="sub">⚡ Hoặc luyện từng câu, chấm ngay bằng trình duyệt (Chrome/Edge)</h3>
       <div class="row gap wrap ls-sbar">
@@ -633,7 +747,6 @@ export async function listenItem(root, id, tab = 'text') {
     };
     // ── Băng chạy liên tục + AI Whisper chấm ──
     let tape = false, stream = null;
-    const aiBox = $('#tpAI', body);
     const scoreFromAI = (i, text, url) => {
       const el = rows[i], out = $('.sp-res', el), audioH = url ? `<audio controls src="${url}"></audio>` : '';
       if (!text) { paint(el, []); out.innerHTML = `<span class="muted">AI không nghe thấy lời nói rõ ràng.</span> ${audioH}`; return; }
@@ -670,21 +783,6 @@ export async function listenItem(root, id, tab = 'text') {
       ac.close(); box.hidden = true;
       return { blob: new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' }), voiced: voiced > 3 };
     }
-    let aw = null; const waiting = new Map(); let seq = 0;
-    const aiWorker = () => {
-      if (aw) return aw;
-      aw = new Worker(new URL('../workers/asr.js', import.meta.url), { type: 'module' });
-      const files = {};
-      aw.onmessage = ev => { const m = ev.data;
-        if (m.type === 'load') { files[m.file] = [m.loaded || 0, m.total || 0]; const L = Object.values(files).reduce((a, x) => a + x[0], 0), T = Object.values(files).reduce((a, x) => a + x[1], 0); aiBox.innerHTML = `🤖 Đang tải AI chấm: ${fmtSize(L)}${T ? ' / ' + fmtSize(T) : ''} (chỉ lần đầu) – bạn cứ luyện, bài sẽ được chấm khi tải xong.`; }
-        else if (m.type === 'ready') aiBox.innerHTML = '<span class="ok-t">🤖 AI chấm đã sẵn sàng.</span>';
-        else if (m.type === 'error') aiBox.innerHTML = `<span class="bad-t">Không tải được AI chấm (${esc(m.msg)}). Bản ghi vẫn được giữ để bạn tự nghe lại; có thể dùng cách chấm bằng trình duyệt bên dưới.</span>`;
-        else if (m.type === 'clip') { const w = waiting.get(m.id); if (w) { waiting.delete(m.id); if (m.error && !m.text) aiBox.innerHTML = `<span class="bad-t">AI chấm gặp lỗi: ${esc(m.error)}</span>`; w(m.text); } }
-      };
-      aw.onerror = ev => { aiBox.innerHTML = `<span class="bad-t">Không chạy được AI chấm (${esc(ev.message || 'lỗi')}).</span>`; };
-      return aw;
-    };
-    const askAI = (pcm, model) => new Promise(res => { const id = ++seq; waiting.set(id, res); aiWorker().postMessage({ type: 'clip', id, audio: pcm, model }, [pcm.buffer]); });
     $('#tpGo', body).onclick = async () => {
       if (tape || running) return;
       try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
@@ -714,10 +812,11 @@ export async function listenItem(root, id, tab = 'text') {
       }
       tape = false; stream.getTracks().forEach(t => t.stop()); stream = null;
       $('#tpGo', body).disabled = false; $('#tpStop', body).disabled = true; $('#spAuto', body).disabled = false; rows.forEach(r => r.classList.remove('now'));
-      if (waiting.size) aiBox.innerHTML = `🤖 AI đang chấm nốt ${waiting.size} câu…`;
+      if (waiting.size) setAI(`🤖 AI đang chấm nốt ${waiting.size} câu…`);
     };
     $('#tpStop', body).onclick = () => { tape = false; cancel && cancel(); };
     summary();
+    bindAiTest();
   }
   const badge = sc => `<span class="score ${sc >= 80 ? 'good' : sc >= 50 ? 'mid' : 'bad'}">${sc}%</span>`;
   const paint = (el, marks) => $$('.cz', el).forEach((c, j) => { c.classList.remove('ok', 'tone', 'miss', 'hl'); if (marks[j]) c.classList.add(marks[j]); });
@@ -729,5 +828,6 @@ export async function listenItem(root, id, tab = 'text') {
     body.innerHTML = `<section class="card ty-sec"><h2>⌨️ Nghe – gõ lại</h2><p class="small muted">Nghe từng câu ở trình phát phía trên (bấm <kbd>R</kbd> để nghe lại câu hiện tại nếu đã đồng bộ thời gian) rồi gõ lại câu đó. Gõ đúng đến đâu chữ mẫu biến mất đến đó.</p><div id="lsTy"></div></section>`;
     typingTrainer($('#lsTy', body), { key: 'ls' + d.id, sentences: d.lines.map(l => [l.zh, l.vi || '']) });
   }
+  if (tab === 'quiz') drawQuiz(); else if (tab === 'type') drawType(); else if (tab === 'speak') drawSpeak(); else drawText();
   return `Luyện nghe: ${d.title}`;
 }

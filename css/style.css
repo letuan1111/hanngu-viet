@@ -830,3 +830,4 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .tp-gap .my-bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; } .tp-gap .my-bar span { display: block; height: 100%; width: 0; background: var(--red); }
 .tp-gap { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: 18px; width: min(560px, calc(100vw - 32px)); box-shadow: 0 6px 24px rgba(0,0,0,.18); border: 1px solid var(--red); background: var(--paper); }
 @media (max-width: 860px) { .tp-gap { bottom: 72px; } }
+.ai-test .at-res { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); } .ai-test .at-said .zh { font-size: 1.4rem; line-height: 2.2; } .ai-test .at-cmp { margin-top: 10px; } .ai-test audio { height: 34px; max-width: 100%; } .btn.rec { background: var(--red); color: #fff; animation: pulse 1s infinite; }
