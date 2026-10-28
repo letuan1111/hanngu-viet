@@ -2,7 +2,7 @@
 // hiện nội dung nghe (pinyin, nghĩa, đồng bộ thời gian) và câu hỏi đọc hiểu (tự soạn hoặc tạo tự động từ nội dung).
 import { store, logActivity } from '../core/store.js';
 import { segment, isHan, hsk30List, LV30, shuffle, sentencePinyin } from '../core/dict.js';
-import { esc, icon, $, $$, toast, zhTokens, recAudio } from '../core/ui.js';
+import { esc, icon, $, $$, toast, zhTokens, recAudio, quickSaveOn, setQuickSave } from '../core/ui.js';
 import { speak, stopSeq, SR } from '../core/tts.js';
 import { typingTrainer, splitSentences } from './typing.js';
 import { sentenceChars, align, recognizeOnce, recordClip } from './speaking.js';
@@ -329,6 +329,7 @@ export async function listenItem(root, id, tab = 'text') {
         <label class="sw"><input type="checkbox" id="oPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
         ${hasVi ? `<label class="sw"><input type="checkbox" id="oVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>` : ''}
         <label class="sw" title="Nghe trước, bấm vào câu để hiện chữ"><input type="checkbox" id="oHide" ${opt.hide ? 'checked' : ''}><span></span> Ẩn chữ (nghe trước)</label>
+        <label class="sw" title="Bấm vào từ là lưu vào Ôn tập; bôi đen cụm từ để lưu cụm"><input type="checkbox" id="oQs" ${quickSaveOn() ? 'checked' : ''}><span></span> ⚡ Bấm từ là lưu ôn tập</label>
         <span class="grow"></span>
         <button class="mini" id="lsSync">⏱️ ${hasT ? 'Đồng bộ lại thời gian' : 'Đồng bộ câu với âm thanh'}</button>
         <button class="mini" id="lsEdit">✏️ Sửa nội dung</button>
@@ -346,6 +347,7 @@ export async function listenItem(root, id, tab = 'text') {
     if ($('#oVi', body)) $('#oVi', body).onchange = e => { opt.vi = e.target.checked; txt.classList.toggle('no-vi', !opt.vi); saveOpt(); };
     $('#oHide', body).onchange = e => { opt.hide = e.target.checked; txt.classList.toggle('hide-zh', opt.hide); $$('.ls-line', body).forEach(x => x.classList.remove('shown')); saveOpt(); };
     $('#lsEdit', body).onclick = () => drawText(true);
+    $('#oQs', body).onchange = e => setQuickSave(e.target.checked);
     $('#lsSync', body).onclick = startSync;
     txt.onclick = e => {
       const ln = e.target.closest('.ls-line'); if (!ln) return; const i = +ln.dataset.i;

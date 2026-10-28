@@ -37,6 +37,7 @@ export function rebuild() {
   V30_NEW23.forEach(add);
   for (const [h, p, vi] of SPEAK_DICT) if (!byH.has(h)) add({ id: `sp-${h}`, h, p, vi, pos: '', topics: ['coban'], level: 0, source: 'extra' });
   for (const w of store.s.community.words) add({ ...w, source: 'community' });
+  for (const [h, w] of Object.entries(store.s.myPhrases || {})) if (!byH.has(h)) add({ id: `my-${h}`, h, p: w.p || '', vi: w.vi || '(cụm từ bạn đã lưu)', ex: w.ex || '', pos: '', topics: ['coban'], level: 0, source: 'mine' });
 }
 rebuild();
 export const lookup = h => byH.get(h) || [];
@@ -219,4 +220,4 @@ export function search(q) {
 
 export const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 export const pick = (a, n) => shuffle(a).slice(0, n);
-export const levelLabel = w => w.source === 'community' ? 'Cộng đồng' : w.source === 'hsk30' ? `HSK ${w.level} · 3.0` : w.source === 'extra' ? (IN30.has(w.h) ? 'HSK 1 · 3.0' : 'Mở rộng') : `HSK ${w.level}`;
+export const levelLabel = w => w.source === 'mine' ? 'Cụm bạn lưu' : w.source === 'community' ? 'Cộng đồng' : w.source === 'hsk30' ? `HSK ${w.level} · 3.0` : w.source === 'extra' ? (IN30.has(w.h) ? 'HSK 1 · 3.0' : 'Mở rộng') : `HSK ${w.level}`;

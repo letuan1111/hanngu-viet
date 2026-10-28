@@ -1,5 +1,5 @@
 import { store, srsAdd, logActivity } from './store.js';
-import { tokensWithPinyin, entry, lookup, examplesFor, collocations, charPinyin, CHARS, isHan, levelLabel, POS, sentencePinyin, GRAMMAR } from './dict.js';
+import { rebuild, tokensWithPinyin, entry, lookup, examplesFor, collocations, charPinyin, CHARS, isHan, levelLabel, POS, sentencePinyin, GRAMMAR } from './dict.js';
 import { SPEAK_STRUCT } from '../data/speaking.js';
 import { speak } from './tts.js';
 import { RADICALS } from '../data/radicals.js';
@@ -25,7 +25,7 @@ export function zhTokens(zh, { gloss = true } = {}) {
     const start = off; off += t.t.length;
     if (!t.han) return `<span class="pn">${esc(t.t)}</span>`;
     const g = gloss && t.w ? `<i class="gl">${esc(short(t.w.vi))}</i>` : '';
-    return `<span class="tk${t.w ? '' : ' unk'}" data-w="${esc(t.t)}" data-i="${start}" data-n="${t.t.length}"><ruby><span class="hz">${esc(t.t)}</span><rt>${esc(t.py || '')}</rt></ruby>${g}</span>`;
+    return `<span class="tk${t.w ? '' : ' unk'}${store.s.srs[t.t] ? ' in-srs' : ''}" data-w="${esc(t.t)}" data-i="${start}" data-n="${t.t.length}"><ruby><span class="hz">${esc(t.t)}</span><rt>${esc(t.py || '')}</rt></ruby>${g}</span>`;
   }).join('');
 }
 export function say(text, label = '') {
@@ -122,7 +122,7 @@ export function wordCard(h, { full = false } = {}) {
     <div class="wc-act">
       <a class="btn sm" href="#/word/${encodeURIComponent(h)}">Xem đầy đủ</a>
       <button class="btn sm ghost" data-act="save" data-h="${esc(h)}">${icon('star')} ${s.saved[h] ? 'Đã lưu' : 'Lưu từ'}</button>
-      <button class="btn sm ghost" data-act="srs" data-h="${esc(h)}">${icon('plus')} ${s.srs[h] ? 'Đang ôn' : 'Thêm ôn tập'}</button>
+      <button class="btn sm ${s.srs[h] ? 'ghost' : ''}" data-act="srs" data-h="${esc(h)}">${s.srs[h] ? '✓ Đang ôn – bỏ' : icon('plus') + ' Lưu vào ôn tập'}</button>
       <button class="btn sm ghost" data-act="hard" data-h="${esc(h)}">${icon('flag')} ${s.hard[h] ? 'Từ khó ✓' : 'Đánh dấu khó'}</button>
     </div>
   </div>`;
@@ -159,8 +159,56 @@ export function openPop(anchor, html) {
   }
 }
 
+// ── Lưu từ / cụm từ vào mục Ôn tập ──
+function unsave(h) { store.update(s => { delete s.srs[h]; if (s.myPhrases && s.myPhrases[h]) delete s.myPhrases[h]; }); rebuild(); }
+function markSaved(h) { $$('.tk').forEach(el => { if (el.dataset.w === h) el.classList.toggle('in-srs', !!store.s.srs[h]); }); }
+export function savePhrase(h, { vi = '', ex = '' } = {}) {
+  h = h.trim(); if (!h) return;
+  if (!entry(h)) { store.update(s => { s.myPhrases = s.myPhrases || {}; s.myPhrases[h] = { p: sentencePinyin(h), vi, ex, at: Date.now() }; }); rebuild(); }
+  srsAdd(h); markSaved(h); logActivity();
+}
+export const quickSaveOn = () => !!store.s.quickSave;
+export function setQuickSave(on) { store.update(s => { s.quickSave = !!on; }); drawQuickBadge(); }
+function drawQuickBadge() {
+  let b = document.getElementById('qsBadge');
+  if (!store.s.quickSave) { b && b.remove(); return; }
+  if (!b) { b = document.createElement('div'); b.id = 'qsBadge'; b.className = 'qs-badge'; document.body.appendChild(b); }
+  b.innerHTML = `⚡ <b>Lưu nhanh</b>: bấm vào từ là lưu vào Ôn tập · <a href="#/review">Xem mục ôn</a> <button type="button" class="mini" id="qsOff">Tắt</button>`;
+  b.querySelector('#qsOff').onclick = () => setQuickSave(false);
+}
+// Bôi đen một cụm chữ Hán → hiện nút lưu cụm từ
+let selBox = null;
+function closeSel() { if (selBox) { selBox.remove(); selBox = null; } }
+function onSelect() {
+  const sel = window.getSelection(); if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+  const frag = sel.getRangeAt(0).cloneContents(); frag.querySelectorAll('rt, rp, .gl, .tp, .py-line, .vi, button').forEach(x => x.remove());
+  const raw = frag.textContent.replace(/[\sA-Za-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü0-9]+/g, ''), h = raw.replace(/^[^\p{Script=Han}]+|[^\p{Script=Han}]+$/gu, '');
+  const n = [...h].filter(isHan).length; if (n < 2 || n > 20) return;
+  const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+  if (!node || node.closest('input, textarea, .pop, .sel-save')) return;
+  const host = node.closest('.sent, .ls-line, .sp-row, .zh, [lang="zh-CN"]'); if (!host) return;
+  const ctx = (host.closest('.sent, .ls-line, .sp-row') || host).getAttribute('data-zh') || '';
+  closeSel();
+  const r = sel.getRangeAt(0).getBoundingClientRect();
+  selBox = document.createElement('div'); selBox.className = 'sel-save';
+  const has = !!entry(h), saved = !!store.s.srs[h];
+  selBox.innerHTML = `<div><b lang="zh-CN">${esc(h)}</b> <span class="muted small">${esc(sentencePinyin(h))}</span></div>
+    ${has ? `<div class="small">${esc(short(entry(h).vi))}</div>` : `<input class="inp sel-vi" placeholder="Nghĩa tiếng Việt (không bắt buộc)">`}
+    <div class="row gap"><button type="button" class="btn sm sel-ok">${saved ? '✓ Đã có trong Ôn tập' : '⭐ Lưu cụm này vào Ôn tập'}</button><button type="button" class="mini sel-x">Đóng</button></div>`;
+  document.body.appendChild(selBox);
+  const w = Math.min(320, window.innerWidth - 24);
+  selBox.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+  selBox.style.top = (r.bottom + 8 + window.scrollY) + 'px'; selBox.style.width = w + 'px';
+  selBox.querySelector('.sel-x').onclick = closeSel;
+  selBox.querySelector('.sel-ok').onclick = () => { if (!saved) { savePhrase(h, { vi: selBox.querySelector('.sel-vi')?.value.trim() || '', ex: ctx }); toast(`Đã lưu “${h}” vào mục Ôn tập`); } closeSel(); window.getSelection()?.removeAllRanges(); };
+}
+
 // ── Xử lý sự kiện chung (ủy quyền) ──
 export function initGlobalEvents() {
+  drawQuickBadge();
+  document.addEventListener('mouseup', () => setTimeout(onSelect, 10));
+  document.addEventListener('touchend', () => setTimeout(onSelect, 300));
+  document.addEventListener('mousedown', e => { if (selBox && !e.target.closest('.sel-save')) closeSel(); });
   document.addEventListener('click', e => {
     const t = e.target;
     const sayBtn = t.closest('[data-say]');
@@ -172,7 +220,7 @@ export function initGlobalEvents() {
       const h = act.dataset.h;
       if (act.dataset.act === 'save') store.update(s => { if (s.saved[h]) delete s.saved[h]; else s.saved[h] = true; });
       if (act.dataset.act === 'hard') store.update(s => { if (s.hard[h]) delete s.hard[h]; else { s.hard[h] = true; } });
-      if (act.dataset.act === 'srs') { srsAdd(h); toast('Đã thêm vào danh sách ôn tập'); }
+      if (act.dataset.act === 'srs') { if (store.s.srs[h]) { unsave(h); toast('Đã bỏ khỏi danh sách ôn tập'); } else { srsAdd(h); toast('Đã lưu vào mục Ôn tập'); } markSaved(h); }
       if (act.dataset.act === 'hard' && store.s.hard[h]) srsAdd(h);
       const card = act.closest('.wc'); if (card && pop && pop.contains(card)) { pop.innerHTML = `<button class="close">${icon('x')}</button>` + wordCard(h); }
       else if (card) { card.outerHTML = wordCard(h, { full: true }); }
@@ -186,6 +234,7 @@ export function initGlobalEvents() {
         // chế độ ẩn: bấm lần đầu để hiện, bấm tiếp để tra từ
         sent.classList.add('show-all'); sent.dataset.tapfirst = '1'; return;
       }
+      if (store.s.quickSave && !store.s.srs[w.dataset.w] && !w.closest('.pop')) { savePhrase(w.dataset.w); toast(`⭐ Đã lưu “${w.dataset.w}” vào Ôn tập – bấm lần nữa để xem nghĩa`); return; }
       openPop(w, wordCard(w.dataset.w)); return;
     }
     if (pop && !t.closest('.pop')) closePop();

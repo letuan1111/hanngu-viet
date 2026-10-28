@@ -847,3 +847,10 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .ty-an { margin-top: 12px; } .ty-gsum { margin: 8px 0 10px; line-height: 2; } .ty-gsum .chip { font-size: .85rem; }
 .ty-an .sent .zh { font-size: 1.25rem; } .ty-sg a { margin-right: 4px; }
 .wc-gr { margin: 8px 0; line-height: 1.9; } .wc-gr .chip { font-size: .82rem; }
+.tk.in-srs .hz, .tk.in-srs ruby { text-decoration: underline 3px #e0a526; text-underline-offset: 5px; }
+.qs-badge { position: fixed; z-index: 45; left: 12px; bottom: 12px; background: var(--paper); border: 1px solid #e0a526; border-radius: 99px; padding: 6px 12px; font-size: .85rem; box-shadow: 0 4px 14px rgba(0,0,0,.12); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 24px); }
+@media (max-width: 860px) { .qs-badge { bottom: 70px; } }
+.sel-save { position: absolute; z-index: 60; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: 0 8px 26px rgba(0,0,0,.18); display: grid; gap: 6px; }
+.sel-save b[lang] { font-size: 1.2rem; } .sel-save .inp { width: 100%; box-sizing: border-box; }
+.ty-save { margin: 8px 0; padding: 8px 10px; background: #fff7e0; border: 1px solid #f0d58a; border-radius: 10px; }
+@media (prefers-color-scheme: dark) { .ty-save { background: transparent; } }
