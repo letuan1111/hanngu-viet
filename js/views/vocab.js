@@ -1,4 +1,5 @@
 import { store, srsAdd } from '../core/store.js';
+import { keepState, takeState } from '../core/nav.js';
 import { IN30, allWords, lookup, entry, search, examplesFor, collocations, confusables, lessonsWithWord, TOPICS, POS, levelLabel, isHan, charPinyin, sentencePinyin, GRAMMAR, hskWords, pick, shuffle } from '../core/dict.js';
 import { esc, say, sentence, exampleHtml, icon, toast, writer, charInfo, short, $, $$, gridSvg, modal } from '../core/ui.js';
 import { MNEMONICS, RADICALS } from '../data/radicals.js';
@@ -23,6 +24,9 @@ export function dictionary(root) {
   </div>
   <div id="cnt" class="muted small"></div><div id="list" class="wlist"></div><div class="center"><button class="btn ghost" id="more" hidden>Xem thêm</button></div>`;
   let lv = 'all', limit = 80;
+  const st0 = takeState();
+  if (st0) { lv = st0.lv || 'all'; limit = st0.limit || 80; $('#q', root).value = st0.q || ''; $('#tp', root).value = st0.tp || ''; $$('#lv .chip', root).forEach(x => x.classList.toggle('on', x.dataset.k === lv)); }
+  keepState(() => ({ lv, limit, q: $('#q', root).value, tp: $('#tp', root).value }));
   const draw = () => {
     const q = $('#q', root).value; const tp = $('#tp', root).value;
     let ws = q ? search(q) : allWords().sort((a, b) => (a.level || 9) - (b.level || 9));

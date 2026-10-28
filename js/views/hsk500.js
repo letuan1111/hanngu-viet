@@ -3,6 +3,7 @@ import { hsk30List, READINGS, grammarById, POS, TOPICS, IN30, HSK30_ORDER, pick,
 import { vocabSet } from './vocabset.js';
 import { esc, say, sentence, exampleHtml, icon, toast, $, $$ } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
+import { keepState, takeState } from '../core/nav.js';
 import { speakSeq, stopSeq } from '../core/tts.js';
 
 const plain = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s/g, '');
@@ -27,6 +28,9 @@ export function hsk500(root, lvArg) {
   <div class="tbl-wrap"><table class="tbl t500"><thead><tr><th>#</th><th>Chữ Hán</th><th>Pinyin</th><th>Nghĩa tiếng Việt</th><th class="hide-sm">Từ loại</th><th>Ví dụ</th><th title="Đã thuộc">✓</th></tr></thead><tbody id="tb"></tbody></table></div>
   <div class="row gap center" id="pg"></div><div id="qz30"></div>`;
   let filter = 'all', page = 0; const PER = 100;
+  const st0 = takeState();
+  if (st0) { filter = st0.f || 'all'; page = st0.p || 0; $('#q30', root).value = st0.q || ''; $('#t30', root).value = st0.t || ''; $$('#f30 .chip', root).forEach(x => x.classList.toggle('on', x.dataset.k === filter)); }
+  keepState(() => ({ f: filter, p: page, q: $('#q30', root).value, t: $('#t30', root).value, open: $$('.ex-btn[aria-expanded="true"]', root).map(b => b.dataset.ex), ql: $('#qlG', root)?.value }));
   const rows = () => {
     const q = plain($('#q30', root).value), tp = $('#t30', root).value, k = known();
     return list.filter(w => (filter === 'all' || (filter === 'known' ? k[w.h] : filter === 'todo' ? !k[w.h] : w.isNew))
@@ -67,6 +71,7 @@ export function hsk500(root, lvArg) {
     $('#qz30', root).scrollIntoView({ behavior: 'smooth' });
   };
   draw();
+  if (st0 && st0.open) st0.open.forEach(h => { const b = $$('.ex-btn', root).find(x => x.dataset.ex === h); if (b) b.click(); });
   // ── Học kiểu Quizlet theo nhóm 20 từ ──
   const qs = document.createElement('section'); qs.className = 'card vs-sec';
   const nG = Math.ceil(list.length / 20);
@@ -75,6 +80,7 @@ export function hsk500(root, lvArg) {
   $('.lv-sum', root).before(qs);
   const pickSet = () => { const v = $('#qlG', root).value, k = known(); const ws = v === 'todo' ? list.filter(w => !k[w.h]) : v === 'filter' ? rows() : list.slice(+v * 20, +v * 20 + 20); return ws.slice(0, 20).map(w => ({ h: w.h, p: w.p, vi: w.vi })); };
   const startQl = () => vocabSet($('#qlBox', root), pickSet(), { id: `hsk30-${lv}`, sent: [], known: () => known(), setKnown: (h, v) => store.update(s => { s.known30 = s.known30 || {}; if (v) s.known30[h] = true; else delete s.known30[h]; }), onChange: draw });
+  if (st0 && st0.ql && [...$('#qlG', root).options].some(o => o.value === st0.ql)) $('#qlG', root).value = st0.ql;
   $('#qlG', root).onchange = startQl; startQl();
   return TITLE;
 }

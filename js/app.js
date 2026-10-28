@@ -1,6 +1,7 @@
 import { store, setLast } from './core/store.js';
 import { applyDisplay, initGlobalEvents, closePop, $, $$ } from './core/ui.js';
 import { stopSeq } from './core/tts.js';
+import { _capture, _setPending } from './core/nav.js';
 import { home } from './views/home.js';
 import { course, lesson, chapterTest } from './views/course.js';
 import { dictionary, word, topics } from './views/vocab.js';
@@ -87,13 +88,26 @@ store.on(() => applyDisplay());
 // ── Quay lại trang trước: nút “← Quay lại” + nhớ vị trí cuộn của từng trang ──
 try { history.scrollRestoration = 'manual'; } catch {}
 const ss = { get: (k, d) => { try { return JSON.parse(sessionStorage.getItem(k)) ?? d; } catch { return d; } }, set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch {} } };
-let restoreY = 0;
+let restoreY = 0, restoreA = '';
+// Ghi nhớ phần tử người dùng vừa bấm trong trang (từ, nút ví dụ, link…) để quay lại đúng chỗ đó
+let lastAnchor = '';
+const cssv = v => String(v).replace(/["\\]/g, '\\$&');
+document.addEventListener('click', e => {
+  const t = e.target; if (!t.closest || !t.closest('#view')) return;
+  const el = t.closest('[data-ex],[data-w],[data-h],[data-unsrs],a[href^="#/"],[data-goto],.lesson-item,.ls-item');
+  if (!el) return;
+  lastAnchor = el.dataset.ex != null ? `[data-ex="${cssv(el.dataset.ex)}"]` : el.dataset.w != null ? `[data-w="${cssv(el.dataset.w)}"]` : el.dataset.h != null ? `[data-h="${cssv(el.dataset.h)}"]` : el.getAttribute('href') ? `a[href="${cssv(el.getAttribute('href'))}"]` : '';
+}, true);
 function track(e) {
   const cur = location.hash || '#/', stack = ss.get('hv-stack', []), pos = ss.get('hv-scroll', {});
-  if (e && e.oldURL) { const old = '#' + (e.oldURL.split('#')[1] || '/'); pos[old] = window.scrollY; ss.set('hv-scroll', pos); }
-  if (stack.length > 1 && stack[stack.length - 2].h === cur) { stack.pop(); restoreY = pos[cur] || 0; }          // bấm quay lại
-  else if (!stack.length || stack[stack.length - 1].h !== cur) { stack.push({ h: cur, t: '' }); restoreY = 0; if (stack.length > 60) stack.shift(); }
-  else restoreY = pos[cur] || 0;                                                                                     // tải lại trang
+  if (e && e.oldURL) { const old = '#' + (e.oldURL.split('#')[1] || '/'); pos[old] = { y: window.scrollY, a: lastAnchor, st: _capture() }; ss.set('hv-scroll', pos); }
+  lastAnchor = '';
+  let back = false;
+  if (stack.length > 1 && stack[stack.length - 2].h === cur) { stack.pop(); back = true; }          // bấm quay lại
+  else if (!stack.length || stack[stack.length - 1].h !== cur) { stack.push({ h: cur, t: '' }); if (stack.length > 60) stack.shift(); }
+  else back = true;                                                                                  // tải lại trang
+  const p = back ? pos[cur] : null, rec = typeof p === 'number' ? { y: p } : p || {};
+  restoreY = rec.y || 0; restoreA = rec.a || ''; _setPending(back ? rec.st : null);
   ss.set('hv-stack', stack);
 }
 function afterRender(title) {
@@ -105,9 +119,20 @@ function afterRender(title) {
     bar.innerHTML = `<button class="back-btn" id="hvBack" type="button">← Quay lại</button>${prev && prev.t ? `<span class="back-to">${prev.t.replace(/[<>&]/g, '')}</span>` : ''}`;
     $('#hvBack').onclick = () => { if (prev) history.back(); else { const up = path.replace(/\/[^/]*$/, '') || '/'; location.hash = '#' + (up === path ? '/' : up); } };
   }
-  // cuộn về vị trí cũ khi quay lại (thử vài lần vì có trang tải dữ liệu chậm)
-  const y = restoreY; window.scrollTo(0, y);
-  if (y) [120, 400, 900].forEach(ms => setTimeout(() => { if (Math.abs(window.scrollY - y) > 40 && document.body.scrollHeight > y) window.scrollTo(0, y); }, ms));
+  // quay lại: cuộn tới đúng phần tử vừa bấm (từ mới, nút “5 câu”…), nếu không có thì về vị trí cuộn cũ
+  const y = restoreY, a = restoreA; restoreY = 0; restoreA = '';
+  window.scrollTo(0, y);
+  if (!y && !a) return;
+  let done = false;
+  const go = () => {
+    if (done) return;
+    let el = null; try { el = a ? $('#view').querySelector(a) : null; } catch {}
+    if (el && el.offsetParent !== null) {
+      done = true; const r = el.getBoundingClientRect(); window.scrollTo(0, window.scrollY + r.top - window.innerHeight / 3);
+      const row = el.closest('tr, .wrow, .sp-row, .ls-line, .lesson-item, .vs-row, li') || el; row.classList.add('back-flash'); setTimeout(() => row.classList.remove('back-flash'), 2200);
+    } else if (y && Math.abs(window.scrollY - y) > 40 && document.body.scrollHeight > y) window.scrollTo(0, y);
+  };
+  [0, 150, 450, 1000].forEach(ms => setTimeout(go, ms));
 }
 window.addEventListener('hashchange', e => { track(e); render(); });
 track(); render();
