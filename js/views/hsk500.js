@@ -17,7 +17,7 @@ export function hsk500(root, lvArg) {
   root.innerHTML = `<nav class="crumb"><a href="#/course/${lv}">HSK ${lv}</a> › Bảng từ vựng</nav>
   <div class="page-head"><div><p class="eyebrow">Chuẩn HSK 3.0 · cấp ${lv}</p><h1>${TITLE}</h1></div>
     <div class="row gap wrap"><button class="btn sm" id="learn">${icon('plus')} Học 20 từ chưa thuộc</button><button class="btn sm ghost" id="test">Kiểm tra nhanh</button>${lv === 1 ? '<a class="btn sm ghost" href="#/reading">Bài đọc theo cấu trúc</a>' : ''}</div></div>
-  <nav class="tabs">${[1, 2, 3].map(l => `<a class="tab ${l === lv ? 'on' : ''}" href="#/hsk30/${l}">HSK ${l} <span class="cnt">${HSK30_ORDER[l].length}</span></a>`).join('')}</nav>
+  <nav class="tabs">${[1, 2, 3].map(l => `<a class="tab ${l === lv ? 'on' : ''}" href="#/hsk30/${l}">HSK ${l} <span class="cnt">${HSK30_ORDER[l].length}</span></a>`).join('')}<a class="tab" href="#/review/mine">⭐ Từ của tôi <span class="cnt">${Object.keys(store.s.srs || {}).length}</span></a></nav>
   <p class="muted small">${lv === 1 ? 'Danh sách cấp 1 theo Tiêu chuẩn trình độ tiếng Trung quốc tế (HSK 3.0, 2021): 500 từ (506 mục do một số từ có biến thể). Bao gồm toàn bộ 150 từ HSK 1 cũ cùng nhiều từ HSK 2–3 cũ.' : `Danh sách từ mới riêng của cấp ${lv} theo HSK 3.0 (2021): ${list.length} mục, không lặp lại từ của cấp dưới. Từ gắn nhãn “mới” là từ không có trong HSK 1–3 cũ (2.0).`} Bấm vào chữ Hán để tra, đánh dấu ✓ những từ đã thuộc. Học kiểu Quizlet theo từng nhóm 20 từ ở ngay bên dưới.</p>
   <div class="card lv-sum"><div class="grow"><b id="kc"></b><span class="bar"><i id="kb"></i></span></div></div>
   <div class="filters">

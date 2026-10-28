@@ -2,6 +2,7 @@ import { store, srsGrade, srsAdd, dueWords, masteryOf } from '../core/store.js';
 import { entry, examplesFor, hskWords, shuffle, LESSON_LIST, sentencePinyin } from '../core/dict.js';
 import { esc, say, icon, $, $$, short } from '../core/ui.js';
 import { speak } from '../core/tts.js';
+import { vocabSet } from './vocabset.js';
 
 export function review(root, mode = 'due') {
   const s = store.s;
@@ -21,11 +22,22 @@ export function review(root, mode = 'due') {
   root.innerHTML = `<div class="page-head"><h1>Ôn tập thông minh</h1></div>
   <p class="muted">Lặp lại ngắt quãng: từ bạn nhớ tốt sẽ xuất hiện thưa dần, từ hay quên sẽ quay lại sớm. Đã thuộc lâu dài: <b>${mastered}</b> từ.</p>
   <div class="tabs">${Object.entries(sets).map(([k, [n]]) => `<a class="tab ${k === mode ? 'on' : ''}" href="#/review/${k}">${n} <span class="cnt">${counts[k]}</span></a>`).join('')}</div>
+  ${mode === 'mine' && list.length ? `<section class="card vs-sec" id="mineQl"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><h2>🃏 Quizlet – học bằng chính các từ bạn đã thêm</h2>
+      <label class="sel">Bộ từ <select id="mqG" class="inp sm"><option value="all">Tất cả (${list.length})</option><option value="new">20 từ mới thêm nhất</option><option value="todo">Từ chưa thuộc</option><option value="due">Từ đến hạn ôn</option></select></label></div>
+      <p class="muted small">Thẻ lật, Học, Kiểm tra, Ghép thẻ, Sao băng, Đúng hay sai – chỉ dùng các từ & cụm từ bạn tự lưu. Từ đánh dấu ✓ được ghi nhớ trên trình duyệt.</p>
+      <div id="mqBox"></div></section>` : ''}
   ${mode === 'mine' ? mineList(list) : ''}
   <div class="row gap wrap fc-modes"><span class="muted small">Kiểu thẻ:</span>${[['zh', 'Chữ Hán → Nghĩa'], ['vi', 'Nghĩa → Chữ Hán'], ['au', 'Nghe → Chữ & nghĩa'], ['mix', 'Trộn']].map(([k, n], i) => `<label class="chk"><input type="radio" name="fm" value="${k}" ${i === 3 ? 'checked' : ''}> ${n}</label>`).join('')}</div>
   <div id="fc"></div>`;
   let i = 0, done = 0;
   const fc = $('#fc', root);
+  if (mode === 'mine' && list.length) {
+    const mk = () => s.mineKnown || {};
+    const pickSet = () => { const v = $('#mqG', root).value, now = Date.now(); const ws = v === 'new' ? list.slice(0, 20) : v === 'todo' ? list.filter(h => !mk()[h]) : v === 'due' ? list.filter(h => s.srs[h] && s.srs[h].due <= now) : list; return ws.map(h => { const w = entry(h); return { h, p: w.p, vi: w.vi }; }); };
+    const sent = Object.values(s.myPhrases || {}).filter(x => x.ex).map(x => [x.ex, '']);
+    const startQl = () => { const ws = pickSet(); if (!ws.length) { $('#mqBox', root).innerHTML = '<p class="muted">Bộ này chưa có từ nào.</p>'; return; } vocabSet($('#mqBox', root), ws, { id: 'mine', sent, known: () => mk(), setKnown: (h, v) => store.update(st => { st.mineKnown = st.mineKnown || {}; if (v) st.mineKnown[h] = true; else delete st.mineKnown[h]; }) }); };
+    $('#mqG', root).onchange = startQl; startQl();
+  }
   root.addEventListener('click', e => {
     const d = e.target.closest('[data-unsrs]'); if (!d) return;
     const h = d.dataset.unsrs; if (!confirm(`Bỏ “${h}” khỏi danh sách ôn tập?`)) return;
