@@ -62,8 +62,8 @@ function render() {
       document.title = (t || title) + ' · HànNgữ Việt';
       if (!/^\/(settings|progress)?$/.test(path)) setLast('#' + path, t || title);
       $$('.nav a').forEach(a => a.classList.toggle('on', path === a.getAttribute('href').slice(1) || (a.dataset.match && new RegExp(a.dataset.match).test(path))));
-      window.scrollTo(0, 0);
       root.focus({ preventScroll: true });
+      afterRender(t || title);
       return;
     }
   }
@@ -84,8 +84,33 @@ try { if (sessionStorage.getItem('hv-reload') && sessionStorage.getItem('hv-relo
 applyDisplay();
 initGlobalEvents();
 store.on(() => applyDisplay());
-window.addEventListener('hashchange', render);
-render();
+// ── Quay lại trang trước: nút “← Quay lại” + nhớ vị trí cuộn của từng trang ──
+try { history.scrollRestoration = 'manual'; } catch {}
+const ss = { get: (k, d) => { try { return JSON.parse(sessionStorage.getItem(k)) ?? d; } catch { return d; } }, set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+let restoreY = 0;
+function track(e) {
+  const cur = location.hash || '#/', stack = ss.get('hv-stack', []), pos = ss.get('hv-scroll', {});
+  if (e && e.oldURL) { const old = '#' + (e.oldURL.split('#')[1] || '/'); pos[old] = window.scrollY; ss.set('hv-scroll', pos); }
+  if (stack.length > 1 && stack[stack.length - 2].h === cur) { stack.pop(); restoreY = pos[cur] || 0; }          // bấm quay lại
+  else if (!stack.length || stack[stack.length - 1].h !== cur) { stack.push({ h: cur, t: '' }); restoreY = 0; if (stack.length > 60) stack.shift(); }
+  else restoreY = pos[cur] || 0;                                                                                     // tải lại trang
+  ss.set('hv-stack', stack);
+}
+function afterRender(title) {
+  const stack = ss.get('hv-stack', []); if (stack.length) { stack[stack.length - 1].t = title; ss.set('hv-stack', stack); }
+  const bar = $('#backBar'), path = location.hash.replace(/^#/, '') || '/';
+  if (bar) {
+    const prev = stack.length > 1 ? stack[stack.length - 2] : null;
+    bar.hidden = path === '/' && !prev;
+    bar.innerHTML = `<button class="back-btn" id="hvBack" type="button">← Quay lại</button>${prev && prev.t ? `<span class="back-to">${prev.t.replace(/[<>&]/g, '')}</span>` : ''}`;
+    $('#hvBack').onclick = () => { if (prev) history.back(); else { const up = path.replace(/\/[^/]*$/, '') || '/'; location.hash = '#' + (up === path ? '/' : up); } };
+  }
+  // cuộn về vị trí cũ khi quay lại (thử vài lần vì có trang tải dữ liệu chậm)
+  const y = restoreY; window.scrollTo(0, y);
+  if (y) [120, 400, 900].forEach(ms => setTimeout(() => { if (Math.abs(window.scrollY - y) > 40 && document.body.scrollHeight > y) window.scrollTo(0, y); }, ms));
+}
+window.addEventListener('hashchange', e => { track(e); render(); });
+track(); render();
 
 // Đổi trang hiển thị bằng phím tắt "/" để tìm từ
 document.addEventListener('keydown', e => {

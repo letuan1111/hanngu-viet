@@ -11,10 +11,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/lxgwwenkaigbscreen.css">
-<link rel="stylesheet" href="css/style.css?v=20261028c">
+<link rel="stylesheet" href="css/style.css?v=20261028d">
 <script defer src="vendor/pinyin-pro.js"></script>
 <script defer src="vendor/hanzi-writer.min.js"></script>
-<script type="module" src="js/app.js?v=20261028c"></script>
+<script type="module" src="js/app.js?v=20261028d"></script>
 </head>
 <body>
 <a class="skip" href="#view">Bỏ qua điều hướng</a>
@@ -38,6 +38,7 @@
 </header>
 <div class="tip-bar" id="tipBar" role="note"><span>💻 Nên dùng <b>máy tính</b> để có trải nghiệm tốt nhất · 🔊 Dùng trình duyệt <b>Microsoft Edge</b> để nghe đọc tiếng Trung chuẩn nhất.</span><button class="tip-x" id="tipX" aria-label="Ẩn thông báo">✕</button></div>
 <script>try{if(localStorage.getItem('hanngu-tip-off')==='1')document.getElementById('tipBar').hidden=true;}catch(e){}document.getElementById('tipX').onclick=function(){document.getElementById('tipBar').hidden=true;try{localStorage.setItem('hanngu-tip-off','1');}catch(e){}};</script>
+<div class="backbar" id="backBar" hidden></div>
 <main id="view" class="view" tabindex="-1"><div class="loading"><span lang="zh-CN">学</span> Đang tải…</div></main>
 <nav class="bottom" aria-label="Điều hướng nhanh">
   <a href="#/"><span>🏠</span>Trang chủ</a><a href="#/pinyin"><span>🗣</span>Phát âm</a><a href="#/hsk30/1"><span>🃏</span>Quizlet</a><a href="#/course/1"><span>📘</span>Học</a><a href="#/review"><span>🔁</span>Ôn tập</a><a href="#/speaking"><span>🗣️</span>Nói</a><a href="#/listen"><span>🎧</span>Nghe</a><a href="#/vocab"><span>🀄</span>Tra từ</a>

@@ -854,3 +854,8 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .sel-save b[lang] { font-size: 1.2rem; } .sel-save .inp { width: 100%; box-sizing: border-box; }
 .ty-save { margin: 8px 0; padding: 8px 10px; background: #fff7e0; border: 1px solid #f0d58a; border-radius: 10px; }
 @media (prefers-color-scheme: dark) { .ty-save { background: transparent; } }
+.backbar { width: 100%; box-sizing: border-box; max-width: 1180px; margin: 10px auto -12px; padding: 0 16px; display: flex; align-items: center; gap: 10px; }
+.back-btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 99px; padding: 6px 14px; font: 600 .9rem var(--ui); cursor: pointer; }
+.back-btn:hover { border-color: var(--red); color: var(--red); }
+.back-to { color: var(--muted); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .back-to::before { content: 'về: '; }
+@media (max-width: 860px) { .backbar { padding: 0 14px; margin-bottom: -8px; } }
