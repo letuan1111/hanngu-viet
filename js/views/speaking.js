@@ -7,7 +7,7 @@ import { checkSentence } from '../core/checker.js';
 import { vocabSet, ex5 } from './vocabset.js';
 import { typingTrainer, splitSentences } from './typing.js';
 import { SPEAK_LONG } from '../data/speaking-long.js';
-import { AI_MODELS, aiPreload, aiClip, aiLong, toPcm16k, recordVoice, onAIStatus } from '../core/ai.js';
+import { AI_MODELS, AI_DEFAULT, aiModelOptions, aiPreload, aiClip, aiLong, toPcm16k, recordVoice, onAIStatus } from '../core/ai.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -106,7 +106,7 @@ export function speakingItem(root, id, mode) {
     <h2>🤖 AI ghi âm – xem bạn nói gì</h2>
     <p class="muted small">Bấm <b>Bắt đầu nói</b> rồi nói: đọc bài mẫu, đọc bài bạn tự viết, hoặc tự trả lời câu hỏi bằng lời của mình. <b>AI Whisper chạy ngay trên máy</b> sẽ nghe lại và <b>ghi ra chữ bạn nói</b> (kèm pinyin, nghĩa). Chọn so sánh để máy tô màu từng chữ đúng/sai. Không cần Chrome, không gửi âm thanh đi đâu (lần đầu cần tải mô hình).</p>
     <div class="row gap wrap ls-sbar">
-      <label class="sel">AI <select id="aiModelSel">${AI_MODELS.map(([v, n]) => `<option value="${v}" ${v === (store.s.aiModel || AI_MODELS[0][0]) ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label class="sel">AI <select id="aiModelSel">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}</select></label>
       <label class="sel">So sánh với <select id="aiCmp"><option value="sample">Bài mẫu đang xem</option><option value="mine">Bài nói của bạn (tự viết)</option><option value="none">Không so sánh – chỉ ghi ra tôi nói gì</option></select></label>
       <label class="chk"><input type="checkbox" id="aiAuto" checked> Tự dừng khi im lặng 3 giây</label>
     </div>
@@ -479,7 +479,7 @@ function renderMySpeech(box, x) {
   let dictCtl = null;
   async function dictate(btn) {
     if (dictCtl) { dictCtl.stop(); return; }
-    const ta = $('.my-ptxt', btn.closest('.my-part')), model = store.s.aiModel || AI_MODELS[0][0];
+    const ta = $('.my-ptxt', btn.closest('.my-part')), model = store.s.aiModel || AI_DEFAULT;
     aiPreload(model);
     try { dictCtl = await recordVoice({ maxSec: 60, silenceSec: 2 }); } catch { toast('Cần cho phép dùng micro.', 'bad'); return; }
     btn.classList.add('rec'); btn.textContent = '⏹ Đang nghe… bấm để dừng';

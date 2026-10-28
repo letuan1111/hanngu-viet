@@ -17,11 +17,16 @@ export function alignZh(target, said) {
   const ok = marks.filter(v => v === 'ok').length, tone = marks.filter(v => v === 'tone').length;
   return { marks, score: Math.round((ok + tone * 0.5) / n * 100), ok, tone };
 }
+const HAS_GPU = typeof navigator !== 'undefined' && !!navigator.gpu;
 export const AI_MODELS = [
-  ['Xenova/whisper-base', 'Whisper base – nhanh (~80 MB)'],
-  ['Xenova/whisper-small', 'Whisper small – chuẩn hơn (~250 MB)'],
-  ['Xenova/whisper-tiny', 'Whisper tiny – rất nhanh (~40 MB)'],
+  ['onnx-community/whisper-large-v3-turbo', `⭐ Chuẩn nhất – Whisper large-v3-turbo (~1 GB${HAS_GPU ? ', chạy bằng card đồ họa' : ', máy này không có WebGPU nên sẽ rất chậm'})`],
+  ['Xenova/whisper-small', 'Chuẩn – Whisper small (~250 MB)'],
+  ['Xenova/whisper-base', 'Nhanh – Whisper base (~80 MB)'],
+  ['Xenova/whisper-tiny', 'Rất nhanh, kém chính xác – Whisper tiny (~40 MB)'],
 ];
+// Mô hình mặc định: máy có WebGPU (Chrome/Edge máy tính) dùng bản chuẩn nhất, còn lại dùng small
+export const AI_DEFAULT = HAS_GPU ? AI_MODELS[0][0] : AI_MODELS[1][0];
+export const aiModelOptions = sel => AI_MODELS.map(([v, n]) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${n}</option>`).join('');
 const fmtSize = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
 let W = null; const waiting = new Map(); let seq = 0, longJob = null;
 const listeners = new Set(); // nhận thông báo trạng thái (đang tải mô hình…)

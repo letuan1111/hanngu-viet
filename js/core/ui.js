@@ -1,5 +1,6 @@
 import { store, srsAdd, logActivity } from './store.js';
-import { tokensWithPinyin, entry, lookup, examplesFor, collocations, charPinyin, CHARS, isHan, levelLabel, POS, sentencePinyin } from './dict.js';
+import { tokensWithPinyin, entry, lookup, examplesFor, collocations, charPinyin, CHARS, isHan, levelLabel, POS, sentencePinyin, GRAMMAR } from './dict.js';
+import { SPEAK_STRUCT } from '../data/speaking.js';
 import { speak } from './tts.js';
 import { RADICALS } from '../data/radicals.js';
 
@@ -87,6 +88,17 @@ export function modal(html, { wide = false } = {}) {
 }
 
 // ── Cửa sổ thông tin khi bấm vào từ / chữ ──
+// ── Ngữ pháp liên quan đến một từ / có trong một câu ──
+const hanParts = t => String(t || '').match(/\p{Script=Han}+/gu) || [];
+export const grammarOfWord = h => GRAMMAR.filter(g => g.key === h || hanParts(g.name).includes(h));
+export const structsOfWord = h => SPEAK_STRUCT.filter(t => hanParts(t.f).includes(h));
+export function grammarInText(z) {
+  const out = [];
+  const NOISY = new Set(['g1-liandong', 'g3-chongdie', 'g1-num', 'g1-time']); // từ khóa quá chung, dễ nhận nhầm
+  for (const g of GRAMMAR) { if (NOISY.has(g.id)) continue; const keys = g.id === 'g1-bu' ? ['不', '没'] : [g.key]; if (keys.some(k => k && z.includes(k))) out.push(g); }
+  return out.sort((a, b) => b.level - a.level);
+}
+export const structsInText = z => SPEAK_STRUCT.filter(t => { try { return new RegExp(t.re).test(z); } catch { return false; } });
 let pop = null;
 export function closePop() { if (pop) { pop.remove(); pop = null; } }
 export function wordCard(h, { full = false } = {}) {
@@ -105,6 +117,7 @@ export function wordCard(h, { full = false } = {}) {
     <div class="row gap">${say(h, ' Nghe')}${say(h, ' Chậm').replace('data-say', 'data-rate="0.7" data-say')}</div>
     ${ex.length ? `<div class="wc-ex">${ex.map(e => `<div class="mini-ex"><div lang="zh-CN">${esc(e.zh.replace(/^[AB]：/, ''))} ${say(e.zh.replace(/^[AB]：/, ''))}</div><div class="mini-py">${esc(sentencePinyin(e.zh.replace(/^[AB]：/, '')))}</div><div class="mini-vi">${esc(e.vi)}</div></div>`).join('')}</div>` : ''}
     ${col.length ? `<div class="wc-col"><b>Kết hợp thường gặp:</b> ${col.map(c => `<span class="chip" data-w="${esc(c.h)}">${esc(c.h)}</span>`).join(' ')}</div>` : ''}
+    ${(() => { const gs = grammarOfWord(h), st = structsOfWord(h).slice(0, 4); return gs.length || st.length ? `<div class="wc-gr"><b>📐 Ngữ pháp liên quan:</b> ${gs.map(g => `<a class="chip" href="#/grammar/${g.id}" title="${esc(g.formula || '')}">HSK${g.level} · ${esc(g.name)}</a>`).join(' ')} ${st.map(t => `<span class="chip" title="${esc(t.vi)}" lang="zh-CN">${esc(t.f)}</span>`).join(' ')}</div>` : `<div class="wc-gr muted small">📐 Từ này không gắn với điểm ngữ pháp riêng nào.</div>`; })()}
     ${chars.length > 1 ? `<div class="wc-chars"><b>Từng chữ:</b> ${chars.map(c => `<button class="chip ch" data-c="${esc(c)}">${esc(c)} <small>${esc(charPinyin(c))}</small></button>`).join(' ')}</div>` : ''}
     <div class="wc-act">
       <a class="btn sm" href="#/word/${encodeURIComponent(h)}">Xem đầy đủ</a>

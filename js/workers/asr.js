@@ -35,10 +35,16 @@ async function load0(model) {
   if (!tf) { self.postMessage({ type: 'stage', msg: 'Đang tải thư viện nhận dạng…' }); tf = await import(TF); tf.env.allowLocalModels = false; }
   if (!asr || cur !== model) {
     self.postMessage({ type: 'stage', msg: 'Đang tải mô hình (chỉ lần đầu)…' });
-    asr = await tf.pipeline('automatic-speech-recognition', model, {
-      dtype: 'q8', device: 'wasm',
-      progress_callback: p => { if (p.status === 'progress') self.postMessage({ type: 'load', file: p.file, loaded: p.loaded, total: p.total }); },
-    });
+    const progress_callback = p => { if (p.status === 'progress') self.postMessage({ type: 'load', file: p.file, loaded: p.loaded, total: p.total }); };
+    let gpu = false;
+    try { gpu = !!(self.navigator && self.navigator.gpu && await self.navigator.gpu.requestAdapter()); } catch {}
+    asr = null;
+    // mô hình lớn: chạy bằng card đồ họa (WebGPU) nếu có – nhanh và chuẩn hơn nhiều
+    if (gpu && /large|medium/.test(model)) {
+      try { asr = await tf.pipeline('automatic-speech-recognition', model, { device: 'webgpu', dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4' }, progress_callback }); self.postMessage({ type: 'stage', msg: 'Đang dùng card đồ họa (WebGPU)…' }); }
+      catch (e) { asr = null; }
+    }
+    if (!asr) asr = await tf.pipeline('automatic-speech-recognition', model, { dtype: 'q8', device: 'wasm', progress_callback });
     cur = model;
     self.postMessage({ type: 'ready', model });
   }

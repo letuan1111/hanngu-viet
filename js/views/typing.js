@@ -1,9 +1,9 @@
 // Luyện gõ lại bài đọc: chạy từng câu, gõ đúng đến đâu chữ biến mất đến đó; có đồng hồ, chữ/phút, từ/phút, độ chính xác
 import { store, logActivity } from '../core/store.js';
 import { segment, charPinyins, isHan } from '../core/dict.js';
-import { esc, icon, $, $$, toast, recAudio } from '../core/ui.js';
+import { esc, icon, $, $$, toast, recAudio, sentence, grammarInText, structsInText } from '../core/ui.js';
 import { speak } from '../core/tts.js';
-import { AI_MODELS, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
+import { AI_MODELS, AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
 
 const tone = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v');
 const isKeyable = c => isHan(c) || /[0-9a-zA-Z]/.test(c);
@@ -50,7 +50,8 @@ export function typingTrainer(el, o) {
       <label class="sw"><input type="checkbox" class="tyPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
       <label class="sw"><input type="checkbox" class="tyVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>
     </div>
-    <div class="ty-run"></div>`;
+    <div class="ty-run"></div>
+    <details class="vs-det ty-an"><summary>📖 Tra từ & ngữ pháp trong đoạn này <small class="muted">(bấm vào từng từ để xem nghĩa, cấp HSK và ngữ pháp liên quan)</small></summary><div class="ty-anBody"></div></details>`;
   const run = $('.ty-run', el);
   let sentences = o.sentences, srcKey = o.key, timer = 0;
   const tabs = el.querySelectorAll('.ty-tabs .tab');
@@ -75,8 +76,18 @@ export function typingTrainer(el, o) {
   $('.tyVi', el).onchange = e => { opt.vi = e.target.checked; saveOpt(); run.classList.toggle('no-vi', !opt.vi); };
   const stopTimer = () => { clearInterval(timer); timer = 0; };
 
+  // Phân tích đoạn: mỗi từ bấm được (nghĩa, cấp độ, ngữ pháp liên quan), mỗi câu liệt kê điểm ngữ pháp có trong câu
+  function analyze() {
+    const box = $('.ty-anBody', el), det = $('.ty-an', el);
+    if (srcKey === 'custom') det.open = true;
+    const all = sentences.map(x => x[0]).join('');
+    const gAll = grammarInText(all), sAll = structsInText(all);
+    box.innerHTML = `<div class="ty-gsum"><b>📐 Ngữ pháp trong đoạn (${gAll.length}):</b> ${gAll.map(g => `<a class="chip" href="#/grammar/${g.id}" title="${esc(g.formula || '')}">HSK${g.level} · ${esc(g.name)}</a>`).join(' ') || '<span class="muted">không tìm thấy</span>'}
+      ${sAll.length ? `<div style="margin-top:6px"><b>🧩 Cấu trúc câu:</b> ${sAll.map(t => `<span class="chip" lang="zh-CN" title="${esc(t.vi)}">${esc(t.f)}</span>`).join(' ')}</div>` : ''}</div>
+      ${sentences.map(([zh, vi]) => { const gs = grammarInText(zh).filter(g => g.level >= 2); return sentence(zh, vi, { extra: gs.length ? `<div class="ty-sg small">📐 ${gs.map(g => `<a href="#/grammar/${g.id}">${esc(g.name)}</a>`).join(' · ')}</div>` : '' }); }).join('')}`;
+  }
   function start() {
-    stopTimer();
+    stopTimer(); analyze();
     const mode = opt.mode;
     const data = sentences.map(([zh, vi]) => ({ zh, vi, ...buildUnits(zh) }));
     const totalHan = data.reduce((s, d) => s + d.han, 0), totalWords = data.reduce((s, d) => s + d.wordEnds.length, 0);
@@ -92,7 +103,7 @@ export function typingTrainer(el, o) {
       <div class="ty-ai">
         <div class="row gap wrap" style="align-items:center"><b>🤖 AI chấm đọc</b>
           <button class="btn sm ty-rd1">${icon('mic')} Đọc câu này</button><button class="btn sm ghost ty-rdall">${icon('mic')} Đọc cả đoạn</button>
-          <label class="sel small">AI <select class="ty-model">${AI_MODELS.map(([v, n]) => `<option value="${v}" ${v === (store.s.aiModel || AI_MODELS[0][0]) ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <label class="sel small">AI <select class="ty-model">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}</select></label>
           <span class="tp-vu"><span class="ty-vu"></span></span><span class="muted small ty-aiT"></span></div>
         <p class="muted small">Đọc to câu đang gõ (hoặc cả đoạn), nói xong im khoảng 1,5 giây là máy tự dừng. AI Whisper chạy ngay trên máy nghe lại và tô màu từng chữ: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>.</p>
         <div class="small ai-status ty-aiS"></div><div class="ty-aiOut"></div>

@@ -6,6 +6,7 @@ import { esc, icon, $, $$, toast, zhTokens, recAudio } from '../core/ui.js';
 import { speak, stopSeq, SR } from '../core/tts.js';
 import { typingTrainer, splitSentences } from './typing.js';
 import { sentenceChars, align, recognizeOnce, recordClip } from './speaking.js';
+import { aiModelOptions, AI_DEFAULT } from '../core/ai.js';
 
 // ── Kho dữ liệu (IndexedDB) ──
 const DB = {
@@ -301,6 +302,7 @@ export async function listenItem(root, id, tab = 'text') {
   if (!d.duration && src) au.addEventListener('loadedmetadata', () => { if (isFinite(au.duration)) { d.duration = au.duration; save(); } }, { once: true });
 
   const body = $('#lsBody', root);
+  body.addEventListener('change', e => { if (/^(aiModel|gpModel|tpModel)$/.test(e.target.id)) store.update(st => { st.aiModel = e.target.value; }); });
 
   // ── Nội dung nghe ──
   function drawText(edit = !d.lines.length) {
@@ -383,10 +385,7 @@ export async function listenItem(root, id, tab = 'text') {
     const mem = navigator.deviceMemory || 8;
     out.innerHTML = `<div class="ls-ai card">
       <p><b>🤖 Nhận dạng tự động bằng AI (Whisper) chạy ngay trên máy bạn</b> – đọc thẳng từ file, không cần loa hay micro, không gửi âm thanh đi đâu. Lần đầu cần tải mô hình về trình duyệt (chỉ một lần), sau đó dùng lại ngay. Kết quả có mốc thời gian, chữ phồn thể được đổi sang giản thể.</p>
-      <div class="row gap wrap"><label class="sel">Mô hình <select id="aiModel">
-        <option value="Xenova/whisper-base">Nhanh – base (~80 MB)</option>
-        <option value="Xenova/whisper-small" ${mem >= 8 ? 'selected' : ''}>Chính xác hơn – small (~250 MB)</option>
-        <option value="Xenova/whisper-tiny">Rất nhanh, kém chính xác – tiny (~40 MB)</option></select></label>
+      <div class="row gap wrap"><label class="sel">Mô hình <select id="aiModel">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}</select></label>
         <button class="btn sm" id="aiGo">▶ Bắt đầu nhận dạng</button><button class="btn sm ghost" id="aiStop" disabled>Dừng</button></div>
       <div class="ai-prog" hidden><div class="my-bar"><span id="aiBar"></span></div><span class="small muted" id="aiTxt"></span></div>
       <div class="sp-live" id="aiLive"></div>
@@ -579,10 +578,7 @@ export async function listenItem(root, id, tab = 'text') {
     <h2>🧪 Thử AI nhận giọng đọc</h2>
     <p class="small muted">Bấm 🎤 rồi đọc một câu tiếng Trung bất kỳ – AI sẽ ghi lại và cho biết nó <b>nghe ra chữ gì</b> (kèm pinyin, nghĩa). Nếu chọn hoặc gõ <b>câu muốn đọc</b>, máy so sánh và tô màu từng chữ đúng/sai. Nói xong im lặng khoảng 1 giây là máy tự dừng.</p>
     <div class="row gap wrap ls-sbar">
-      <label class="sel">AI nghe <select id="atEng">
-        <option value="Xenova/whisper-base">Whisper base – chạy trên máy (~80 MB)</option>
-        <option value="Xenova/whisper-small">Whisper small – chuẩn hơn (~250 MB)</option>
-        <option value="Xenova/whisper-tiny">Whisper tiny – rất nhanh (~40 MB)</option>
+      <label class="sel">AI nghe <select id="atEng">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}
         ${SR ? '<option value="sr">Nhận dạng của trình duyệt (Chrome/Edge, cần mạng)</option>' : ''}</select></label>
       ${d.lines.length ? `<label class="sel">Câu trong bài <select id="atPick"><option value="">— đọc tự do —</option>${d.lines.map((l, i) => `<option value="${i}">${i + 1}. ${esc(l.zh.slice(0, 24))}${l.zh.length > 24 ? '…' : ''}</option>`).join('')}</select></label>` : ''}
     </div>
@@ -594,8 +590,7 @@ export async function listenItem(root, id, tab = 'text') {
   </section>`;
   function bindAiTest() {
     const eng = $('#atEng', body), tg = $('#atTarget', body), btn = $('#atRec', body), info = $('#atInfo', body), out = $('#atOut', body), vu = $('#atVu', body);
-    try { const v = store.s.listenOpt?.aiEng; if (v && [...eng.options].some(o => o.value === v)) eng.value = v; } catch {}
-    eng.onchange = () => { opt.aiEng = eng.value; saveOpt(); };
+    eng.onchange = () => { if (eng.value !== 'sr') store.update(st => { st.aiModel = eng.value; }); };
     if ($('#atPick', body)) $('#atPick', body).onchange = e => { const i = e.target.value; tg.value = i === '' ? '' : d.lines[+i].zh; };
     const hist = [];
     let active = false, stopNow = null;
@@ -654,7 +649,7 @@ export async function listenItem(root, id, tab = 'text') {
     <div class="row gap wrap ls-sbar">
       <label class="sel">Kiểu bài <select id="gpMode"><option value="answer">Nghe câu hỏi rồi trả lời – AI ghi ra bạn nói gì</option><option value="repeat">Nghe và nhắc lại – chấm đọc đúng từng chữ</option></select></label>
       <label class="sel">Khoảng trống dài từ <select id="gpMin"><option value="1.2">1,2 giây</option><option value="2" selected>2 giây</option><option value="3">3 giây</option><option value="5">5 giây</option></select></label>
-      <label class="sel">AI <select id="gpModel"><option value="Xenova/whisper-base">Whisper base (~80 MB)</option><option value="Xenova/whisper-small">Whisper small – chuẩn hơn (~250 MB)</option><option value="Xenova/whisper-tiny">Whisper tiny (~40 MB)</option></select></label>
+      <label class="sel">AI <select id="gpModel">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}</select></label>
     </div>
     <div class="row gap wrap"><button class="btn" id="gpGo">▶ Chạy file và ghi âm câu trả lời</button><button class="btn ghost" id="gpStop" disabled>⏹ Dừng</button><button class="btn ghost" id="gpScan">🔍 Chỉ dò khoảng trống</button></div>
     <div class="small" id="gpInfo"></div>
@@ -798,7 +793,7 @@ export async function listenItem(root, id, tab = 'text') {
         <div class="row gap wrap ls-sbar">
           <label class="sel">Kiểu <select id="tpMode"><option value="repeat">Nhắc lại câu vừa nghe – chấm từng chữ</option><option value="answer">Câu vừa nghe là câu hỏi – tôi trả lời, AI ghi ra tôi nói gì</option></select></label>
           <label class="sel">Khoảng trống <select id="tpGap"><option value="1">bằng độ dài câu</option><option value="1.5" selected>1,5 lần câu</option><option value="2">2 lần câu</option><option value="3">3 lần câu</option></select></label>
-          <label class="sel">AI chấm <select id="tpModel"><option value="Xenova/whisper-base">base – nhanh (~80 MB)</option><option value="Xenova/whisper-small">small – chuẩn hơn (~250 MB)</option><option value="Xenova/whisper-tiny">tiny – rất nhanh (~40 MB)</option></select></label>
+          <label class="sel">AI chấm <select id="tpModel">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}</select></label>
           <label class="chk"><input type="checkbox" id="tpEarly" checked> Nói xong thì chạy tiếp ngay</label>
         </div>
         <div class="row gap wrap"><button class="btn" id="tpGo">▶ Chạy băng từ câu <input id="tpFrom" type="number" min="1" max="${d.lines.length}" value="1" class="inp sm" style="width:64px" onclick="event.stopPropagation()"></button><button class="btn ghost" id="tpStop" disabled>⏹ Dừng băng</button></div>
