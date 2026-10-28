@@ -860,3 +860,4 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .back-to { color: var(--muted); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .back-to::before { content: 'về: '; }
 @media (max-width: 860px) { .backbar { padding: 0 14px; margin-bottom: -8px; } }
 .back-flash { animation: backflash 2.2s ease; } @keyframes backflash { 0%, 40% { background: #ffe9a8; box-shadow: 0 0 0 3px #f0c541; } 100% { background: transparent; box-shadow: none; } }
+.rv-form { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr 1.6fr auto; gap: 8px; } @media (max-width: 860px) { .rv-form { grid-template-columns: 1fr; } } .rv-form .inp[lang] { font-size: 1.05rem; }

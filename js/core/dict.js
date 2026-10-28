@@ -37,7 +37,7 @@ export function rebuild() {
   V30_NEW23.forEach(add);
   for (const [h, p, vi] of SPEAK_DICT) if (!byH.has(h)) add({ id: `sp-${h}`, h, p, vi, pos: '', topics: ['coban'], level: 0, source: 'extra' });
   for (const w of store.s.community.words) add({ ...w, source: 'community' });
-  for (const [h, w] of Object.entries(store.s.myPhrases || {})) if (!byH.has(h)) add({ id: `my-${h}`, h, p: w.p || '', vi: w.vi || '(cụm từ bạn đã lưu)', ex: w.ex || '', pos: '', topics: ['coban'], level: 0, source: 'mine' });
+  for (const [h, w] of Object.entries(store.s.myPhrases || {})) if (!byH.has(h) || (w.vi && !byH.get(h).some(x => x.vi === w.vi))) add({ id: `my-${h}`, h, p: w.p || '', vi: w.vi || '(cụm từ bạn đã lưu)', ex: w.ex || '', pos: '', topics: ['coban'], level: 0, source: 'mine' });
 }
 rebuild();
 export const lookup = h => byH.get(h) || [];

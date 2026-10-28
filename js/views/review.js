@@ -1,6 +1,6 @@
 import { store, srsGrade, srsAdd, dueWords, masteryOf } from '../core/store.js';
-import { entry, examplesFor, hskWords, shuffle, LESSON_LIST, sentencePinyin } from '../core/dict.js';
-import { esc, say, icon, $, $$, short } from '../core/ui.js';
+import { entry, isHan, rebuild, examplesFor, hskWords, shuffle, LESSON_LIST, sentencePinyin } from '../core/dict.js';
+import { esc, say, icon, $, $$, short, savePhrase, toast } from '../core/ui.js';
 import { speak } from '../core/tts.js';
 import { vocabSet } from './vocabset.js';
 
@@ -22,6 +22,14 @@ export function review(root, mode = 'due') {
   root.innerHTML = `<div class="page-head"><h1>Ôn tập thông minh</h1></div>
   <p class="muted">Lặp lại ngắt quãng: từ bạn nhớ tốt sẽ xuất hiện thưa dần, từ hay quên sẽ quay lại sớm. Đã thuộc lâu dài: <b>${mastered}</b> từ.</p>
   <div class="tabs">${Object.entries(sets).map(([k, [n]]) => `<a class="tab ${k === mode ? 'on' : ''}" href="#/review/${k}">${n} <span class="cnt">${counts[k]}</span></a>`).join('')}</div>
+  ${mode === 'mine' ? `<section class="card rv-add"><h2>✍️ Tự thêm từ mới</h2>
+      <p class="muted small">Gõ từ hoặc cụm từ tiếng Trung, máy tự điền pinyin và nghĩa nếu có trong từ điển; bạn có thể sửa hoặc tự ghi nghĩa. Chỉ lưu trên trình duyệt của bạn.</p>
+      <div class="rv-form"><input id="adH" class="inp" lang="zh-CN" placeholder="Từ / cụm từ, ví dụ: 加油"><input id="adP" class="inp" placeholder="Pinyin (tự điền)"><input id="adV" class="inp" placeholder="Nghĩa tiếng Việt"><input id="adE" class="inp" lang="zh-CN" placeholder="Câu ví dụ (không bắt buộc)"><button class="btn" id="adOk">${icon('plus')} Thêm</button></div>
+      <details class="vs-det"><summary>📋 Thêm nhiều từ cùng lúc</summary>
+        <p class="small muted">Mỗi dòng một từ: <code>từ</code> hoặc <code>từ|nghĩa</code> hoặc <code>từ|nghĩa|câu ví dụ</code>.</p>
+        <textarea id="adBulk" class="inp" lang="zh-CN" rows="5" style="width:100%;box-sizing:border-box" placeholder="加油|cố lên\n努力|cố gắng|我会努力学习。\n放弃"></textarea>
+        <button class="btn sm" id="adBulkOk">Thêm tất cả</button></details>
+      <div id="adMsg" class="small"></div></section>` : ''}
   ${mode === 'mine' && list.length ? `<section class="card vs-sec" id="mineQl"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><h2>🃏 Quizlet – học bằng chính các từ bạn đã thêm</h2>
       <label class="sel">Bộ từ <select id="mqG" class="inp sm"><option value="all">Tất cả (${list.length})</option><option value="new">20 từ mới thêm nhất</option><option value="todo">Từ chưa thuộc</option><option value="due">Từ đến hạn ôn</option></select></label></div>
       <p class="muted small">Thẻ lật, Học, Kiểm tra, Ghép thẻ, Sao băng, Đúng hay sai – chỉ dùng các từ & cụm từ bạn tự lưu. Từ đánh dấu ✓ được ghi nhớ trên trình duyệt.</p>
@@ -31,6 +39,21 @@ export function review(root, mode = 'due') {
   <div id="fc"></div>`;
   let i = 0, done = 0;
   const fc = $('#fc', root);
+  if (mode === 'mine') {
+    const H = $('#adH', root), P = $('#adP', root), V = $('#adV', root), E = $('#adE', root);
+    let autoP = '', autoV = '';
+    H.oninput = () => { const h = H.value.trim(), w = entry(h); const np = h ? sentencePinyin(h) : ''; if (!P.value || P.value === autoP) P.value = autoP = (w ? w.p : np); if (!V.value || V.value === autoV) V.value = autoV = (w ? w.vi : ''); };
+    const add1 = (h, vi, ex, p) => {
+      h = h.trim(); if (![...h].some(isHan)) return false;
+      const w = entry(h);
+      if (w && w.source !== 'mine' && !vi) { if (!s.srs[h]) savePhrase(h); return true; }
+      store.update(st => { st.myPhrases = st.myPhrases || {}; st.myPhrases[h] = { p: p || (w ? w.p : sentencePinyin(h)), vi: vi || (w ? w.vi : ''), ex: ex || '', at: Date.now() }; });
+      rebuild(); srsAdd(h); return true;
+    };
+    $('#adOk', root).onclick = () => { const h = H.value.trim(); if (!h) { H.focus(); return; } if (!add1(h, V.value.trim(), E.value.trim(), P.value.trim())) { toast('Hãy gõ chữ Hán.', 'bad'); return; } toast(`Đã thêm “${h}”`); review(root, 'mine'); setTimeout(() => $('#adH', root)?.focus(), 50); };
+    [H, P, V, E].forEach(x => x.onkeydown = e => { if (e.key === 'Enter') $('#adOk', root).click(); });
+    $('#adBulkOk', root).onclick = () => { let n = 0; for (const ln of $('#adBulk', root).value.split('\n')) { const [h, vi, ex] = ln.split('|').map(x => (x || '').trim()); if (h && add1(h, vi, ex)) n++; } if (!n) { $('#adMsg', root).innerHTML = '<span class="bad-t">Chưa có dòng nào có chữ Hán.</span>'; return; } toast(`Đã thêm ${n} từ`); review(root, 'mine'); };
+  }
   if (mode === 'mine' && list.length) {
     const mk = () => s.mineKnown || {};
     const pickSet = () => { const v = $('#mqG', root).value, now = Date.now(); const ws = v === 'new' ? list.slice(0, 20) : v === 'todo' ? list.filter(h => !mk()[h]) : v === 'due' ? list.filter(h => s.srs[h] && s.srs[h].due <= now) : list; return ws.map(h => { const w = entry(h); return { h, p: w.p, vi: w.vi }; }); };
