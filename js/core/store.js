@@ -87,7 +87,7 @@ export function srsGrade(h, q) { // q: 0 quên, 3 khó, 4 nhớ, 5 dễ
   });
   logActivity();
 }
-export function srsAdd(h) { store.update(s => { if (!s.srs[h]) s.srs[h] = { ef: 2.5, iv: 0, due: Date.now(), reps: 0, lapses: 0, seen: 0 }; }); }
+export function srsAdd(h) { store.update(s => { if (!s.srs[h]) s.srs[h] = { ef: 2.5, iv: 0, due: Date.now(), reps: 0, lapses: 0, seen: 0, added: Date.now() }; }); }
 export function dueWords() { const now = Date.now(); return Object.entries(store.s.srs).filter(([, c]) => c.due <= now).map(([h]) => h); }
 export function masteryOf(h) { const c = store.s.srs[h]; if (!c) return 0; if (c.iv >= 21) return 3; if (c.iv >= 3) return 2; return 1; }
 

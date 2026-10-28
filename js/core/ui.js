@@ -173,7 +173,7 @@ function drawQuickBadge() {
   let b = document.getElementById('qsBadge');
   if (!store.s.quickSave) { b && b.remove(); return; }
   if (!b) { b = document.createElement('div'); b.id = 'qsBadge'; b.className = 'qs-badge'; document.body.appendChild(b); }
-  b.innerHTML = `⚡ <b>Lưu nhanh</b>: bấm vào từ là lưu vào Ôn tập · <a href="#/review">Xem mục ôn</a> <button type="button" class="mini" id="qsOff">Tắt</button>`;
+  b.innerHTML = `⚡ <b>Lưu nhanh</b>: bấm vào từ là lưu vào Ôn tập · <a href="#/review/mine">Xem từ đã lưu</a> <button type="button" class="mini" id="qsOff">Tắt</button>`;
   b.querySelector('#qsOff').onclick = () => setQuickSave(false);
 }
 // Bôi đen một cụm chữ Hán → hiện nút lưu cụm từ
@@ -220,7 +220,7 @@ export function initGlobalEvents() {
       const h = act.dataset.h;
       if (act.dataset.act === 'save') store.update(s => { if (s.saved[h]) delete s.saved[h]; else s.saved[h] = true; });
       if (act.dataset.act === 'hard') store.update(s => { if (s.hard[h]) delete s.hard[h]; else { s.hard[h] = true; } });
-      if (act.dataset.act === 'srs') { if (store.s.srs[h]) { unsave(h); toast('Đã bỏ khỏi danh sách ôn tập'); } else { srsAdd(h); toast('Đã lưu vào mục Ôn tập'); } markSaved(h); }
+      if (act.dataset.act === 'srs') { if (store.s.srs[h]) { unsave(h); toast('Đã bỏ khỏi danh sách ôn tập'); } else { srsAdd(h); toast("Đã lưu – xem ở Ôn tập › ⭐ Từ tôi đã thêm"); } markSaved(h); }
       if (act.dataset.act === 'hard' && store.s.hard[h]) srsAdd(h);
       const card = act.closest('.wc'); if (card && pop && pop.contains(card)) { pop.innerHTML = `<button class="close">${icon('x')}</button>` + wordCard(h); }
       else if (card) { card.outerHTML = wordCard(h, { full: true }); }

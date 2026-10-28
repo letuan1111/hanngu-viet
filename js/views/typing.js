@@ -82,7 +82,7 @@ export function typingTrainer(el, o) {
     if (srcKey === 'custom') det.open = true;
     const all = sentences.map(x => x[0]).join('');
     const gAll = grammarInText(all), sAll = structsInText(all);
-    box.innerHTML = `<div class="ty-save"><label class="chk"><input type="checkbox" class="ty-qs" ${quickSaveOn() ? 'checked' : ''}> ⚡ Bấm vào từ là <b>lưu ngay vào Ôn tập</b></label> <span class="muted small">· Muốn lưu một <b>cụm từ</b>: bôi đen cụm đó → bấm “⭐ Lưu cụm này”. Từ đã lưu được gạch chân vàng. <a href="#/review">Mở mục Ôn tập</a></span></div>
+    box.innerHTML = `<div class="ty-save"><label class="chk"><input type="checkbox" class="ty-qs" ${quickSaveOn() ? 'checked' : ''}> ⚡ Bấm vào từ là <b>lưu ngay vào Ôn tập</b></label> <span class="muted small">· Muốn lưu một <b>cụm từ</b>: bôi đen cụm đó → bấm “⭐ Lưu cụm này”. Từ đã lưu được gạch chân vàng. <a href="#/review/mine">Xem từ đã lưu (Ôn tập › ⭐ Từ tôi đã thêm)</a></span></div>
       <div class="ty-gsum"><b>📐 Ngữ pháp trong đoạn (${gAll.length}):</b> ${gAll.map(g => `<a class="chip" href="#/grammar/${g.id}" title="${esc(g.formula || '')}">HSK${g.level} · ${esc(g.name)}</a>`).join(' ') || '<span class="muted">không tìm thấy</span>'}
       ${sAll.length ? `<div style="margin-top:6px"><b>🧩 Cấu trúc câu:</b> ${sAll.map(t => `<span class="chip" lang="zh-CN" title="${esc(t.vi)}">${esc(t.f)}</span>`).join(' ')}</div>` : ''}</div>
       ${sentences.map(([zh, vi]) => { const gs = grammarInText(zh).filter(g => g.level >= 2); return sentence(zh, vi, { extra: gs.length ? `<div class="ty-sg small">📐 ${gs.map(g => `<a href="#/grammar/${g.id}">${esc(g.name)}</a>`).join(' · ')}</div>` : '' }); }).join('')}`;

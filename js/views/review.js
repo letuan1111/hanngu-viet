@@ -5,7 +5,9 @@ import { speak } from '../core/tts.js';
 
 export function review(root, mode = 'due') {
   const s = store.s;
+  const mine = Object.keys(s.srs).sort((a, b) => (s.srs[b].added || 0) - (s.srs[a].added || 0));
   const sets = {
+    mine: ['⭐ Từ tôi đã thêm', mine],
     due: ['Đến hạn ôn', dueWords()],
     hard: ['Từ khó', Object.keys(s.hard)],
     saved: ['Từ đã lưu', Object.keys(s.saved)],
@@ -13,16 +15,23 @@ export function review(root, mode = 'due') {
     new: ['Từ mới', newWords(10)],
   };
   const [title, list0] = sets[mode] || sets.due;
-  const list = shuffle(list0.filter(h => entry(h)));
+  const list = mode === 'mine' ? list0.filter(h => entry(h)) : shuffle(list0.filter(h => entry(h)));
   const counts = Object.fromEntries(Object.entries(sets).map(([k, v]) => [k, v[1].filter(h => entry(h)).length]));
   const mastered = Object.keys(s.srs).filter(h => masteryOf(h) === 3).length;
   root.innerHTML = `<div class="page-head"><h1>Ôn tập thông minh</h1></div>
   <p class="muted">Lặp lại ngắt quãng: từ bạn nhớ tốt sẽ xuất hiện thưa dần, từ hay quên sẽ quay lại sớm. Đã thuộc lâu dài: <b>${mastered}</b> từ.</p>
   <div class="tabs">${Object.entries(sets).map(([k, [n]]) => `<a class="tab ${k === mode ? 'on' : ''}" href="#/review/${k}">${n} <span class="cnt">${counts[k]}</span></a>`).join('')}</div>
+  ${mode === 'mine' ? mineList(list) : ''}
   <div class="row gap wrap fc-modes"><span class="muted small">Kiểu thẻ:</span>${[['zh', 'Chữ Hán → Nghĩa'], ['vi', 'Nghĩa → Chữ Hán'], ['au', 'Nghe → Chữ & nghĩa'], ['mix', 'Trộn']].map(([k, n], i) => `<label class="chk"><input type="radio" name="fm" value="${k}" ${i === 3 ? 'checked' : ''}> ${n}</label>`).join('')}</div>
   <div id="fc"></div>`;
   let i = 0, done = 0;
   const fc = $('#fc', root);
+  root.addEventListener('click', e => {
+    const d = e.target.closest('[data-unsrs]'); if (!d) return;
+    const h = d.dataset.unsrs; if (!confirm(`Bỏ “${h}” khỏi danh sách ôn tập?`)) return;
+    store.update(st => { delete st.srs[h]; if (st.myPhrases) delete st.myPhrases[h]; });
+    review(root, mode);
+  });
   const modeOf = () => { const v = $('input[name=fm]:checked', root).value; return v === 'mix' ? ['zh', 'vi', 'au'][Math.random() * 3 | 0] : v; };
   const draw = () => {
     if (!list.length) { fc.innerHTML = `<div class="empty card"><h3>Không có từ nào ở mục này 🎉</h3><p>${mode === 'due' ? 'Bạn đã ôn hết từ đến hạn. Học thêm từ mới nhé!' : ''}</p><a class="btn" href="#/review/new">Học 10 từ mới</a></div>`; return; }
@@ -75,4 +84,17 @@ function newWords(n) {
   const s = store.s;
   for (const l of LESSON_LIST) { const ws = [...l.words, ...l.extra].filter(h => !s.srs[h] && entry(h)); if (ws.length) return ws.slice(0, n); }
   return [];
+}
+
+// Danh sách từ / cụm từ người học tự thêm (mới nhất ở trên)
+function mineList(list) {
+  const s = store.s, now = Date.now(), fmt = t => t ? new Date(t).toLocaleDateString('vi-VN') : '';
+  if (!list.length) return `<div class="card note">Chưa có từ nào. Khi đọc bài, bấm vào một từ rồi chọn <b>⭐ Lưu vào ôn tập</b>, bật <b>⚡ Bấm từ là lưu</b>, hoặc bôi đen một cụm từ để lưu – tất cả sẽ hiện ở đây.</div>`;
+  return `<section class="card rv-mine"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><h2>⭐ Từ & cụm từ bạn đã thêm <small class="muted">(${list.length})</small></h2><span class="muted small">Mới thêm ở trên · thẻ ôn ở phía dưới</span></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Từ</th><th>Pinyin</th><th>Nghĩa</th><th>Trạng thái</th><th></th></tr></thead><tbody>
+    ${list.map(h => { const w = entry(h), c = s.srs[h], m = masteryOf(h), ex = s.myPhrases?.[h]?.ex;
+      return `<tr><td><b lang="zh-CN" class="tk" data-w="${esc(h)}" style="cursor:pointer">${esc(h)}</b>${w.source === 'mine' ? ' <span class="badge">cụm</span>' : ''}${ex ? `<div class="small muted" lang="zh-CN">${esc(ex)}</div>` : ''}</td><td>${esc(w.p)}</td><td>${esc(short(w.vi))}</td>
+        <td class="small">${c.due <= now ? '<span class="bad-t">Đến hạn ôn</span>' : `Ôn lại ${fmt(c.due)}`}<br><span class="muted">${['Mới', 'Đang học', 'Khá nhớ', 'Thuộc lâu'][m]}${c.added ? ' · thêm ' + fmt(c.added) : ''}</span></td>
+        <td class="nowrap">${say(h)} <button class="mini" data-unsrs="${esc(h)}" title="Bỏ khỏi ôn tập">🗑️</button></td></tr>`; }).join('')}
+    </tbody></table></div></section>`;
 }
