@@ -31,20 +31,24 @@ function buildUnits(zh) {
   return { units, wordEnds, han: units.filter(u => isHan(u.c)).length };
 }
 
+// Bảng tra: mỗi từ bấm được (nghĩa, cấp độ, ngữ pháp liên quan), mỗi câu liệt kê điểm ngữ pháp có trong câu
+export function analyzeHtml(sentences) {
+  const all = sentences.map(x => x[0]).join('');
+  const gAll = grammarInText(all), sAll = structsInText(all);
+  return `<div class="ty-save"><label class="chk"><input type="checkbox" class="ty-qs" ${quickSaveOn() ? 'checked' : ''}> ⚡ Bấm vào từ là <b>lưu ngay vào Ôn tập</b></label> <span class="muted small">· Muốn lưu một <b>cụm từ</b>: bôi đen cụm đó → bấm “⭐ Lưu cụm này”. Từ đã lưu được gạch chân vàng. <a href="#/review/mine">Xem từ đã lưu (Ôn tập › ⭐ Từ tôi đã thêm)</a></span></div>
+    <div class="ty-gsum"><b>📐 Ngữ pháp trong đoạn (${gAll.length}):</b> ${gAll.map(g => `<a class="chip" href="#/grammar/${g.id}" title="${esc(g.formula || '')}">HSK${g.level} · ${esc(g.name)}</a>`).join(' ') || '<span class="muted">không tìm thấy</span>'}
+    ${sAll.length ? `<div style="margin-top:6px"><b>🧩 Cấu trúc câu:</b> ${sAll.map(t => `<span class="chip" lang="zh-CN" title="${esc(t.vi)}">${esc(t.f)}</span>`).join(' ')}</div>` : ''}</div>
+    ${sentences.map(([zh, vi]) => { const gs = grammarInText(zh).filter(g => g.level >= 2); return sentence(zh, vi, { extra: gs.length ? `<div class="ty-sg small">📐 ${gs.map(g => `<a href="#/grammar/${g.id}">${esc(g.name)}</a>`).join(' · ')}</div>` : '' }); }).join('')}`;
+}
+
 /**
  * @param el   phần tử chứa
- * @param o    { key: mã lưu kỷ lục, sentences: [[zh, vi]], custom: bool }
+ * @param o    { key: mã lưu kỷ lục, sentences: [[zh, vi]], openAnalyze: mở sẵn phần tra từ }
  */
 export function typingTrainer(el, o) {
   const opt = store.s.typeOpt || { mode: 'han', py: true, vi: true };
   const saveOpt = () => store.update(s => { s.typeOpt = { ...opt }; });
   el.innerHTML = `
-    <div class="ty-tabs tabs" role="tablist"><button class="tab on" data-src="lesson">📄 Gõ lại bài đọc này</button><button class="tab" data-src="custom">✏️ Gõ nội dung tự tạo</button></div>
-    <div class="ty-custom" hidden>
-      <p class="muted small">Dán hoặc tự viết một đoạn tiếng Trung (tối đa 3.000 ký tự). Đoạn văn được tách thành từng câu theo dấu 。！？ hoặc xuống dòng, rồi chạy giống bài đọc. Nội dung được lưu trên trình duyệt của bạn.</p>
-      <textarea class="inp ty-text" lang="zh-CN" rows="5" maxlength="3000" placeholder="Ví dụ: 我叫小明。我是越南人。我很喜欢学习汉语。">${esc(store.s.typeCustom || '')}</textarea>
-      <div class="row gap wrap"><button class="btn ty-use">Bắt đầu gõ đoạn này</button><span class="muted small ty-cnt"></span></div>
-    </div>
     <div class="ty-opts row gap wrap">
       <span class="seg" role="radiogroup" aria-label="Cách gõ"><label><input type="radio" name="tyMode" value="han" ${opt.mode === 'han' ? 'checked' : ''}><span>Gõ chữ Hán (bộ gõ tiếng Trung)</span></label><label><input type="radio" name="tyMode" value="py" ${opt.mode === 'py' ? 'checked' : ''}><span>Gõ pinyin (không cần dấu)</span></label></span>
       <label class="sw"><input type="checkbox" class="tyPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
@@ -53,24 +57,7 @@ export function typingTrainer(el, o) {
     <div class="ty-run"></div>
     <details class="vs-det ty-an"><summary>📖 Tra từ & ngữ pháp trong đoạn này <small class="muted">(bấm vào từng từ để xem nghĩa, cấp HSK và ngữ pháp liên quan)</small></summary><div class="ty-anBody"></div></details>`;
   const run = $('.ty-run', el);
-  let sentences = o.sentences, srcKey = o.key, timer = 0;
-  const tabs = el.querySelectorAll('.ty-tabs .tab');
-  el.querySelector('.ty-tabs').onclick = e => {
-    const b = e.target.closest('[data-src]'); if (!b) return;
-    tabs.forEach(t => t.classList.toggle('on', t === b));
-    const custom = b.dataset.src === 'custom';
-    $('.ty-custom', el).hidden = !custom;
-    if (custom) { const s = splitSentences($('.ty-text', el).value); if (s.length) { sentences = s.map(z => [z, '']); srcKey = 'custom'; start(); } else { stopTimer(); run.innerHTML = '<p class="muted">Hãy nhập nội dung rồi bấm “Bắt đầu gõ đoạn này”.</p>'; } }
-    else { sentences = o.sentences; srcKey = o.key; start(); }
-  };
-  const cnt = () => { const s = splitSentences($('.ty-text', el).value); $('.ty-cnt', el).textContent = s.length ? `${s.length} câu · ${[...s.join('')].filter(isHan).length} chữ Hán` : ''; };
-  $('.ty-text', el).oninput = () => { cnt(); store.update(s => { s.typeCustom = $('.ty-text', el).value; }); };
-  cnt();
-  $('.ty-use', el).onclick = () => {
-    const s = splitSentences($('.ty-text', el).value);
-    if (!s.length) { toast('Nội dung cần có chữ Hán.', 'bad'); return; }
-    sentences = s.map(z => [z, '']); srcKey = 'custom'; start(); $('.ty-inp', el)?.focus();
-  };
+  const sentences = o.sentences, srcKey = o.key; let timer = 0;
   el.querySelectorAll('[name=tyMode]').forEach(r => r.onchange = () => { opt.mode = r.value; saveOpt(); start(); });
   $('.tyPy', el).onchange = e => { opt.py = e.target.checked; saveOpt(); run.classList.toggle('no-py', !opt.py); };
   $('.tyVi', el).onchange = e => { opt.vi = e.target.checked; saveOpt(); run.classList.toggle('no-vi', !opt.vi); };
@@ -79,13 +66,8 @@ export function typingTrainer(el, o) {
   // Phân tích đoạn: mỗi từ bấm được (nghĩa, cấp độ, ngữ pháp liên quan), mỗi câu liệt kê điểm ngữ pháp có trong câu
   function analyze() {
     const box = $('.ty-anBody', el), det = $('.ty-an', el);
-    if (srcKey === 'custom') det.open = true;
-    const all = sentences.map(x => x[0]).join('');
-    const gAll = grammarInText(all), sAll = structsInText(all);
-    box.innerHTML = `<div class="ty-save"><label class="chk"><input type="checkbox" class="ty-qs" ${quickSaveOn() ? 'checked' : ''}> ⚡ Bấm vào từ là <b>lưu ngay vào Ôn tập</b></label> <span class="muted small">· Muốn lưu một <b>cụm từ</b>: bôi đen cụm đó → bấm “⭐ Lưu cụm này”. Từ đã lưu được gạch chân vàng. <a href="#/review/mine">Xem từ đã lưu (Ôn tập › ⭐ Từ tôi đã thêm)</a></span></div>
-      <div class="ty-gsum"><b>📐 Ngữ pháp trong đoạn (${gAll.length}):</b> ${gAll.map(g => `<a class="chip" href="#/grammar/${g.id}" title="${esc(g.formula || '')}">HSK${g.level} · ${esc(g.name)}</a>`).join(' ') || '<span class="muted">không tìm thấy</span>'}
-      ${sAll.length ? `<div style="margin-top:6px"><b>🧩 Cấu trúc câu:</b> ${sAll.map(t => `<span class="chip" lang="zh-CN" title="${esc(t.vi)}">${esc(t.f)}</span>`).join(' ')}</div>` : ''}</div>
-      ${sentences.map(([zh, vi]) => { const gs = grammarInText(zh).filter(g => g.level >= 2); return sentence(zh, vi, { extra: gs.length ? `<div class="ty-sg small">📐 ${gs.map(g => `<a href="#/grammar/${g.id}">${esc(g.name)}</a>`).join(' · ')}</div>` : '' }); }).join('')}`;
+    if (o.openAnalyze) det.open = true;
+    box.innerHTML = analyzeHtml(sentences);
   }
   el.addEventListener('change', e => { if (e.target.classList.contains('ty-qs')) setQuickSave(e.target.checked); });
   function start() {
@@ -219,4 +201,36 @@ export function typingTrainer(el, o) {
     drawSentence();
   }
   start();
+}
+
+// ════════════ Trang Đánh máy: tự nhập nội dung, mỗi từ bấm vào xem nghĩa, rồi luyện gõ ════════════
+export function typingPage(root) {
+  root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Tự nhập nội dung</p><h1>⌨️ Đánh máy</h1></div></div>
+  <section class="card tp-in">
+    <p class="muted small">Dán hoặc tự viết một đoạn tiếng Trung (tối đa 3.000 ký tự). Ngay bên dưới, <b>mỗi từ bạn nhập đều bấm vào được</b> để xem nghĩa, pinyin, cấp HSK, ngữ pháp liên quan và lưu vào Ôn tập. Nội dung được lưu trên trình duyệt của bạn.</p>
+    <textarea class="inp ty-text" id="tpText" lang="zh-CN" rows="6" maxlength="3000" placeholder="Ví dụ: 我叫小明。我是越南人。我很喜欢学习汉语。">${esc(store.s.typeCustom || '')}</textarea>
+    <div class="row gap wrap"><button class="btn" id="tpStart">⌨️ Luyện gõ đoạn này</button><button class="btn ghost" id="tpClear">🗑️ Xóa nội dung</button><span class="muted small" id="tpCnt"></span></div>
+  </section>
+  <section class="card"><h2>📖 Từ mới & ngữ pháp trong đoạn <small class="muted">(bấm vào từng từ)</small></h2><div id="tpWords"></div></section>
+  <section class="card ty-sec" id="tpTrain" hidden><h2>⌨️ Luyện gõ</h2><div id="tpTy"></div></section>`;
+  const ta = $('#tpText', root), words = $('#tpWords', root);
+  let tm = 0;
+  const draw = () => {
+    const ss = splitSentences(ta.value);
+    $('#tpCnt', root).textContent = ss.length ? `${ss.length} câu · ${[...ss.join('')].filter(isHan).length} chữ Hán` : '';
+    words.innerHTML = ss.length ? analyzeHtml(ss.map(z => [z, ''])) : '<p class="muted">Nhập nội dung tiếng Trung ở ô phía trên – các từ sẽ hiện ra ở đây để bạn bấm xem.</p>';
+  };
+  ta.oninput = () => { store.update(s => { s.typeCustom = ta.value; }); clearTimeout(tm); tm = setTimeout(draw, 350); };
+  words.addEventListener('change', e => { if (e.target.classList.contains('ty-qs')) setQuickSave(e.target.checked); });
+  $('#tpClear', root).onclick = () => { if (ta.value && !confirm('Xóa nội dung đã nhập?')) return; ta.value = ''; store.update(s => { s.typeCustom = ''; }); draw(); $('#tpTrain', root).hidden = true; ta.focus(); };
+  $('#tpStart', root).onclick = () => {
+    const ss = splitSentences(ta.value);
+    if (!ss.length) { toast('Nội dung cần có chữ Hán.', 'bad'); return; }
+    const box = $('#tpTrain', root); box.hidden = false;
+    typingTrainer($('#tpTy', root), { key: 'custom', sentences: ss.map(z => [z, '']) });
+    $('.ty-an', box)?.remove(); // phần tra từ đã có ở trên
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' }); $('.ty-inp', box)?.focus();
+  };
+  draw();
+  return 'Đánh máy';
 }

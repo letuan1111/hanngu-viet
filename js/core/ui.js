@@ -95,7 +95,8 @@ export const structsOfWord = h => SPEAK_STRUCT.filter(t => hanParts(t.f).include
 export function grammarInText(z) {
   const out = [];
   const NOISY = new Set(['g1-liandong', 'g3-chongdie', 'g1-num', 'g1-time']); // từ khóa quá chung, dễ nhận nhầm
-  for (const g of GRAMMAR) { if (NOISY.has(g.id)) continue; const keys = g.id === 'g1-bu' ? ['不', '没'] : [g.key]; if (keys.some(k => k && z.includes(k))) out.push(g); }
+  const RE = { 'g3-yue': /越来越|越.{1,8}越/ }; // tránh nhận nhầm như 越南
+  for (const g of GRAMMAR) { if (NOISY.has(g.id)) continue; if (RE[g.id]) { if (RE[g.id].test(z)) out.push(g); continue; } const keys = g.id === 'g1-bu' ? ['不', '没'] : [g.key]; if (keys.some(k => k && z.includes(k))) out.push(g); }
   return out.sort((a, b) => b.level - a.level);
 }
 export const structsInText = z => SPEAK_STRUCT.filter(t => { try { return new RegExp(t.re).test(z); } catch { return false; } });

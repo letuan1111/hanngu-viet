@@ -443,8 +443,7 @@ body.split .tk { margin: 0 .18em; } body.split .gl { display: block; }
 .foot-msg h3 { margin: 0 0 8px; font-size: 1.05rem; color: var(--red); } .foot-msg p { margin: 0 0 8px; } .foot-msg p:last-child { margin: 0; font-weight: 600; }
 
 /* ── Luyện gõ ── */
-.ty-tabs { margin-top: 4px; }
-.ty-custom { margin-bottom: 12px; } .ty-custom textarea { width: 100%; font: 1.15rem/1.6 var(--zh); margin-bottom: 8px; }
+.tp-in textarea { width: 100%; font: 1.15rem/1.6 var(--zh); margin-bottom: 8px; }
 .ty-opts { margin-bottom: 12px; align-items: center; }
 .ty-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .95rem; color: var(--ink2); margin-bottom: 6px; } .ty-stats b { color: var(--ink); font-size: 1.15rem; }
 .ty-stage { text-align: center; padding: 18px 8px 10px; min-height: 130px; }

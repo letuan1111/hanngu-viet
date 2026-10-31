@@ -16,6 +16,7 @@ import { hsk500, readings } from './views/hsk500.js';
 import { speakingList, speakingItem } from './views/speaking.js';
 import { pronounce } from './views/pronounce.js';
 import { listenHome, listenItem } from './views/listen.js';
+import { typingPage } from './views/typing.js';
 
 const routes = [
   [/^\/?$/, home, 'Trang chủ'],
@@ -30,6 +31,7 @@ const routes = [
   [/^\/speaking\/(\d+)(?:\/(long))?$/, speakingItem, 'Luyện nói'],
   [/^\/listen$/, r => { listenHome(r); return 'Luyện nghe'; }, 'Luyện nghe'],
   [/^\/listen\/([\w-]+)(?:\/(quiz|type|speak))?$/, (r, id, tab) => { listenItem(r, id, tab || 'text'); return 'Luyện nghe'; }, 'Luyện nghe'],
+  [/^\/typing$/, typingPage, 'Đánh máy'],
   [/^\/vocab$/, dictionary, 'Từ vựng'],
   [/^\/word\/(.+)$/, word, 'Từ'],
   [/^\/topics(?:\/(\w+))?$/, topics, 'Nhóm từ'],
