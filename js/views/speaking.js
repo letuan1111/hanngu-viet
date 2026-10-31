@@ -1,13 +1,13 @@
 // Luyện nói theo chủ đề: bài nói mẫu 5 phần × 3 câu, bật/tắt pinyin & nghĩa, đổi phông, nghe mẫu, ghi âm và chấm từng chữ
 import { store, logActivity } from '../core/store.js';
 import { SPEAK_GROUPS, SPEAK_ITEMS, SPEAK_VOCAB, SPEAK_STRUCT, SPEAK_FOCUS, SPEAK_INTRO } from '../data/speaking.js';
-import { segment, charPinyins, isHan, examplesFor, sentencePinyin, grammarById } from '../core/dict.js';
+import { segment, charPinyins, isHan, sentencePinyin, grammarById } from '../core/dict.js';
 import { esc, icon, $, $$, toast, applyDisplay, say, sentence, exampleHtml, zhTokens, recAudio } from '../core/ui.js';
 import { checkSentence } from '../core/checker.js';
 import { vocabSet, ex5 } from './vocabset.js';
 import { typingTrainer, splitSentences } from './typing.js';
 import { SPEAK_LONG } from '../data/speaking-long.js';
-import { AI_MODELS, AI_DEFAULT, aiModelOptions, aiPreload, aiClip, aiLong, toPcm16k, recordVoice, onAIStatus } from '../core/ai.js';
+import { AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, onAIStatus } from '../core/ai.js';
 import { speak, speakSeq, stopSeq, SR } from '../core/tts.js';
 
 const FONTS = [['kai', 'Khải thư 楷体 (chuẩn sách giáo khoa)'], ['song', 'Tống thể 宋体 (chữ in)'], ['hei', 'Hắc thể 黑体 (không chân)']];
@@ -75,7 +75,6 @@ export function speakingItem(root, id, mode) {
   const rows = x.s.map(([zh, vi], i) => { const r = sentenceChars(zh, base); const k = x.pi[i]; const ph = (i === 0 || x.pi[i - 1] !== k) && x.parts?.[k] ? `<h3 class="sp-part"><span class="sp-pn">${NUM[k]}</span> ${esc(x.parts[k])} <small class="muted">${range(k)}</small></h3>` : ''; const row = ph + `<div class="sp-row" data-i="${i}" data-zh="${esc(zh)}" data-from="${base}" data-n="${r.n}">
       <div class="sp-body"><div class="sp-zh" lang="zh-CN">${r.html}</div><div class="sp-vi">${esc(vi)}</div><div class="sp-res"></div></div>
       <div class="sp-act"><button class="say sp-play" title="Nghe câu này" aria-label="Nghe câu này">${icon('vol')}</button>${SR ? `<button class="say sp-mic" title="Ghi âm câu này" aria-label="Ghi âm câu này">${icon('mic')}</button>` : ''}</div></div>`; base += r.n; return row; }).join('');
-  const total = base;
   const qr = sentenceChars(x.q, 100000);
   root.innerHTML = `<nav class="crumb"><a href="#/speaking">Luyện nói</a> › ${g[2]} ${esc(g[1])}</nav>
   <div class="sp-head card"><p class="eyebrow">Câu hỏi ${x.id} · Nhóm ${g[0]} – ${esc(g[1])}</p><div class="sp-qbig" lang="zh-CN">${qr.html}</div><div class="sp-qvi">${esc(x.qvi)}</div>
@@ -94,23 +93,17 @@ export function speakingItem(root, id, mode) {
     <label class="sel">Tốc độ <select id="pRate">${[0.75, 1, 1.25].map(r => `<option ${r === (st.rate || 1) ? 'selected' : ''} value="${r}">${r}x</option>`).join('')}</select></label>
   </div>
   <article class="sp-text card ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" style="--sp-size:${opt.size}rem">${rows}</article>
-  <section class="card sp-rec">
-    <h2>${icon('mic')} Ghi âm & kiểm tra phát âm</h2>
-    ${SR ? `<p class="muted small">Bấm “Bắt đầu đọc”, đọc to cả bài (có thể tắt pinyin để thử thách), rồi bấm “Dừng & chấm điểm”. Máy sẽ tô màu từng chữ: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng / nên kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>. Cũng có thể bấm biểu tượng micro bên cạnh từng câu để luyện riêng câu đó.</p>`
-      : `<p class="note">Trình duyệt này chưa hỗ trợ nhận dạng giọng nói nên không chấm điểm tự động được. Hãy mở bằng <b>Chrome</b> hoặc <b>Edge</b> trên máy tính/Android. Bạn vẫn có thể ghi âm và nghe lại để tự so với giọng mẫu.</p>`}
-    <div class="row gap wrap"><button class="btn" id="rStart">${icon('mic')} Bắt đầu đọc</button><button class="btn ghost" id="rStop" disabled>Dừng & chấm điểm</button><span id="rTime" class="muted"></span></div>
-    <div id="rLive" class="sp-live" aria-live="polite"></div>
-    <div id="rOut"></div>
-  </section>
   <section class="card sp-ai">
-    <h2>🤖 AI ghi âm – xem bạn nói gì</h2>
-    <p class="muted small">Bấm <b>Bắt đầu nói</b> rồi nói: đọc bài mẫu, đọc bài bạn tự viết, hoặc tự trả lời câu hỏi bằng lời của mình. <b>AI Whisper chạy ngay trên máy</b> sẽ nghe lại và <b>ghi ra chữ bạn nói</b> (kèm pinyin, nghĩa). Chọn so sánh để máy tô màu từng chữ đúng/sai. Không cần Chrome, không gửi âm thanh đi đâu (lần đầu cần tải mô hình).</p>
+    <h2>${icon('mic')} Ghi âm & chấm phát âm</h2>
+    <p class="muted small">Bấm <b>Bắt đầu nói</b> rồi đọc bài mẫu, đọc bài bạn tự viết, hoặc tự trả lời bằng lời của mình. Máy <b>ghi ra chữ bạn nói</b> (kèm pinyin, nghĩa) và khi chọn so sánh sẽ tô màu từng chữ: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>. Bấm 🎤 cạnh từng câu để luyện riêng câu đó.</p>
     <div class="row gap wrap ls-sbar">
-      <label class="sel">AI <select id="aiModelSel">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}</select></label>
+      <label class="sel">Nhận dạng bằng <select id="aiEng"><option value="ai">🤖 AI Whisper trên máy (chuẩn hơn, lần đầu cần tải mô hình)</option>${SR ? `<option value="sr" ${store.s.speakEng === 'sr' ? 'selected' : ''}>⚡ Trình duyệt Chrome/Edge (nhanh, không cần tải)</option>` : ''}</select></label>
+      <label class="sel ai-only">AI <select id="aiModelSel">${aiModelOptions(store.s.aiModel || AI_DEFAULT)}</select></label>
       <label class="sel">So sánh với <select id="aiCmp"><option value="sample">Bài mẫu đang xem</option><option value="mine">Bài nói của bạn (tự viết)</option><option value="none">Không so sánh – chỉ ghi ra tôi nói gì</option></select></label>
-      <label class="chk"><input type="checkbox" id="aiAuto" checked> Tự dừng khi im lặng 3 giây</label>
+      <label class="chk ai-only"><input type="checkbox" id="aiAuto" checked> Tự dừng khi im lặng 3 giây</label>
     </div>
     <div class="row gap wrap" style="align-items:center"><button class="btn big" id="aiGo">🎤 Bắt đầu nói</button><span class="tp-vu"><span id="aiVu"></span></span><span class="muted" id="aiTime"></span></div>
+    <div id="aiLive" class="sp-live" aria-live="polite"></div>
     <div class="small ai-status" id="aiStat"></div>
     <div id="aiOut"></div>
   </section>
@@ -159,40 +152,6 @@ export function speakingItem(root, id, mode) {
     mic.classList.remove('rec');
   };
 
-  // ── Ghi âm cả bài: nhận dạng liên tục + thu âm để nghe lại ──
-  let rec = null;
-  $('#rStart', root).onclick = async () => {
-    stopSeq();
-    $('#rOut', root).innerHTML = ''; srows.forEach(r => { paint(r, []); $('.sp-res', r).innerHTML = ''; });
-    rec = await startSession($('#rLive', root), $('#rTime', root));
-    if (!rec) return;
-    $('#rStart', root).disabled = true; $('#rStop', root).disabled = false;
-  };
-  $('#rStop', root).onclick = async () => {
-    if (!rec) return;
-    $('#rStop', root).disabled = true; $('#rStart', root).disabled = false;
-    const { transcript, audioUrl } = await rec.stop(); rec = null;
-    $('#rLive', root).innerHTML = '';
-    const out = $('#rOut', root);
-    if (!SR) { out.innerHTML = audioUrl ? `<p>Nghe lại giọng của bạn:</p>${recAudio(audioUrl)}` : ''; return; }
-    if (!transcript.trim()) { out.innerHTML = '<p class="bad-t">Không nhận được giọng nói. Hãy kiểm tra micro và đọc to, rõ hơn.</p>' + (audioUrl ? `${recAudio(audioUrl)}` : ''); return; }
-    const all = x.s.map(s => s[0]).join('');
-    const r = align(all, transcript);
-    const per = srows.map(el => { const from = +el.dataset.from, n = +el.dataset.n; const m = r.marks.slice(from, from + n); paint(el, m); const sc = n ? Math.round((m.filter(v => v === 'ok').length + m.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; $('.sp-res', el).innerHTML = badge(sc); return { el, sc, i: +el.dataset.i }; });
-    const weak = per.filter(p => p.sc < 70);
-    store.update(s => { s.speakBest = s.speakBest || {}; s.speakBest[bk] = Math.max(s.speakBest[bk] || 0, r.score); });
-    logActivity(5);
-    out.innerHTML = `<div class="sp-sum">
-      <div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div>
-      <div><h3>${r.score >= 85 ? 'Rất tốt! Phát âm rõ ràng.' : r.score >= 65 ? 'Khá tốt, luyện thêm vài câu nữa nhé.' : 'Cần luyện thêm – hãy nghe mẫu rồi đọc chậm, rõ từng chữ.'}</h3>
-        <p>Đọc đúng <b>${r.ok}</b>/${total} chữ · gần đúng <b>${r.tone}</b> · thiếu/sai <b>${total - r.ok - r.tone}</b>. Điểm cao nhất: <b>${store.s.speakBest[bk]}%</b></p>
-        ${audioUrl ? `<p class="small muted">Nghe lại giọng của bạn rồi so với giọng mẫu:</p>${recAudio(audioUrl)}` : ''}
-      </div></div>
-      ${weak.length ? `<h3 class="sub">Câu nên luyện lại (${weak.length})</h3><ul class="weak">${weak.map(p => `<li><a href="#" data-goto="${p.i}">Câu ${p.i + 1}: <span lang="zh-CN">${esc(x.s[p.i][0])}</span></a> ${badge(p.sc)}</li>`).join('')}</ul>` : '<p class="ok-t">Không có câu nào dưới 70%. Giỏi lắm!</p>'}
-      <details class="small"><summary>Văn bản máy nghe được</summary><p lang="zh-CN">${esc(transcript)}</p></details>
-      <p class="muted small">Lưu ý: chấm điểm dựa trên nhận dạng giọng nói của trình duyệt, chỉ mang tính tham khảo. Chữ màu cam thường là chữ đồng âm hoặc cần kiểm tra lại thanh điệu.</p>`;
-    out.scrollIntoView({ behavior: 'smooth' });
-  };
   typingTrainer($('#typing', root), { key: 'sp' + bk, sentences: x.s });
   renderStudy($('#study', root), x0);
   renderMySpeech($('#mySp', root), x0);
@@ -202,15 +161,30 @@ export function speakingItem(root, id, mode) {
     const go = $('#aiGo', root), out = $('#aiOut', root), stat = $('#aiStat', root), vu = $('#aiVu', root), tm = $('#aiTime', root);
     const off = onAIStatus(h => { if (document.body.contains(stat)) stat.innerHTML = h; else off(); });
     $('#aiModelSel', root).onchange = e => store.update(s => { s.aiModel = e.target.value; });
-    let ctl = null;
+    const eng = $('#aiEng', root), live = $('#aiLive', root);
+    const syncEng = () => { $$('.sp-ai .ai-only', root).forEach(el => { el.hidden = eng.value !== 'ai'; }); };
+    eng.onchange = () => { store.update(s => { s.speakEng = eng.value; }); syncEng(); }; syncEng();
+    let ctl = null, sess = null;
+    const idle = () => { go.classList.remove('rec'); go.textContent = '🎤 Bắt đầu nói'; vu.style.width = '0'; };
     go.onclick = async () => {
       if (ctl) { ctl.stop(); return; }
-      stopSeq(); const model = $('#aiModelSel', root).value; aiPreload(model);
+      if (sess) { // dừng nhận dạng của trình duyệt
+        const s0 = sess; sess = null; idle(); const { transcript, audioUrl } = await s0.stop(); live.innerHTML = '';
+        const audioH = audioUrl ? recAudio(audioUrl) : '', said = transcript.replace(/\s+/g, '');
+        if (!said) { out.innerHTML = `<p class="bad-t">Không nhận được giọng nói. Hãy kiểm tra micro và đọc to, rõ hơn.</p>${audioH}`; return; }
+        return show(said, audioH, 'Máy');
+      }
+      stopSeq(); out.innerHTML = '';
+      if (eng.value === 'sr') {
+        sess = await startSession(live, tm); if (!sess) return;
+        go.classList.add('rec'); go.textContent = '⏹ Dừng & chấm điểm'; return;
+      }
+      const model = $('#aiModelSel', root).value; aiPreload(model);
       try { ctl = await recordVoice({ maxSec: 180, silenceSec: $('#aiAuto', root).checked ? 3 : 0, onLevel: v => { vu.style.width = Math.min(100, v / 0.15 * 100) + '%'; }, onTime: t => { tm.textContent = `⏺ ${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`; } }); }
       catch { toast('Cần cho phép dùng micro.', 'bad'); return; }
-      go.classList.add('rec'); go.textContent = '⏹ Đang ghi – bấm để dừng'; out.innerHTML = '';
+      go.classList.add('rec'); go.textContent = '⏹ Đang ghi – bấm để dừng';
       const { blob, voiced } = await ctl.done; ctl = null;
-      go.classList.remove('rec'); go.textContent = '🎤 Bắt đầu nói'; vu.style.width = '0';
+      idle();
       const url = URL.createObjectURL(blob), audioH = `${recAudio(url)}`;
       if (!voiced) { out.innerHTML = `<p class="bad-t">Không nghe thấy giọng nói – hãy nói to hơn, gần micro.</p>${audioH}`; tm.textContent = ''; return; }
       out.innerHTML = `<p class="muted">🤖 AI đang nghe bản ghi…</p>${audioH}`;
@@ -220,6 +194,9 @@ export function speakingItem(root, id, mode) {
       tm.textContent = '';
       const said = lines.map(l => l.zh).join('');
       if (!said) { out.innerHTML = `<p class="bad-t">AI không nhận ra chữ nào rõ ràng.</p>${audioH}`; return; }
+      show(said, audioH, '🤖 AI');
+    };
+    function show(said, audioH, who) {
       const sents = splitSentences(said).length ? splitSentences(said) : [said];
       let cmpH = '';
       const mode = $('#aiCmp', root).value;
@@ -227,19 +204,21 @@ export function speakingItem(root, id, mode) {
       if (mode !== 'none' && rowsEl.length) {
         const all = rowsEl.map(r => r.dataset.zh).join(''), r = align(all, said);
         let from = 0;
-        rowsEl.forEach(el => { const n = $$('.cz', el).length, m = r.marks.slice(from, from + n); from += n; paint(el, m); const sc = n ? Math.round((m.filter(v => v === 'ok').length + m.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; const rs = $('.sp-res', el); if (rs) rs.innerHTML = badge(sc); });
-        cmpH = `<div class="sp-sum"><div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div><div><p>So với ${mode === 'sample' ? 'bài mẫu' : 'bài bạn tự viết'}: đúng <b>${r.ok}</b> chữ · gần đúng <b>${r.tone}</b>. Các chữ đã được tô màu trong ${mode === 'sample' ? 'bài mẫu ở trên' : 'phần xem trước bài của bạn'}.</p></div></div>`;
+        const weak = [];
+        rowsEl.forEach((el, k) => { const n = $$('.cz', el).length, m = r.marks.slice(from, from + n); from += n; paint(el, m); const sc = n ? Math.round((m.filter(v => v === 'ok').length + m.filter(v => v === 'tone').length * 0.5) / n * 100) : 100; const rs = $('.sp-res', el); if (rs) rs.innerHTML = badge(sc); if (sc < 70) weak.push([k, sc, el.dataset.zh]); });
+        cmpH = `<div class="sp-sum"><div class="score-ring" style="--p:${r.score}"><span>${r.score}%</span></div><div><p>So với ${mode === 'sample' ? 'bài mẫu' : 'bài bạn tự viết'}: đúng <b>${r.ok}</b> chữ · gần đúng <b>${r.tone}</b>. Các chữ đã được tô màu trong ${mode === 'sample' ? 'bài mẫu ở trên' : 'phần xem trước bài của bạn'}.</p></div></div>`
+          + (mode === 'sample' ? (weak.length ? `<h3 class="sub">Câu nên luyện lại (${weak.length})</h3><ul class="weak">${weak.map(([k, sc, z]) => `<li><a href="#" data-goto="${k}">Câu ${k + 1}: <span lang="zh-CN">${esc(z)}</span></a> ${badge(sc)}</li>`).join('')}</ul>` : '<p class="ok-t small">Không có câu nào dưới 70%. Giỏi lắm!</p>') : '');
         if (mode === 'sample') store.update(s => { s.speakBest = s.speakBest || {}; s.speakBest[bk] = Math.max(s.speakBest[bk] || 0, r.score); });
       } else if (mode === 'mine') cmpH = '<p class="note small">Bạn chưa viết “Bài nói của bạn” ở phía dưới nên chưa so sánh được.</p>';
-      out.innerHTML = `<div class="at-res"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><b>🗣️ AI nghe được bạn nói (${[...said].filter(isHan).length} chữ):</b><span class="row gap"><button class="mini" id="aiCopy">📋 Sao chép</button><button class="mini" id="aiDraft">📝 Đưa vào “Bài nói của bạn”</button><button class="mini" id="aiClr">🗑️ Xóa</button></span></div>
+      out.innerHTML = `<div class="at-res"><div class="row gap wrap" style="justify-content:space-between;align-items:center"><b>🗣️ ${who} nghe được bạn nói (${[...said].filter(isHan).length} chữ):</b><span class="row gap"><button class="mini" id="aiCopy">📋 Sao chép</button><button class="mini" id="aiDraft">📝 Đưa vào “Bài nói của bạn”</button><button class="mini" id="aiClr">🗑️ Xóa</button></span></div>
         ${sents.map(z => `<div class="sent at-said"><div class="sent-body"><div class="zh">${zhTokens(z)}</div></div><div class="sent-act"><button class="say ai-say" data-z="${esc(z)}" title="Nghe máy đọc câu này" aria-label="Nghe">${icon('vol')}</button></div></div>`).join('')}
         <div class="small muted">Giọng của bạn:</div>${audioH}${cmpH}</div>`;
-      logActivity(3);
+      logActivity(5);
       out.onclick = e => { const b = e.target.closest('.ai-say'); if (b) speak(b.dataset.z); };
       $('#aiClr', out).onclick = () => { $$('audio', out).forEach(a => { try { URL.revokeObjectURL(a.src); } catch {} }); out.innerHTML = ''; rowsEl.forEach(el => { paint(el, []); const rs = $('.sp-res', el); if (rs) rs.innerHTML = ''; }); };
       $('#aiCopy', out).onclick = async () => { try { await navigator.clipboard.writeText(said); toast('Đã sao chép.'); } catch { toast('Không sao chép được.', 'bad'); } };
       $('#aiDraft', out).onclick = () => { const pts = $$('.my-ptxt', root); if (!pts.length) return; if (pts.some(t => t.value.trim()) && !confirm('Thay nội dung “Bài nói của bạn” bằng lời bạn vừa nói (chia đều vào 5 phần)?')) return; const per = Math.ceil(sents.length / pts.length) || 1; pts.forEach((t, k) => { t.value = sents.slice(k * per, k * per + per).join(''); t.dispatchEvent(new Event('input')); }); $('#mySp', root).scrollIntoView({ behavior: 'smooth' }); toast('Đã đưa vào Bài nói của bạn – hãy sửa lại cho đúng.'); };
-    };
+    }
   }
   return `Luyện nói: ${x.q}${long ? ' (bài 200 chữ)' : ''}`;
 }

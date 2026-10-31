@@ -1,9 +1,9 @@
 // Luyện gõ lại bài đọc: chạy từng câu, gõ đúng đến đâu chữ biến mất đến đó; có đồng hồ, chữ/phút, từ/phút, độ chính xác
 import { store, logActivity } from '../core/store.js';
 import { segment, charPinyins, isHan } from '../core/dict.js';
-import { esc, icon, $, $$, toast, recAudio, sentence, grammarInText, structsInText, quickSaveOn, setQuickSave } from '../core/ui.js';
+import { esc, icon, $, toast, recAudio, sentence, grammarInText, structsInText, quickSaveOn, setQuickSave } from '../core/ui.js';
 import { speak } from '../core/tts.js';
-import { AI_MODELS, AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
+import { AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
 
 const tone = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v');
 const isKeyable = c => isHan(c) || /[0-9a-zA-Z]/.test(c);

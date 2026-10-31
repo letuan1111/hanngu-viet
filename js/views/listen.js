@@ -6,7 +6,7 @@ import { esc, icon, $, $$, toast, zhTokens, recAudio, quickSaveOn, setQuickSave 
 import { speak, stopSeq, SR } from '../core/tts.js';
 import { typingTrainer, splitSentences } from './typing.js';
 import { sentenceChars, align, recognizeOnce, recordClip } from './speaking.js';
-import { aiModelOptions, AI_DEFAULT } from '../core/ai.js';
+import { aiModelOptions, AI_DEFAULT, aiClip, aiPreload, toPcm16k, onAIStatus } from '../core/ai.js';
 
 // ── Kho dữ liệu (IndexedDB) ──
 const DB = {
@@ -141,7 +141,7 @@ export function autoQuestions(lines, n = 10) {
 }
 
 // Ghi âm đến khi người nói im lặng ~1,2 giây (hoặc hết maxSec / bấm dừng)
-async function recordSilence(stream, maxSec, onLevel, setStop) {
+async function recordSilence(stream, maxSec, onLevel, setStop, { early = () => true, onTime, alive = () => true } = {}) {
   const mr = new MediaRecorder(stream), chunks = []; mr.ondataavailable = e => e.data.size && chunks.push(e.data);
   const ac = new (window.AudioContext || window.webkitAudioContext)(), an = ac.createAnalyser(); an.fftSize = 1024;
   ac.createMediaStreamSource(stream).connect(an); const buf = new Float32Array(an.fftSize);
@@ -154,8 +154,8 @@ async function recordSilence(stream, maxSec, onLevel, setStop) {
       an.getFloatTimeDomainData(buf); let e = 0; for (const v of buf) e += v * v; const rm = Math.sqrt(e / buf.length);
       if (el < 0.3) noise = (noise * n + rm) / ++n;
       if (rm > Math.max(0.015, noise * 3)) { voiced++; lastVoice = el; }
-      onLevel && onLevel(rm);
-      if (stop || el >= maxSec || (voiced > 6 && el - lastVoice > 1.2 && el > 1.2)) return res();
+      onLevel && onLevel(rm); onTime && onTime(el);
+      if (stop || !alive() || el >= maxSec || (early() && voiced > 6 && el - lastVoice > 1.2 && el > 1.2)) return res();
       requestAnimationFrame(tick);
     };
     tick();
@@ -313,13 +313,11 @@ export async function listenItem(root, id, tab = 'text') {
         <div class="row gap wrap"><button class="btn" id="lsSaveTxt">💾 Lưu nội dung</button>
           <label class="btn ghost">📄 Tải file nội dung (.txt, .lrc, .srt)<input type="file" id="lsTxtFile" accept=".txt,.lrc,.srt,.vtt,text/plain" hidden></label>
           <button class="btn" id="lsAI">🤖 Nhận dạng tự động từ file</button>
-          ${SR ? '<button class="btn ghost" id="lsAuto">🎙️ Nhận dạng qua loa + micro</button>' : ''}
           ${d.lines.length ? '<button class="btn ghost" id="lsCancel">Hủy</button>' : ''}</div>
         <div id="lsAutoBox" class="small"></div></section>`;
       $('#lsSaveTxt', body).onclick = async () => { d.lines = parseTranscript($('#lsTxt', body).value); await save(); toast(d.lines.length ? `Đã lưu ${d.lines.length} câu.` : 'Đã xóa nội dung.'); drawText(false); };
       $('#lsTxtFile', body).onchange = async e => { const f = e.target.files[0]; if (f) $('#lsTxt', body).value = linesToText(parseTranscript(await readText(f))); };
       if ($('#lsCancel', body)) $('#lsCancel', body).onclick = () => drawText(false);
-      if ($('#lsAuto', body)) $('#lsAuto', body).onclick = autoTranscribe;
       $('#lsAI', body).onclick = aiTranscribe;
       return;
     }
@@ -432,42 +430,9 @@ export async function listenItem(root, id, tab = 'text') {
   // Giải mã file thành âm thanh mono 16 kHz (định dạng Whisper cần)
   async function decode16k() {
     const buf = d.audio ? await d.audio.arrayBuffer() : await (await fetch(d.audioUrl)).arrayBuffer();
-    return pcm16k(buf);
-  }
-  async function pcm16k(buf) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AC();
-    const ab = await new Promise((res, rej) => { const p = ctx.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); });
-    ctx.close && ctx.close();
-    const len = Math.ceil(ab.duration * 16000);
-    const off = new OfflineAudioContext(1, len, 16000);
-    const src = off.createBufferSource(); src.buffer = ab; src.connect(off.destination); src.start();
-    const r = await off.startRendering();
-    return new Float32Array(r.getChannelData(0));
+    return toPcm16k(buf);
   }
 
-  // Nhận dạng tự động: phát âm thanh qua loa và nghe lại bằng micro (Chrome/Edge)
-  function autoTranscribe() {
-    const out = $('#lsAutoBox', body);
-    out.innerHTML = `<div class="note">Máy sẽ <b>phát bài nghe qua loa</b> và dùng <b>micro</b> để nhận dạng lời nói (cần Chrome/Edge, cho phép micro, phòng yên tĩnh, bật loa vừa đủ – không dùng tai nghe). Kết quả chỉ để tham khảo, hãy sửa lại cho đúng rồi bấm “Lưu nội dung”. Mỗi câu nhận được sẽ kèm mốc thời gian.</div>
-      <div class="row gap"><button class="btn sm" id="aGo">🎙️ Bắt đầu nhận dạng</button><button class="btn sm ghost" id="aStop" disabled>Dừng</button></div><div class="sp-live" id="aLive"></div>`;
-    let r = null, running = false, segStart = null; const got = [];
-    const live = $('#aLive', out);
-    const stop = () => { running = false; try { r && r.stop(); } catch {} au.pause(); $('#aGo', out).disabled = false; $('#aStop', out).disabled = true;
-      if (got.length) { const ta = $('#lsTxt', body); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + got.map(g => `[${fmtT(g.t)}] ${g.zh}`).join('\n'); toast(`Đã nhận dạng ${got.length} câu – hãy kiểm tra lại rồi lưu.`); } };
-    const begin = () => {
-      if (!running) return;
-      r = new SR(); r.lang = 'zh-CN'; r.continuous = true; r.interimResults = true;
-      r.onresult = e => { let interim = ''; for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript.trim(); if (segStart == null) segStart = Math.max(0, au.currentTime - 1); if (e.results[i].isFinal) { if (t) got.push({ zh: t.replace(/\s+/g, ''), t: segStart }); segStart = null; } else interim += t; }
-        live.innerHTML = got.slice(-4).map(g => `<div lang="zh-CN">[${fmtT(g.t)}] ${esc(g.zh)}</div>`).join('') + (interim ? `<div class="muted" lang="zh-CN">${esc(interim)}</div>` : ''); };
-      r.onerror = e => { if (e.error === 'not-allowed') { toast('Bạn chưa cho phép dùng micro.', 'bad'); stop(); } };
-      r.onend = () => { if (running) setTimeout(begin, 120); };
-      try { r.start(); } catch {}
-    };
-    $('#aGo', out).onclick = () => { running = true; got.length = 0; au.currentTime = 0; au.playbackRate = 1; au.play(); begin(); $('#aGo', out).disabled = true; $('#aStop', out).disabled = false; live.innerHTML = '<span class="muted">Đang nghe…</span>'; };
-    $('#aStop', out).onclick = stop;
-    au.addEventListener('ended', () => { if (running) setTimeout(stop, 1500); });
-  }
 
   // ── Câu hỏi đọc hiểu ──
   function drawQuiz(mode = d.qs.length ? 'do' : 'edit') {
@@ -559,21 +524,9 @@ export async function listenItem(root, id, tab = 'text') {
   // ── Nghe – nói lại (shadowing): nghe từng câu, máy tự ghi âm và chấm đọc đúng từng chữ ──
   // AI Whisper dùng chung cho chấm băng và thử nhận giọng
   const setAI = h => $$('.ai-status', body).forEach(x => { x.innerHTML = h; });
-  let aw = null; const waiting = new Map(); let seq = 0;
-  const aiWorker = () => {
-    if (aw) return aw;
-    aw = new Worker(new URL('../workers/asr.js', import.meta.url), { type: 'module' });
-    const files = {};
-    aw.onmessage = ev => { const m = ev.data;
-      if (m.type === 'load') { files[m.file] = [m.loaded || 0, m.total || 0]; const L = Object.values(files).reduce((a, x) => a + x[0], 0), T = Object.values(files).reduce((a, x) => a + x[1], 0); setAI(`🤖 Đang tải AI chấm: ${fmtSize(L)}${T ? ' / ' + fmtSize(T) : ''} (chỉ lần đầu) – bạn cứ luyện, bài sẽ được chấm khi tải xong.`); }
-      else if (m.type === 'ready') setAI('<span class="ok-t">🤖 AI chấm đã sẵn sàng.</span>');
-      else if (m.type === 'error') setAI(`<span class="bad-t">Không tải được AI chấm (${esc(m.msg)}). Bản ghi vẫn được giữ để bạn tự nghe lại; có thể dùng cách chấm bằng trình duyệt bên dưới.</span>`);
-      else if (m.type === 'clip') { const w = waiting.get(m.id); if (w) { waiting.delete(m.id); if (m.error && !m.text) setAI(`<span class="bad-t">AI chấm gặp lỗi: ${esc(m.error)}</span>`); w(m.text); } }
-    };
-    aw.onerror = ev => { setAI(`<span class="bad-t">Không chạy được AI chấm (${esc(ev.message || 'lỗi')}).</span>`); };
-    return aw;
-  };
-  const askAI = (pcm, model) => new Promise(res => { const id = ++seq; waiting.set(id, res); aiWorker().postMessage({ type: 'clip', id, audio: pcm, model }, [pcm.buffer]); });
+  const offAI = onAIStatus(h => { if (document.body.contains(body)) setAI(h); else offAI(); });
+  let pending = 0;
+  const askAI = (pcm, model) => { pending++; return aiClip(pcm, model).finally(() => { pending--; }); };
 
   // ── Thử AI nhận giọng: nói bất kỳ câu nào, xem AI nghe ra chữ gì (và so với câu muốn đọc) ──
   const aiTestHtml = () => `<section class="card ai-test">
@@ -628,14 +581,14 @@ export async function listenItem(root, id, tab = 'text') {
           render(said ? said : '', r.url, 0, 'Trình duyệt');
         } else {
           let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { throw new Error('Cần cho phép dùng micro.'); }
-          aiWorker().postMessage({ type: 'preload', model: e });
+          aiPreload(e);
           info.textContent = 'Đang ghi âm…';
           const { blob, voiced } = await recordSilence(stream, 15, lv => { vu.style.width = Math.min(100, lv / 0.15 * 100) + '%'; }, f => { stopNow = f; });
           stream.getTracks().forEach(t => t.stop()); vu.style.width = '0';
           const url = URL.createObjectURL(blob);
           if (!voiced) { render('', url, 0, 'Whisper'); return; }
           info.textContent = '🤖 AI đang nghe lại bản ghi…'; const t0 = performance.now();
-          const said = await askAI(await pcm16k(await blob.arrayBuffer()), e);
+          const said = await askAI(await toPcm16k(await blob.arrayBuffer()), e);
           render(said, url, performance.now() - t0, 'Whisper');
         }
         logActivity();
@@ -706,7 +659,7 @@ export async function listenItem(root, id, tab = 'text') {
       const slots = gapSlots || await doScan(); if (!slots) return;
       let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { toast('Cần cho phép dùng micro để ghi âm câu trả lời.', 'bad'); return; }
       const model = $('#gpModel', body).value, mode = $('#gpMode', body).value;
-      aiWorker().postMessage({ type: 'preload', model });
+      aiPreload(model);
       running = true; $('#gpGo', body).disabled = true; $('#gpStop', body).disabled = false; answers = []; drawAnswers();
       res.innerHTML = slots.map((s, k) => `<li class="ls-gr" data-k="${k}"><div class="ls-gq"><b>Câu ${k + 1}</b> <button class="mini gp-q" data-k="${k}">▶ Nghe lại đoạn trong file (${fmtT(s.qa).replace(/\.\d$/, '')})</button> <span class="small muted gp-qt"></span></div><div class="ls-ga small muted">Chưa đến lượt</div></li>`).join('');
       $('#lsLoop', root).checked = false; stopAt = null; au.playbackRate = 1; au.currentTime = Math.max(0, slots[0].qa - 0.3);
@@ -766,7 +719,7 @@ export async function listenItem(root, id, tab = 'text') {
     $('.gp-qt', row).innerHTML = target ? `File: <span lang="zh-CN">${esc(target)}</span>` : '';
     if (r.voiced < 4) { out.innerHTML = `<span class="muted">Không nghe thấy bạn trả lời.</span> ${recAudio(url)}`; answers[r.k] = { q: target || '', a: '', t: slot.qa }; drawAnswers(); return; }
     out.innerHTML = `🤖 AI đang nghe câu trả lời… ${recAudio(url)}`;
-    const said = await askAI(await pcm16k(await blob.arrayBuffer()), model);
+    const said = await askAI(await toPcm16k(await blob.arrayBuffer()), model);
     if (!said) { out.innerHTML = `<span class="muted">AI không nghe ra chữ nào rõ ràng.</span> ${recAudio(url)}`; return; }
     if (mode === 'repeat' && target) {
       const al = align(target, said), sc = sentenceChars(target, 0);
@@ -787,8 +740,7 @@ export async function listenItem(root, id, tab = 'text') {
     const hasT = d.lines.some(l => l.t != null);
     body.innerHTML = gapHtml() + aiTestHtml() + `<section class="card">
       <h2>🎤 Nghe – nói lại</h2>
-      <p class="small muted">Nghe từng câu rồi nói lại. Ở chế độ <b>tự động</b>, máy phát câu ${hasT ? 'trong file' : 'bằng giọng máy đọc (nên đồng bộ thời gian để dùng giọng thật trong file)'}, sau đó <b>tự ghi âm</b> giọng bạn và <b>chấm đúng/sai từng chữ</b>: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>, rồi chuyển sang câu tiếp theo.</p>
-      ${SR ? '' : '<p class="note small">Trình duyệt này chưa có nhận dạng giọng nói sẵn – hãy dùng chế độ “Băng chạy liên tục” (AI Whisper chấm) hoặc mở bằng Chrome/Edge.</p>'}
+      <p class="small muted">Nghe từng câu rồi nói lại. Bấm ▶ cạnh câu để nghe, 🎤 để ghi âm riêng câu đó, hoặc chạy <b>băng liên tục</b>. AI Whisper chạy ngay trên máy chấm đúng/sai từng chữ: <span class="lg ok">đúng</span> <span class="lg tone">gần đúng – kiểm tra thanh điệu</span> <span class="lg miss">thiếu hoặc sai</span>.</p>
       <div class="ls-tape">
         <h3>📼 Băng chạy liên tục – có khoảng trống để bạn nói</h3>
         <p class="small muted">Băng phát từng câu, sau mỗi câu <b>tự dừng một khoảng</b> (dài theo độ dài câu) để bạn nói lại. Trong khoảng trống máy <b>tự ghi âm</b>, nói xong thì tự chạy tiếp. Bản ghi của bạn được <b>AI Whisper chạy ngay trên máy</b> nghe lại và chấm đúng/sai từng chữ – không cần Chrome, không gửi âm thanh đi đâu (lần đầu cần tải mô hình).</p>
@@ -802,11 +754,7 @@ export async function listenItem(root, id, tab = 'text') {
         <div class="tp-gap" id="tpGapBox" hidden><div class="tp-lbl">🎤 Đến lượt bạn – nói lại câu vừa nghe <span class="tp-vu"><span id="tpVu"></span></span></div><div class="my-bar"><span id="tpBar"></span></div></div>
         <div class="small ai-status" id="tpAI"></div>
       </div>
-      <h3 class="sub">⚡ Hoặc luyện từng câu, chấm ngay bằng trình duyệt (Chrome/Edge)</h3>
       <div class="row gap wrap ls-sbar">
-        <button class="btn" id="spAuto">▶ Luyện tự động từ câu <input id="spFrom" type="number" min="1" max="${d.lines.length}" value="1" class="inp sm" style="width:64px" onclick="event.stopPropagation()"></button>
-        <button class="btn ghost" id="spStop" disabled>⏹ Dừng</button>
-        <label class="chk"><input type="checkbox" id="spRetry" checked> Đọc lại câu dưới 60%</label>
         <label class="chk"><input type="checkbox" id="spHide"> Ẩn chữ khi nghe</label>
         <label class="sw"><input type="checkbox" id="spPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
       </div>
@@ -818,7 +766,7 @@ export async function listenItem(root, id, tab = 'text') {
     const rows = $$('.ls-sp .sp-row', body);
     $('#spPy', body).onchange = e => { opt.py = e.target.checked; $('.ls-sp', body).classList.toggle('no-py', !opt.py); saveOpt(); };
     $('#spHide', body).onchange = e => $('.ls-sp', body).classList.toggle('hide-zh', e.target.checked);
-    let running = false, cancel = null;
+    let cancel = null, stopRec1 = null;
     const hear = i => new Promise(res => {
       const l = d.lines[i];
       $('#lsLoop', root).checked = false;
@@ -828,21 +776,19 @@ export async function listenItem(root, id, tab = 'text') {
     const durOf = i => { const l = d.lines[i]; return l.t != null ? Math.max(2, lineEnd(i) - l.t) : [...l.zh].filter(isHan).length * 0.35 + 1; };
     async function rec(i) {
       const el = rows[i], out = $('.sp-res', el), mic = $('.sp-rec1', el);
-      mic.classList.add('rec'); el.classList.add('now'); out.innerHTML = '<span class="muted">🎤 Đang ghi âm… hãy nói lại câu này</span>';
-      const fake = {}; if (!SR) setTimeout(() => fake._stop && fake._stop(), (durOf(i) * 1.6 + 1.5) * 1000);
+      let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { toast('Cần cho phép dùng micro.', 'bad'); return; }
+      const model = $('#tpModel', body).value; aiPreload(model);
+      mic.classList.add('rec'); el.classList.add('now'); out.innerHTML = '<span class="muted">🎤 Đang ghi âm… hãy nói lại câu này (bấm 🎤 lần nữa để dừng)</span>';
       try {
-        const r = await recordClip(fake);
-        const audioH = r.url ? `${recAudio(r.url)}` : '';
-        if (!SR) { out.innerHTML = `<span class="muted small">Nghe lại giọng bạn để so với câu gốc:</span> ${audioH}`; return null; }
-        const bestA = (r.alts || []).map(a => ({ a, ...align(d.lines[i].zh, a) })).sort((x, y) => y.score - x.score)[0];
-        if (!bestA) { paint(el, []); out.innerHTML = `<span class="muted">Không nghe rõ giọng nói.</span> ${audioH}`; return 0; }
-        paint(el, bestA.marks);
-        d.speak[i] = Math.max(d.speak[i] || 0, bestA.score);
-        out.innerHTML = `${badge(bestA.score)} <span class="muted small">Máy nghe được:</span> <span lang="zh-CN">${esc(bestA.a)}</span> ${audioH}`;
+        const { blob, voiced } = await recordSilence(stream, durOf(i) * 2 + 4, null, f => { stopRec1 = f; });
+        stream.getTracks().forEach(t => t.stop());
+        const url = URL.createObjectURL(blob);
+        if (!voiced) { paint(el, []); out.innerHTML = `<span class="muted">Không nghe rõ giọng nói.</span> ${recAudio(url)}`; return; }
+        out.innerHTML = `<span class="muted">🤖 AI đang nghe bản ghi…</span> ${recAudio(url)}`;
+        scoreFromAI(i, await askAI(await toPcm16k(await blob.arrayBuffer()), model), url, 'repeat');
         logActivity();
-        return bestA.score;
-      } catch (err) { out.innerHTML = `<span class="bad-t">${esc(err.message)}</span>`; return null; }
-      finally { mic.classList.remove('rec'); }
+      } catch (err) { out.innerHTML = `<span class="bad-t">${esc(err.message || err)}</span>`; }
+      finally { mic.classList.remove('rec'); el.classList.remove('now'); stopRec1 = null; }
     }
     const summary = () => {
       const sc = Object.values(d.speak); if (!sc.length) return;
@@ -851,34 +797,12 @@ export async function listenItem(root, id, tab = 'text') {
       $('#spSum', body).innerHTML = `<div class="sp-sum"><div class="score-ring" style="--p:${avg}"><span>${avg}%</span></div><div><h3>Đã luyện ${sc.length}/${d.lines.length} câu · trung bình ${avg}% <button class="mini" id="spClr">🗑️ Xóa kết quả & bản ghi</button></h3>
         ${weak.length ? `<p class="small">Câu nên luyện lại: ${weak.map(i => `<a href="#" data-goto="${i}">${i + 1}</a>`).join(', ')}</p>` : '<p class="ok-t small">Không có câu nào dưới 70%. Giỏi lắm!</p>'}</div></div>`;
     };
-    $('#spAuto', body).onclick = async () => {
-      if (running) return;
-      running = true; $('#spAuto', body).disabled = true; $('#spStop', body).disabled = false;
-      const from = Math.min(d.lines.length, Math.max(1, +$('#spFrom', body).value || 1)) - 1;
-      for (let i = from; i < d.lines.length && running; i++) {
-        rows.forEach(r => r.classList.remove('now')); rows[i].classList.add('now'); rows[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
-        let tries = 0, sc;
-        do {
-          $('.sp-res', rows[i]).innerHTML = '<span class="muted">🔊 Nghe câu gốc…</span>';
-          await hear(i); if (!running) break;
-          await new Promise(r => setTimeout(r, 250));
-          sc = await rec(i); tries++;
-          if (running && sc != null && sc < 60 && $('#spRetry', body).checked && tries < 2) { $('.sp-res', rows[i]).insertAdjacentHTML('beforeend', ' <span class="muted small">– nghe lại và đọc thêm một lần</span>'); await new Promise(r => setTimeout(r, 1200)); }
-          else break;
-        } while (running);
-        $('#spFrom', body).value = Math.min(d.lines.length, i + 2);
-        await new Promise(r => setTimeout(r, 600));
-      }
-      running = false; $('#spAuto', body).disabled = false; $('#spStop', body).disabled = true; rows.forEach(r => r.classList.remove('now'));
-      await save(); summary();
-    };
-    $('#spStop', body).onclick = () => { running = false; cancel && cancel(); };
     body.onclick = async e => {
       if (e.target.closest('#spClr')) { if (!confirm('Xóa điểm và bản ghi đã luyện của bài này?')) return; d.speak = {}; d.tapeAnswers = {}; d.speakAvg = null; await save(); rows.forEach(r => { paint(r, []); $('.sp-res', r).innerHTML = ''; }); $('#spSum', body).innerHTML = ''; toast('Đã xóa.'); return; }
       const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); const el = rows[+g.dataset.goto]; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash-row'); setTimeout(() => el.classList.remove('flash-row'), 1600); return; }
-      const row = e.target.closest('.sp-row'); if (!row || running) return; const i = +row.dataset.i;
+      const row = e.target.closest('.sp-row'); if (!row || tape) return; const i = +row.dataset.i;
       if (e.target.closest('.sp-hear')) { hear(i); return; }
-      if (e.target.closest('.sp-rec1')) { if ($('.sp-rec1', row).classList.contains('rec')) return; await rec(i); await save(); summary(); return; }
+      if (e.target.closest('.sp-rec1')) { if ($('.sp-rec1', row).classList.contains('rec')) { stopRec1 && stopRec1(); return; } if (stopRec1) return; await rec(i); return; }
       if ($('.ls-sp', body).classList.contains('hide-zh')) row.classList.toggle('shown');
     };
     // ── Băng chạy liên tục + AI Whisper chấm ──
@@ -895,39 +819,19 @@ export async function listenItem(root, id, tab = 'text') {
     async function recordGap(maxSec) {
       const box = $('#tpGapBox', body), bar = $('#tpBar', body), vu = $('#tpVu', body);
       box.hidden = false;
-      const mr = new MediaRecorder(stream), chunks = []; mr.ondataavailable = e => e.data.size && chunks.push(e.data);
-      const ac = new (window.AudioContext || window.webkitAudioContext)(), an = ac.createAnalyser(); an.fftSize = 1024;
-      ac.createMediaStreamSource(stream).connect(an); const buf = new Float32Array(an.fftSize);
-      mr.start();
-      const t0 = performance.now(); let voiced = 0, lastVoice = 0, noise = 0.01, n = 0;
-      await new Promise(res => {
-        const tick = () => {
-          if (!tape) return res();
-          const el = (performance.now() - t0) / 1000;
-          an.getFloatTimeDomainData(buf); let e = 0; for (const v of buf) e += v * v; const rm = Math.sqrt(e / buf.length);
-          if (el < 0.3) { noise = (noise * n + rm) / ++n; }
-          const thr = Math.max(0.015, noise * 3);
-          if (rm > thr) { voiced++; lastVoice = el; }
-          vu.style.width = Math.min(100, rm / 0.15 * 100) + '%';
-          bar.style.width = Math.min(100, el / maxSec * 100) + '%';
-          const early = $('#tpEarly', body).checked && voiced > 6 && el - lastVoice > 1.1 && el > 1.2;
-          if (el >= maxSec || early) return res();
-          requestAnimationFrame(tick);
-        };
-        tick();
-      });
-      await new Promise(res => { mr.onstop = res; mr.stop(); });
-      ac.close(); box.hidden = true;
-      return { blob: new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' }), voiced: voiced > 3 };
+      const r = await recordSilence(stream, maxSec, rm => { vu.style.width = Math.min(100, rm / 0.15 * 100) + '%'; }, null,
+        { early: () => $('#tpEarly', body).checked, onTime: el => { bar.style.width = Math.min(100, el / maxSec * 100) + '%'; }, alive: () => tape });
+      box.hidden = true;
+      return r;
     }
     $('#tpGo', body).onclick = async () => {
-      if (tape || running) return;
+      if (tape || stopRec1) return;
       try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
       catch { toast('Cần cho phép dùng micro để ghi âm câu trả lời.', 'bad'); return; }
       if (!window.MediaRecorder) { toast('Trình duyệt này không hỗ trợ ghi âm.', 'bad'); return; }
       const model = $('#tpModel', body).value;
-      aiWorker().postMessage({ type: 'preload', model });
-      tape = true; $('#tpGo', body).disabled = true; $('#tpStop', body).disabled = false; $('#spAuto', body).disabled = true;
+      aiPreload(model);
+      tape = true; $('#tpGo', body).disabled = true; $('#tpStop', body).disabled = false;
       const mult = +$('#tpGap', body).value, tmode = $('#tpMode', body).value;
       $('#tpGapBox .tp-lbl', body).firstChild.textContent = tmode === 'answer' ? '🎤 Đến lượt bạn – hãy trả lời câu hỏi ' : '🎤 Đến lượt bạn – nói lại câu vừa nghe ';
       const from = Math.min(d.lines.length, Math.max(1, +$('#tpFrom', body).value || 1)) - 1;
@@ -943,14 +847,14 @@ export async function listenItem(root, id, tab = 'text') {
         else {
           $('.sp-res', rows[i]).innerHTML = `<span class="muted">🤖 AI đang nghe bản ghi…</span> ${recAudio(url)}`;
           const idx = i;
-          blob.arrayBuffer().then(pcm16k).then(pcm => askAI(pcm, model)).then(text => scoreFromAI(idx, text, url, tmode))
+          blob.arrayBuffer().then(toPcm16k).then(pcm => askAI(pcm, model)).then(text => scoreFromAI(idx, text, url, tmode))
             .catch(() => { $('.sp-res', rows[idx]).innerHTML = `<span class="muted">Không đọc được bản ghi.</span> ${recAudio(url)}`; });
         }
         $('#tpFrom', body).value = Math.min(d.lines.length, i + 2);
       }
       tape = false; stream.getTracks().forEach(t => t.stop()); stream = null;
-      $('#tpGo', body).disabled = false; $('#tpStop', body).disabled = true; $('#spAuto', body).disabled = false; rows.forEach(r => r.classList.remove('now'));
-      if (waiting.size) setAI(`🤖 AI đang chấm nốt ${waiting.size} câu…`);
+      $('#tpGo', body).disabled = false; $('#tpStop', body).disabled = true; rows.forEach(r => r.classList.remove('now'));
+      if (pending) setAI(`🤖 AI đang chấm nốt ${pending} câu…`);
     };
     $('#tpStop', body).onclick = () => { tape = false; cancel && cancel(); };
     summary();

@@ -67,7 +67,7 @@ export function home(root) {
         ['#/listen', '听', 'Luyện nghe với file của bạn', 'Tải mp3, xem nội dung nghe, làm câu hỏi'],
         ['#/review', '复', 'Ôn tập', 'Thẻ ghi nhớ lặp lại ngắt quãng'],
         ['#/exam', '考', 'Thi thử HSK', 'Đề đúng cấu trúc HSK 1, 2, 3 có tính giờ'],
-        ['#/community', '友', 'Góc đóng góp', 'Thêm từ, ví dụ, mẹo của riêng bạn'],
+        ['#/community', '友', 'Góc đóng góp', 'Thêm ví dụ, mẹo, hội thoại của riêng bạn'],
       ].map(([h, c, t, d]) => `<a class="path" href="${h}"><span class="pi" lang="zh-CN">${c}</span><span><b>${t}</b><small>${d}</small></span></a>`).join('')}
     </div>
   </section>`;

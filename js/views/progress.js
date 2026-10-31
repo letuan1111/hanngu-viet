@@ -1,6 +1,6 @@
 import { store, streak, masteryOf, dueWords } from '../core/store.js';
-import { lessonsOf, entry, LESSON_LIST } from '../core/dict.js';
-import { esc, $, $$, toast, applyDisplay, say } from '../core/ui.js';
+import { entry, LESSON_LIST } from '../core/dict.js';
+import { esc, $, toast, applyDisplay } from '../core/ui.js';
 import { zhVoices, speak, ttsSupported, SR, voiceLabel } from '../core/tts.js';
 import { levelProgress } from './home.js';
 import { CURRICULUM } from '../data/lessons.js';

@@ -89,11 +89,6 @@ function fixPy(cs, a) {
   }
   return a;
 }
-function splitSyl(p, n) { // tách pinyin của từ thành từng âm tiết (gần đúng)
-  const parts = p.replace(/[·'’-]/g, ' ').split(/\s+/).filter(Boolean);
-  if (parts.length === n) return parts;
-  return null;
-}
 export function tokensWithPinyin(text) {
   const toks = segment(text);
   const han = [...text].filter(isHan).join('');

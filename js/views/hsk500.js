@@ -1,5 +1,5 @@
 import { store, srsAdd, logActivity } from '../core/store.js';
-import { hsk30List, READINGS, grammarById, POS, TOPICS, IN30, HSK30_ORDER, pick, shuffle, curatedExamples, examplesFor } from '../core/dict.js';
+import { hsk30List, READINGS, grammarById, POS, TOPICS, HSK30_ORDER, pick, shuffle, curatedExamples } from '../core/dict.js';
 import { vocabSet } from './vocabset.js';
 import { esc, say, sentence, exampleHtml, icon, toast, $, $$ } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
@@ -90,7 +90,7 @@ export function readings(root, id) {
   const done = store.s.readDone || {};
   if (!id) {
     root.innerHTML = `<nav class="crumb"><a href="#/course/1">HSK 1</a> › Bài đọc</nav>
-    <div class="page-head"><div><p class="eyebrow">HSK 1</p><h1>Bài đọc theo cấu trúc ngữ pháp</h1></div><a class="btn sm ghost" href="#/hsk1-500">Bảng 500 từ</a></div>
+    <div class="page-head"><div><p class="eyebrow">HSK 1</p><h1>Bài đọc theo cấu trúc ngữ pháp</h1></div><a class="btn sm ghost" href="#/hsk30/1">Bảng 500 từ</a></div>
     <p class="muted">Mỗi bài đọc tập trung vào một cấu trúc ngữ pháp HSK 1, dùng từ vựng trong bảng 500 từ. Đọc, nghe, rồi trả lời câu hỏi đọc hiểu.</p>
     <div class="reading-list">${READINGS.map((r, i) => { const g = grammarById(r.g); return `<a class="lesson-item ${done[r.id] ? 'done' : ''}" href="#/reading/${r.id}"><span class="ln">${done[r.id] ? icon('check') : i + 1}</span><span class="lt"><b>${esc(r.t)}</b><small><span lang="zh-CN">${esc(g?.formula || '')}</span> · ${esc(g?.name || '')}</small></span>${done[r.id] ? `<span class="best">${done[r.id]}%</span>` : ''}</a>`; }).join('')}</div>`;
     return 'Bài đọc HSK 1';

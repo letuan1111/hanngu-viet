@@ -1,24 +1,8 @@
 import { store } from '../core/store.js';
-import { hskWords, sentenceBank, GRAMMAR, lessonsOf, pick, shuffle } from '../core/dict.js';
-import { esc, $, toast } from '../core/ui.js';
+import { hskWords, GRAMMAR, lessonsOf, pick } from '../core/dict.js';
+import { $, toast } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { examHome, examGenLevel } from './myexam.js';
-
-const CFG = { 1: { n: 20, min: 15 }, 2: { n: 25, min: 20 }, 3: { n: 30, min: 25 } };
-
-function examQuestions(lv) {
-  const ws = hskWords(lv), pool = [1, 2, 3].filter(x => x <= lv).flatMap(hskWords);
-  const bank = sentenceBank().filter(x => x.level <= lv);
-  const own = bank.filter(x => x.level === lv);
-  const keys = GRAMMAR.map(g => g.key);
-  const gs = GRAMMAR.filter(g => g.level === lv);
-  const n = CFG[lv].n;
-  const listening = [...pick(ws, Math.round(n * 0.2)).map(w => Q.listen(w, ws)), ...pick(own, Math.round(n * 0.2)).map(x => Q.listenSent(x, bank))];
-  const reading = [...pick(ws, Math.round(n * 0.15)).map(w => Q.meaning(w, pool)), ...pick(gs, Math.round(n * 0.15)).map(g => Q.fill(pick(g.ex, 1)[0], g.key, keys)), ...pick(own, Math.round(n * 0.1)).map(x => Q.readMeaning(x, bank))];
-  const writing = lv >= 2 ? pick(own, 14).map(Q.order).filter(Boolean).slice(0, Math.round(n * 0.2)) : pick(ws, Math.round(n * 0.2)).map(w => Q.hanzi(w, pool));
-  const tag = (arr, t) => arr.filter(Boolean).map(q => ({ ...q, tag: `${t} · ${q.tag}` }));
-  return [...tag(listening, 'Phần Nghe'), ...tag(reading, 'Phần Đọc'), ...tag(writing, lv >= 2 ? 'Phần Viết' : 'Phần Đọc')].slice(0, n);
-}
 
 export function exam(root, lv) {
   if (lv) { root.innerHTML = '<p class="muted">Đang tạo đề…</p>'; examGenLevel(root, +lv); return 'Thi thử HSK'; }

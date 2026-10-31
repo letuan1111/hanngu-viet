@@ -1,5 +1,5 @@
 import { store, srsGrade, srsAdd, dueWords, masteryOf } from '../core/store.js';
-import { entry, isHan, rebuild, examplesFor, hskWords, shuffle, LESSON_LIST, sentencePinyin } from '../core/dict.js';
+import { entry, isHan, rebuild, examplesFor, shuffle, LESSON_LIST, sentencePinyin } from '../core/dict.js';
 import { esc, say, icon, $, $$, short, savePhrase, toast } from '../core/ui.js';
 import { speak } from '../core/tts.js';
 import { vocabSet } from './vocabset.js';

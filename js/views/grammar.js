@@ -1,6 +1,6 @@
 import { store, logActivity } from '../core/store.js';
-import { READINGS, GRAMMAR, grammarById, lessonsWithGrammar, shuffle, pick, sentencePinyin } from '../core/dict.js';
-import { esc, say, sentence, $, $$ } from '../core/ui.js';
+import { READINGS, GRAMMAR, grammarById, lessonsWithGrammar, shuffle, sentencePinyin } from '../core/dict.js';
+import { esc, say, $, $$ } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { checkSentence, analyse } from '../core/checker.js';
 import { grammarBlock } from './course.js';

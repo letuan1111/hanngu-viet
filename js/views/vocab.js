@@ -1,6 +1,6 @@
 import { store, srsAdd } from '../core/store.js';
 import { keepState, takeState } from '../core/nav.js';
-import { IN30, allWords, lookup, entry, search, examplesFor, collocations, confusables, lessonsWithWord, TOPICS, POS, levelLabel, isHan, charPinyin, sentencePinyin, GRAMMAR, hskWords, pick, shuffle } from '../core/dict.js';
+import { IN30, allWords, lookup, entry, search, examplesFor, collocations, confusables, lessonsWithWord, TOPICS, POS, levelLabel, isHan, charPinyin, GRAMMAR, pick } from '../core/dict.js';
 import { esc, say, sentence, exampleHtml, icon, toast, writer, charInfo, short, $, $$, gridSvg, modal } from '../core/ui.js';
 import { MNEMONICS, RADICALS } from '../data/radicals.js';
 import { Q, runQuiz } from '../core/quiz.js';
@@ -30,10 +30,10 @@ export function dictionary(root) {
   const draw = () => {
     const q = $('#q', root).value; const tp = $('#tp', root).value;
     let ws = q ? search(q) : allWords().sort((a, b) => (a.level || 9) - (b.level || 9));
-    ws = ws.filter(w => lv === 'all' ? true : lv === '30' ? IN30.has(w.h) : lv === 'saved' ? s.saved[w.h] : lv === 'hard' ? s.hard[w.h] : lv === 'extra' ? w.source === 'extra' && !IN30.has(w.h) : lv === 'community' ? w.source === 'community' : w.level === +lv && w.source === 'hsk');
+    ws = ws.filter(w => lv === 'all' ? true : lv === '30' ? IN30.has(w.h) : lv === 'saved' ? s.saved[w.h] : lv === 'hard' ? s.hard[w.h] : lv === 'extra' ? w.source === 'extra' && !IN30.has(w.h) : lv === 'community' ? (w.source === 'community' || w.source === 'mine') : w.level === +lv && w.source === 'hsk');
     if (tp) ws = ws.filter(w => w.topics.includes(tp));
     $('#cnt', root).textContent = `${ws.length} từ`;
-    $('#list', root).innerHTML = ws.slice(0, limit).map(w => `<a class="wrow" href="#/word/${encodeURIComponent(w.h)}"><span class="wr-h" lang="zh-CN">${esc(w.h)}</span><span class="wr-p">${esc(w.p)}</span><span class="wr-vi">${esc(w.vi)}</span><span class="badge ${w.source}">${levelLabel(w)}</span><span class="no-pop">${say(w.h)}</span></a>`).join('') || '<p class="muted">Không tìm thấy. Bạn có thể <a href="#/community/add">tự thêm từ mới</a>.</p>';
+    $('#list', root).innerHTML = ws.slice(0, limit).map(w => `<a class="wrow" href="#/word/${encodeURIComponent(w.h)}"><span class="wr-h" lang="zh-CN">${esc(w.h)}</span><span class="wr-p">${esc(w.p)}</span><span class="wr-vi">${esc(w.vi)}</span><span class="badge ${w.source}">${levelLabel(w)}</span><span class="no-pop">${say(w.h)}</span></a>`).join('') || '<p class="muted">Không tìm thấy. Bạn có thể <a href="#/review/mine">tự thêm từ mới</a>.</p>';
     $('#more', root).hidden = ws.length <= limit;
   };
   $('#q', root).oninput = () => { limit = 80; draw(); };

@@ -2,7 +2,7 @@
 import { store, logActivity } from '../core/store.js';
 import { curatedExamples, examplesFor, shuffle, segment } from '../core/dict.js';
 import { SPEAK_VOCAB } from '../data/speaking.js';
-import { esc, icon, $, $$, say, exampleHtml, toast } from '../core/ui.js';
+import { esc, icon, $, $$, say, exampleHtml } from '../core/ui.js';
 import { speak, speakSeq } from '../core/tts.js';
 
 const strip = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v').replace(/[^a-z0-9v]/g, '');

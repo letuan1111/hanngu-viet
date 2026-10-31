@@ -1,6 +1,6 @@
 // Luyện phát âm: thanh điệu, thanh mẫu, vận mẫu, biến điệu, bảng âm tiết, luyện nghe phân biệt, quy tắc viết pinyin
 import { store, logActivity } from '../core/store.js';
-import { esc, icon, $, $$, toast } from '../core/ui.js';
+import { esc, icon, $, $$ } from '../core/ui.js';
 import { speak, speakSeq, stopSeq, listen, SR } from '../core/tts.js';
 import { TONES, TONE_SETS, TONE_PAIRS, SANDHI, INITIALS, FINALS, PAIRS, RULES } from '../data/pinyin.js';
 import { SYL } from '../data/syllables.js';

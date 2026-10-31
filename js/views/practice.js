@@ -1,5 +1,5 @@
 import { store, logActivity } from '../core/store.js';
-import { hskWords, sentenceBank, LESSON_LIST, lessonsOf, pick, shuffle, entry, sentencePinyin, segment } from '../core/dict.js';
+import { hskWords, sentenceBank, LESSON_LIST, lessonsOf, pick, sentencePinyin } from '../core/dict.js';
 import { esc, say, sentence, icon, $, $$, writer, gridSvg, short, toast } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { speak, listen, SR } from '../core/tts.js';
@@ -20,7 +20,6 @@ const MODES = [
 function levelPicker(cur) { return `<div class="chips" id="lvp">${[1, 2, 3].map(l => `<button class="chip ${l === cur ? 'on' : ''}" data-l="${l}">HSK ${l}</button>`).join('')}</div>`; }
 const curLevel = () => { const s = store.s; for (const lv of [1, 2, 3]) if (lessonsOf(lv).some(l => !s.lessons[l.idx]?.done)) return lv; return 3; };
 const bankUpTo = lv => sentenceBank().filter(x => x.level <= lv);
-const wordsUpTo = lv => [1, 2, 3].filter(x => x <= lv).flatMap(hskWords);
 
 export function practice(root, mode) {
   if (!mode) {
