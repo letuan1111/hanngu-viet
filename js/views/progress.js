@@ -66,7 +66,8 @@ export function settings(root) {
     <div class="set"><b>Chương trình</b><span>${esc(CURRICULUM.version)}</span></div>
     <p class="muted small">${esc(CURRICULUM.note)} Hệ thống dữ liệu được thiết kế để có thể bổ sung giáo trình HSK 3.0 (9 cấp) trong các phiên bản sau.</p>
   </section>
-  <section class="card"><h2>Dữ liệu</h2><p class="muted small">Dữ liệu chỉ nằm trên trình duyệt này. Sao lưu tại trang <a href="#/progress">Tiến độ</a>.</p><button class="btn ghost" id="reset">Xóa toàn bộ dữ liệu học</button></section>`;
+  <section class="card"><h2>Dữ liệu</h2><p class="muted small">Dữ liệu chỉ nằm trên trình duyệt này. Sao lưu tại trang <a href="#/progress">Tiến độ</a>.</p><button class="btn ghost" id="reset">Xóa toàn bộ dữ liệu học</button></section>
+  <section class="card"><h2>Tài khoản</h2><p class="muted small">Đăng xuất để máy này phải nhập lại tên đăng nhập và mật khẩu. Dữ liệu học vẫn được giữ.</p><button class="btn ghost" id="logout">🚪 Đăng xuất</button></section>`;
   const drawPreview = async () => { const { zhTokens } = await import('../core/ui.js'); const { sentencePinyin } = await import('../core/dict.js'); const p = $('.preview .sent', root); $('.zh', p).innerHTML = zhTokens('我喜欢学习汉语。'); $('.py-line', p).textContent = sentencePinyin('我喜欢学习汉语。'); };
   drawPreview();
   root.onchange = e => {
@@ -79,6 +80,7 @@ export function settings(root) {
   };
   root.onclick = e => {
     const b = e.target.closest('[data-test]'); if (b) speak(+b.dataset.test ? '你好！我叫小明，很高兴认识你。' : '你好！欢迎来到汉语学习网站。', { role: +b.dataset.test });
+    if (e.target.id === 'logout') { try { localStorage.removeItem('hv-auth'); sessionStorage.removeItem('hv-auth'); } catch {} location.reload(); return; }
     if (e.target.id === 'reset' && confirm('Xóa toàn bộ tiến độ, từ đã lưu và đóng góp? Không thể hoàn tác.')) { store.reset(); toast('Đã xóa dữ liệu'); location.hash = '#/'; }
   };
   if (ttsSupported() && !vs.length) setTimeout(() => { if (zhVoices().length && root.isConnected && location.hash === '#/settings') settings(root); }, 800);

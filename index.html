@@ -11,10 +11,37 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/lxgwwenkaigbscreen.css">
-<link rel="stylesheet" href="css/style.css?v=20261031c">
+<link rel="stylesheet" href="css/style.css?v=20261031d">
 <script defer src="vendor/pinyin-pro.js"></script>
 <script defer src="vendor/hanzi-writer.min.js"></script>
-<script type="module" src="js/app.js?v=20261031c"></script>
+<script>
+// Cổng đăng nhập: chỉ người có tên đăng nhập + mật khẩu mới mở được web (máy đã đăng nhập sẽ được ghi nhớ)
+(function () {
+  var H = '08a476cee8efa86a9d63e1d8985b7b59f765c00e8fa6c4c0ef0b0a5c2010d214', K = 'hv-auth';
+  function boot() { var sc = document.createElement('script'); sc.type = 'module'; sc.src = 'js/app.js?v=20261031d'; document.head.appendChild(sc); }
+  var ok = false; try { ok = localStorage.getItem(K) === H; } catch (e) {}
+  if (ok) { boot(); return; }
+  document.documentElement.classList.add('locked');
+  async function sha(t) { var b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [].map.call(new Uint8Array(b), function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }
+  document.addEventListener('DOMContentLoaded', function () {
+    var d = document.createElement('div'); d.className = 'gate';
+    d.innerHTML = '<form class="gate-box" autocomplete="on"><div class="gate-logo" lang="zh-CN">汉</div><h1>HànNgữ <b>Việt</b></h1><p class="muted">Vui lòng đăng nhập để vào web.</p>'
+      + '<label class="fld">Tên đăng nhập<input class="inp" id="gU" name="username" autocomplete="username" required autofocus></label>'
+      + '<label class="fld">Mật khẩu<input class="inp" id="gP" name="password" type="password" autocomplete="current-password" required></label>'
+      + '<label class="chk"><input type="checkbox" id="gR" checked> Ghi nhớ trên máy này</label>'
+      + '<button class="btn big">Đăng nhập</button><p class="bad-t" id="gE" role="alert"></p></form>';
+    document.body.appendChild(d);
+    d.querySelector('form').onsubmit = async function (e) {
+      e.preventDefault();
+      var h = await sha('hanngu|' + d.querySelector('#gU').value.trim().toLowerCase() + '|' + d.querySelector('#gP').value);
+      if (h !== H) { d.querySelector('#gE').textContent = 'Sai tên đăng nhập hoặc mật khẩu.'; d.querySelector('#gP').select(); return; }
+      try { if (d.querySelector('#gR').checked) localStorage.setItem(K, H); else sessionStorage.setItem(K, H); } catch (e) {}
+      d.remove(); document.documentElement.classList.remove('locked'); boot();
+    };
+    try { if (sessionStorage.getItem(K) === H) { d.remove(); document.documentElement.classList.remove('locked'); boot(); } } catch (e) {}
+  });
+})();
+</script>
 </head>
 <body>
 <a class="skip" href="#view">Bỏ qua điều hướng</a>

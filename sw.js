@@ -1,5 +1,5 @@
 // Bộ nhớ đệm để website mở được khi mất mạng (sau lần truy cập đầu tiên)
-const CACHE = 'hanngu-viet-v2';
+const CACHE = 'hanngu-viet-v3';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
