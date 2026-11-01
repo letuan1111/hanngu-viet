@@ -53,6 +53,7 @@ export function typingTrainer(el, o) {
       <span class="seg" role="radiogroup" aria-label="Cách gõ"><label><input type="radio" name="tyMode" value="han" ${opt.mode === 'han' ? 'checked' : ''}><span>Gõ chữ Hán (bộ gõ tiếng Trung)</span></label><label><input type="radio" name="tyMode" value="py" ${opt.mode === 'py' ? 'checked' : ''}><span>Gõ pinyin (không cần dấu)</span></label></span>
       <label class="sw"><input type="checkbox" class="tyPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
       <label class="sw"><input type="checkbox" class="tyVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>
+      <label class="sw" title="Bắt đầu gõ câu nào, máy tự đọc câu đó một lần"><input type="checkbox" class="tyAuto" ${opt.auto !== false ? 'checked' : ''}><span></span> 🔊 Tự đọc câu</label>
     </div>
     <div class="ty-run"></div>
     <details class="vs-det ty-an"><summary>📖 Tra từ & ngữ pháp trong đoạn này <small class="muted">(bấm vào từng từ để xem nghĩa, cấp HSK và ngữ pháp liên quan)</small></summary><div class="ty-anBody"></div></details>`;
@@ -61,6 +62,8 @@ export function typingTrainer(el, o) {
   el.querySelectorAll('[name=tyMode]').forEach(r => r.onchange = () => { opt.mode = r.value; saveOpt(); start(); });
   $('.tyPy', el).onchange = e => { opt.py = e.target.checked; saveOpt(); run.classList.toggle('no-py', !opt.py); };
   $('.tyVi', el).onchange = e => { opt.vi = e.target.checked; saveOpt(); run.classList.toggle('no-vi', !opt.vi); };
+  $('.tyAuto', el).onchange = e => { opt.auto = e.target.checked; saveOpt(); };
+  let active = false; // chỉ tự đọc sau khi người học đã bấm vào ô gõ (trình duyệt chặn tự phát âm thanh khi vừa mở trang)
   const stopTimer = () => { clearInterval(timer); timer = 0; };
 
   // Phân tích đoạn: mỗi từ bấm được (nghĩa, cấp độ, ngữ pháp liên quan), mỗi câu liệt kê điểm ngữ pháp có trong câu
@@ -95,6 +98,8 @@ export function typingTrainer(el, o) {
       <div class="ty-out"></div>`;
     const inp = $('.ty-inp', run), cur = $('.ty-cur', run);
     const kOf = u => mode === 'han' ? u.kh : u.kp;
+    let readSi = -1;
+    const autoRead = () => { if (!active || opt.auto === false || readSi === si || !data[si] || !el.isConnected) return; readSi = si; speak(data[si].zh); };
     const drawSentence = () => {
       const d = data[si];
       cur.innerHTML = d.units.map((u, i) => `<span class="tu ${kOf(u) ? '' : 'pn'}" data-i="${i}"><span class="tp">${esc(u.py)}</span><span class="tz">${esc(u.c)}</span></span>`).join('');
@@ -102,6 +107,7 @@ export function typingTrainer(el, o) {
       $('.ty-next', run).textContent = data[si + 1] ? 'Câu tiếp: ' + data[si + 1].zh : '';
       $('.ty-si', run).textContent = si + 1;
       inp.value = ''; lastErrLen = -1; update();
+      autoRead();
     };
     const stats = () => {
       const ms = t0 ? performance.now() - t0 : 0, min = ms / 60000;
@@ -138,6 +144,7 @@ export function typingTrainer(el, o) {
       stats();
       if (p >= K.length && K.length) { cur.classList.add('ty-flash'); setTimeout(() => cur.classList.remove('ty-flash'), 300); si++; if (si >= data.length) return finish(); setTimeout(drawSentence, 120); }
     }
+    inp.addEventListener('focus', () => { active = true; autoRead(); });
     inp.addEventListener('compositionstart', () => { composing = true; });
     inp.addEventListener('compositionend', () => { composing = false; onType(); });
     inp.addEventListener('input', e => { if (composing || e.isComposing) return; onType(); });
