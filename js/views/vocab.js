@@ -16,7 +16,7 @@ const rel = (h, list) => list.filter(p => p.includes(h)).map(p => p[0] === h ? p
 
 export function dictionary(root) {
   const s = store.s;
-  root.innerHTML = `<div class="page-head"><h1>Từ vựng</h1><a class="btn sm ghost" href="#/topics">Học theo nhóm chủ đề</a></div>
+  root.innerHTML = `<div class="page-head"><h1>Từ vựng</h1><span class="row gap"><a class="btn sm ghost" href="#/measure">📏 Danh sách lượng từ</a><a class="btn sm ghost" href="#/topics">Học theo nhóm chủ đề</a></span></div>
   <div class="search-box"><input id="q" class="inp big" placeholder="Tìm bằng chữ Hán, pinyin (không cần dấu) hoặc tiếng Việt…" autocomplete="off" aria-label="Tìm từ"></div>
   <div class="filters">
     <div class="chips" id="lv">${[['all', 'Tất cả'], ['1', 'HSK 1'], ['30', 'HSK 1 · 3.0 (500 từ)'], ['2', 'HSK 2'], ['3', 'HSK 3'], ['extra', 'Mở rộng'], ['community', 'Của bạn'], ['saved', '★ Đã lưu'], ['hard', '⚑ Từ khó']].map(([k, n], i) => `<button class="chip ${i ? '' : 'on'}" data-k="${k}">${n}</button>`).join('')}</div>

@@ -17,6 +17,7 @@ import { speakingList, speakingItem } from './views/speaking.js';
 import { pronounce } from './views/pronounce.js';
 import { listenHome, listenItem } from './views/listen.js';
 import { typingPage } from './views/typing.js';
+import { measureList } from './views/measure.js';
 
 const routes = [
   [/^\/?$/, home, 'Trang chủ'],
@@ -32,6 +33,7 @@ const routes = [
   [/^\/listen$/, r => { listenHome(r); return 'Luyện nghe'; }, 'Luyện nghe'],
   [/^\/listen\/([\w-]+)(?:\/(quiz|type|speak))?$/, (r, id, tab) => { listenItem(r, id, tab || 'text'); return 'Luyện nghe'; }, 'Luyện nghe'],
   [/^\/typing$/, typingPage, 'Đánh máy'],
+  [/^\/measure$/, measureList, 'Lượng từ'],
   [/^\/vocab$/, dictionary, 'Từ vựng'],
   [/^\/word\/(.+)$/, word, 'Từ'],
   [/^\/topics(?:\/(\w+))?$/, topics, 'Nhóm từ'],
