@@ -1,4 +1,4 @@
-// AI nhận dạng giọng nói Whisper chạy ngay trên trình duyệt (dùng chung cho Luyện nói, Bài nói của bạn…)
+// AI nhận dạng giọng nói Whisper chạy ngay trên trình duyệt (dùng chung cho Luyện nói, Luyện nghe, Đánh máy…)
 // - recordVoice: ghi âm đến khi im lặng / bấm dừng / hết giờ
 // - toPcm16k: đổi file ghi âm sang âm thanh mono 16 kHz
 // - aiClip: nhận dạng đoạn ngắn (≤ 30 giây) ; aiLong: nhận dạng đoạn dài (tự cắt đoạn)

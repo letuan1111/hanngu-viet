@@ -893,3 +893,19 @@ html.locked body > :not(.gate) { display: none !important; }
 .mw-o.good { border-color: #2e8b57; background: #e8f5ee; color: #1f6b41; } .mw-o.bad { border-color: var(--red); background: var(--red2); }
 .mw-fb { margin-bottom: 8px; }
 @media (max-width: 600px) { .mw-grid { grid-template-columns: 1fr; } .mw-opts { grid-template-columns: repeat(2, 1fr); } }
+/* Bài nói 3 cột: Tiếng Trung – Tiếng Việt – Pinyin */
+.sp-3col { --cols: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
+.sp-3col.no-vi { --cols: minmax(0, 1.2fr) minmax(0, 1fr) auto; } .sp-3col.no-py { --cols: minmax(0, 1.2fr) minmax(0, 1fr) auto; } .sp-3col.no-vi.no-py { --cols: minmax(0, 1fr) auto; }
+.sp-3col .sp-row, .sp-3col .sp-thead { display: grid; grid-template-columns: var(--cols); gap: 14px; align-items: center; }
+.sp-3col .sp-thead { font: 600 .78rem var(--ui); text-transform: uppercase; letter-spacing: .04em; color: var(--ink2); padding: 0 0 8px; border-bottom: 2px solid var(--line); }
+.sp-3col .sp-zh { font-size: var(--sp-size, 1.5rem); line-height: 1.5; } .sp-3col .sp-zh rt { display: none; }
+.sp-3col .sp-vi { margin: 0; font-size: .98rem; }
+.sp-3col .sp-py { font: 1rem var(--py, var(--ui)); color: #2f6f9f; }
+.sp-3col .sp-act { flex-direction: row; padding: 0; }
+.sp-3col.no-vi .sp-vi, .sp-3col.no-vi .sp-hvi, .sp-3col.no-py .sp-py, .sp-3col.no-py .sp-hpy { display: none; }
+@media (max-width: 760px) {
+  .sp-3col .sp-thead { display: none; }
+  .sp-3col .sp-row { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+  .sp-3col .sp-body { grid-column: 1; grid-row: 1; } .sp-3col .sp-act { grid-column: 2; grid-row: 1 / span 3; flex-direction: column; }
+  .sp-3col .sp-py { grid-column: 1; grid-row: 2; font-size: .9rem; } .sp-3col .sp-vi { grid-column: 1; grid-row: 3; }
+}
