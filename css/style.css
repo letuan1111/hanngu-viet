@@ -909,3 +909,7 @@ html.locked body > :not(.gate) { display: none !important; }
   .sp-3col .sp-body { grid-column: 1; grid-row: 1; } .sp-3col .sp-act { grid-column: 2; grid-row: 1 / span 3; flex-direction: column; }
   .sp-3col .sp-py { grid-column: 1; grid-row: 2; font-size: .9rem; } .sp-3col .sp-vi { grid-column: 1; grid-row: 3; }
 }
+
+.ios-voice { border: 1px solid var(--gold); background: var(--gold2); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
+.ios-voice.ok { border-color: var(--line); background: var(--paper); }
+.ios-voice ol { margin: 6px 0; padding-left: 1.3em; display: grid; gap: 4px; }

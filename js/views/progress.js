@@ -1,7 +1,7 @@
 import { store, streak, masteryOf, dueWords } from '../core/store.js';
 import { entry, LESSON_LIST } from '../core/dict.js';
 import { esc, $, toast, applyDisplay } from '../core/ui.js';
-import { zhVoices, speak, ttsSupported, SR, voiceLabel } from '../core/tts.js';
+import { zhVoices, speak, ttsSupported, SR, voiceLabel, voiceId, isIOS, hasGoodVoice } from '../core/tts.js';
 import { levelProgress } from './home.js';
 import { CURRICULUM } from '../data/lessons.js';
 
@@ -53,9 +53,18 @@ export function settings(root) {
     <p class="muted small">Mẹo: chế độ “tự kiểm tra” = Pinyin “Ẩn, bấm để hiện” + Nghĩa “Ẩn, bấm để hiện”.</p>
   </section>
   <section class="card"><h2>Giọng đọc tiếng Trung</h2>
+    ${isIOS ? `<div class="ios-voice ${hasGoodVoice() ? 'ok' : ''}">
+      <p><b>📱 iPhone / iPad: tải giọng tiếng Trung chất lượng cao (miễn phí, chỉ làm một lần)</b>${hasGoodVoice() ? ' <span class="ok-t">✓ Máy đã có giọng chất lượng cao</span>' : ''}</p>
+      <ol class="small">
+        <li>Mở ứng dụng <b>Cài đặt</b> › <b>Trợ năng</b> › <b>Nội dung được đọc</b> › <b>Giọng nói</b>.</li>
+        <li>Chọn <b>Tiếng Trung (Trung Quốc đại lục)</b>.</li>
+        <li>Bấm vào <b>Lili</b> hoặc <b>Tingting</b> rồi tải bản <b>Cao cấp</b> (Premium – hay nhất) hoặc <b>Nâng cao</b> (Enhanced). Nên bật Wi‑Fi, tệp khoảng 100–400 MB.</li>
+        <li>Tải xong, <b>đóng hẳn Safari/Chrome rồi mở lại web</b>. Web sẽ tự chọn giọng tốt nhất; bạn có thể chọn lại ở ô “Giọng chính” bên dưới và bấm “Nghe thử”.</li>
+      </ol>
+      <p class="muted small">Tiếng Anh: Settings › Accessibility › Spoken Content › Voices › Chinese (China mainland). Không chọn các giọng vui như Eddy, Flo, Grandma, Rocko… – web đã tự ẩn các giọng này.</p></div>` : ''}
     ${!ttsSupported() ? '<p class="bad-t">Trình duyệt không hỗ trợ đọc giọng nói.</p>' : vs.length ? `
-      <div class="set"><b>Giọng chính (vai A)</b><select class="inp" id="v1"><option value="">Tự chọn tốt nhất</option>${vs.map(v => `<option value="${esc(v.name)}" ${v.name === st.voice ? 'selected' : ''}>${esc(voiceLabel(v))}</option>`).join('')}</select><button class="btn sm ghost" data-test="0">Nghe thử</button></div>
-      <div class="set"><b>Giọng thứ hai (vai B)</b><select class="inp" id="v2"><option value="">Tự chọn</option>${vs.map(v => `<option value="${esc(v.name)}" ${v.name === st.voice2 ? 'selected' : ''}>${esc(voiceLabel(v))}</option>`).join('')}</select><button class="btn sm ghost" data-test="1">Nghe thử</button></div>`
+      <div class="set"><b>Giọng chính (vai A)</b><select class="inp" id="v1"><option value="">Tự chọn tốt nhất</option>${vs.map(v => `<option value="${esc(voiceId(v))}" ${[voiceId(v), v.name].includes(st.voice) ? 'selected' : ''}>${esc(voiceLabel(v))}</option>`).join('')}</select><button class="btn sm ghost" data-test="0">Nghe thử</button></div>
+      <div class="set"><b>Giọng thứ hai (vai B)</b><select class="inp" id="v2"><option value="">Tự chọn</option>${vs.map(v => `<option value="${esc(voiceId(v))}" ${[voiceId(v), v.name].includes(st.voice2) ? 'selected' : ''}>${esc(voiceLabel(v))}</option>`).join('')}</select><button class="btn sm ghost" data-test="1">Nghe thử</button></div>`
       : `<p class="note">Chưa tìm thấy giọng tiếng Trung trên thiết bị. Cách khắc phục: dùng <b>Microsoft Edge</b> (có sẵn giọng tự nhiên “Xiaoxiao Online”), hoặc <b>Chrome</b> (giọng Google 普通话), hoặc cài gói ngôn ngữ Tiếng Trung (giản thể) trong Cài đặt Windows → Thời gian & ngôn ngữ → Giọng nói. Trên iPhone: Cài đặt → Trợ năng → Nội dung được đọc → Giọng nói → Tiếng Trung.</p>`}
     <div class="set"><b>Tốc độ mặc định</b>${radio('rate', [[0.75, '0.75x'], [1, '1.0x'], [1.25, '1.25x']])}</div>
     <p class="muted small">Chất lượng giọng phụ thuộc vào trình duyệt và hệ điều hành. Giọng có chữ “Natural/Online” thường tự nhiên nhất. Nhận dạng giọng nói (luyện phát âm): ${SR ? 'có hỗ trợ ✓' : 'chưa hỗ trợ trên trình duyệt này – dùng Chrome hoặc Edge'}.</p>

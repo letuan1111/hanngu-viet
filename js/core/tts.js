@@ -13,10 +13,18 @@ function isMandarin(v) {
   if (/^zh-cn-./.test(lang)) return false;          // zh-CN-liaoning, zh-CN-shaanxi…
   return !DIALECT.test(v.name);
 }
+// Giọng "vui" của Apple (Eddy, Flo, Grandma, Rocko…) cũng có bản tiếng Trung nhưng đọc rất kém → bỏ qua
+const NOVELTY = /^(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|kathy|fred|ralph)\b/i;
+export const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+const vid = v => v.voiceURI || v.name;
+// Bản giọng Apple: compact (mặc định, kém) < enhanced "Nâng cao" < premium "Cao cấp"
+const appleTier = v => /premium/i.test(vid(v) + v.name) ? 2 : /enhanced/i.test(vid(v) + v.name) ? 1 : 0;
 // Xếp hạng: giọng thần kinh tự nhiên trước, giọng máy cũ sau
 function score(v) {
-  const n = v.name; let s = 0;
-  if (/natural|neural|enhanced|premium/i.test(n)) s += 10;
+  const n = v.name, u = vid(v); let s = 0;
+  if (NOVELTY.test(n)) return -50;
+  if (/premium/i.test(n + u)) s += 14; else if (/natural|neural|enhanced/i.test(n + u)) s += 10;
+  if (/compact/i.test(u)) s -= 2;
   if (/online/i.test(n)) s += 3;
   if (/google/i.test(n)) s += 6;
   if (/xiaoxiao/i.test(n)) s += 5; if (/yunxi|xiaoyi|yunjian|yunyang/i.test(n)) s += 3;
@@ -27,7 +35,9 @@ function score(v) {
 }
 function loadVoices() {
   if (!synth) return;
-  voices = synth.getVoices().filter(isMandarin).sort((a, b) => score(b) - score(a));
+  const all = synth.getVoices().filter(isMandarin).sort((a, b) => score(b) - score(a));
+  const good = all.filter(v => !NOVELTY.test(v.name));
+  voices = good.length ? good : all;
 }
 loadVoices();
 if (synth) synth.addEventListener?.('voiceschanged', loadVoices);
@@ -43,12 +53,15 @@ function voicesReady() {
 
 export const ttsSupported = () => !!synth;
 export const zhVoices = () => voices;
-export const voiceLabel = v => `${v.name.replace(/Microsoft |Online |\(Natural\)|- Chinese \(Mainland\)|- Chinese \(Simplified, PRC\)/g, '').trim()}${score(v) >= 9 ? ' ★ tự nhiên' : ''}`;
+export const voiceId = vid;
+export const voiceLabel = v => { const n = v.name.replace(/Microsoft |Online |\(Natural\)|- Chinese \(Mainland\)|- Chinese \(Simplified, PRC\)/g, '').trim(); const t = appleTier(v), tag = t === 2 && !/premium|cao cấp/i.test(n) ? ' (Cao cấp)' : t === 1 && !/enhanced|nâng cao/i.test(n) ? ' (Nâng cao)' : ''; return `${n}${tag}${score(v) >= 9 ? ' ★ tự nhiên' : ''}`; };
+// Giọng tốt nhất hiện có đã là giọng tự nhiên chưa (trên iPhone: đã tải bản Nâng cao/Cao cấp chưa)
+export const hasGoodVoice = () => !!voices[0] && score(voices[0]) >= 9;
 const MALE = /yunxi|yunjian|yunyang|kangkang|male|男/i;
 export function voiceFor(role = 0) {
   const s = store.s.settings;
   const want = role === 1 ? s.voice2 : s.voice;
-  let v = voices.find(x => x.name === want);
+  let v = want && (voices.find(x => vid(x) === want) || voices.find(x => x.name === want));
   if (v) return v;
   const female = voices.filter(x => !MALE.test(x.name)), male = voices.filter(x => MALE.test(x.name));
   if (role === 1) return male[0] || voices.find(x => x !== voiceFor(0)) || voices[0] || null;
@@ -73,6 +86,7 @@ export async function speak(text, { rate, role = 0, onBoundary, onEnd, el } = {}
   stop();
   await voicesReady();
   if (!voices.length && !warned) { warned = true; noVoiceNotice(); }
+  else if (isIOS && !warned && !hasGoodVoice()) { warned = true; iosNotice(); }
   await new Promise(r => setTimeout(r, 60));              // Chrome đôi khi bỏ câu nếu speak() ngay sau cancel()
   return new Promise(res => {
     const u = new SpeechSynthesisUtterance(fixText(text));
@@ -94,6 +108,16 @@ export async function speak(text, { rate, role = 0, onBoundary, onEnd, el } = {}
   });
 }
 
+// iPhone/iPad: giọng mặc định (bản rút gọn) nghe "máy" – hướng dẫn tải giọng Nâng cao/Cao cấp miễn phí của Apple
+function iosNotice() {
+  let seen = 0; try { seen = +localStorage.getItem('hv-ios-voice') || 0; } catch {}
+  if (Date.now() - seen < 3 * 864e5) return;           // nhắc lại sau 3 ngày nếu chưa tải
+  try { localStorage.setItem('hv-ios-voice', Date.now()); } catch {}
+  const d = document.createElement('div');
+  d.className = 'toast in'; d.style.bottom = '90px';
+  d.innerHTML = '🔊 iPhone đang dùng giọng tiếng Trung bản rút gọn nên nghe chưa hay. Tải miễn phí giọng <b>Cao cấp</b> của Apple để nghe chuẩn hơn – <a href="#/settings" style="color:#fff;text-decoration:underline">xem hướng dẫn</a>.';
+  document.body.appendChild(d); setTimeout(() => d.remove(), 9000);
+}
 function noVoiceNotice() {
   const d = document.createElement('div');
   d.className = 'toast in bad'; d.style.bottom = '90px';
