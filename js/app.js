@@ -29,7 +29,7 @@ const routes = [
   [/^\/hsk30\/([123])$/, hsk500, 'Bảng từ vựng HSK'],
   [/^\/reading(?:\/([\w-]+))?$/, readings, 'Bài đọc HSK 1'],
   [/^\/speaking$/, speakingList, 'Luyện nói'],
-  [/^\/speaking\/(\d+)(?:\/(long))?$/, speakingItem, 'Luyện nói'],
+  [/^\/speaking\/(\d+)(?:\/long)?$/, speakingItem, 'Luyện nói'],
   [/^\/listen$/, r => { listenHome(r); return 'Luyện nghe'; }, 'Luyện nghe'],
   [/^\/listen\/([\w-]+)(?:\/(quiz|type|speak))?$/, (r, id, tab) => { listenItem(r, id, tab || 'text'); return 'Luyện nghe'; }, 'Luyện nghe'],
   [/^\/typing$/, typingPage, 'Đánh máy'],
