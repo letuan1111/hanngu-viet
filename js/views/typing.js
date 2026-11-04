@@ -345,7 +345,11 @@ export function typingPage(root) {
   $('#apLoop', root).onchange = e => { opt.loop = e.target.checked; saveOpt(); };
   $('#apFull', root).onclick = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage); };
   list.addEventListener('click', e => { if (e.target.closest('.tk')) return; const r = e.target.closest('.ap-row'); if (!r) return; const was = !!run; stopRun(); cur = +r.dataset.i; show(); if (was) startRun(); else sayCur(); });
-  stage.addEventListener('click', e => { if (document.fullscreenElement && !e.target.closest('.tk')) run ? stopRun() : startRun(); });
+  stage.addEventListener('click', e => {
+    if (e.target.closest('.pop')) return;
+    if (e.target.closest('.tk')) { stopRun(); return; }          // bấm vào từ: dừng lại để xem nghĩa (bảng nghĩa hiện ngay trên màn hình)
+    if (document.fullscreenElement || document.webkitFullscreenElement) run ? stopRun() : startRun();
+  });
   const onKey = e => {
     if (!root.isConnected) { document.removeEventListener('keydown', onKey); stopRun(); return; }
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;

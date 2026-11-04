@@ -102,6 +102,7 @@ export function grammarInText(z) {
 export const structsInText = z => SPEAK_STRUCT.filter(t => { try { return new RegExp(t.re).test(z); } catch { return false; } });
 let pop = null;
 export function closePop() { if (pop) { pop.remove(); pop = null; } }
+document.addEventListener('fullscreenchange', () => { if (pop && pop.classList.contains('in-fs')) closePop(); });
 export function wordCard(h, { full = false } = {}) {
   const ws = lookup(h); const w = ws[0];
   const s = store.s;
@@ -149,14 +150,17 @@ export function charCard(c) {
 export function openPop(anchor, html) {
   closePop();
   pop = document.createElement('div'); pop.className = 'pop'; pop.innerHTML = `<button class="close" aria-label="Đóng">${icon('x')}</button>` + html;
-  document.body.appendChild(pop);
+  // đang ở chế độ toàn màn hình: phải gắn bảng vào phần tử toàn màn hình thì mới nhìn thấy
+  const fs = document.fullscreenElement || document.webkitFullscreenElement;
+  (fs || document.body).appendChild(pop);
+  if (fs) pop.classList.add('in-fs');
   const mobile = window.innerWidth < 640;
   if (mobile) pop.classList.add('sheet');
   else {
     const r = anchor.getBoundingClientRect(); const pw = pop.offsetWidth, ph = pop.offsetHeight;
     let x = Math.min(Math.max(12, r.left + r.width / 2 - pw / 2), window.innerWidth - pw - 12);
     let y = r.bottom + 8; if (y + ph > window.innerHeight - 12) y = Math.max(12, r.top - ph - 8);
-    pop.style.left = x + 'px'; pop.style.top = (y + window.scrollY) + 'px';
+    pop.style.left = x + 'px'; pop.style.top = (y + (fs ? 0 : window.scrollY)) + 'px';
   }
 }
 

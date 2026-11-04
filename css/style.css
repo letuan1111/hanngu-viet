@@ -939,3 +939,6 @@ html.locked body > :not(.gate) { display: none !important; }
 .ap-stage .ch { display: inline-block; } .ap-stage .ch, .ap-rz .ch { transition: color .12s, background .12s, text-shadow .12s; border-radius: 6px; }
 .ch.lit { color: var(--red); background: var(--gold2); text-shadow: 0 0 10px rgba(255, 196, 0, .95), 0 0 22px rgba(255, 170, 0, .6); }
 .ap-stage .ch.lit { transform: scale(1.12); }
+
+/* bảng nghĩa khi đang toàn màn hình */
+.pop.in-fs { position: fixed; z-index: 2147483000; text-align: left; font-size: 1rem; cursor: auto; }
