@@ -1,8 +1,8 @@
 // Luyện gõ lại bài đọc: chạy từng câu, gõ đúng đến đâu chữ biến mất đến đó; có đồng hồ, chữ/phút, từ/phút, độ chính xác
 import { store, logActivity } from '../core/store.js';
-import { segment, charPinyins, isHan } from '../core/dict.js';
-import { esc, icon, $, toast, recAudio, sentence, grammarInText, structsInText, quickSaveOn, setQuickSave } from '../core/ui.js';
-import { speak } from '../core/tts.js';
+import { segment, charPinyins, isHan, sentencePinyin } from '../core/dict.js';
+import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, structsInText, quickSaveOn, setQuickSave } from '../core/ui.js';
+import { speak, stopSeq } from '../core/tts.js';
 import { AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
 
 const tone = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v');
@@ -210,31 +210,151 @@ export function typingTrainer(el, o) {
   start();
 }
 
-// ════════════ Trang Đánh máy: tự nhập nội dung, mỗi từ bấm vào xem nghĩa, rồi luyện gõ ════════════
+// ════════════ Trang Đánh máy: nhập Tiếng Trung – Tiếng Việt – Pinyin, máy chạy tự động, tra từ, luyện gõ ════════════
+const VI_CH = /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹđ]/gi;
+const PY_CH = /[āēīōūǖǎěǐǒǔǚǘǜü]/gi;
+const kindOf = t => [...t].some(isHan) ? 'zh' : (t.match(PY_CH) || []).length > (t.match(VI_CH) || []).length ? 'py' : (t.match(VI_CH) || []).length ? 'vi' : '?';
+// Đọc nội dung nhập: mỗi dòng "中文 | Tiếng Việt | pinyin" (hoặc cách nhau bằng Tab khi dán bảng Word/Excel, thứ tự cột tùy ý),
+// hoặc mỗi câu tiếng Trung một dòng, dòng nghĩa / pinyin ngay bên dưới. Đoạn văn liền sẽ được tách thành câu.
+export function parseRows(text) {
+  const rows = [];
+  for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
+    const line = raw.trim(); if (!line) continue;
+    const parts = line.split(/\t+|\s*\|\s*/).map(x => x.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      const r = { zh: '', vi: '', py: '' }, rest = [];
+      parts.forEach(x => { const k = kindOf(x); if (k !== '?' && !r[k]) r[k] = x; else rest.push(x); });
+      rest.forEach(x => { if (!r.vi) r.vi = x; else if (!r.py) r.py = x; });
+      if (r.zh) { rows.push(r); continue; }
+    }
+    const k = kindOf(line);
+    if (k === 'zh') { rows.push({ zh: line, vi: '', py: '' }); continue; }
+    const last = rows[rows.length - 1]; if (!last) continue;      // bỏ dòng tiêu đề như “TIẾNG TRUNG | TIẾNG VIỆT | PINYIN”
+    const kk = k === '?' ? (last.vi ? 'py' : 'vi') : k;
+    last[kk] = last[kk] ? last[kk] + ' ' + line : line;
+  }
+  // đoạn văn dài chưa có nghĩa/pinyin → tách thành từng câu
+  return rows.flatMap(r => !r.vi && !r.py && splitSentences(r.zh).length > 1 ? splitSentences(r.zh).map(z => ({ zh: z, vi: '', py: '' })) : [r]);
+}
+const rowsToText = rows => rows.map(r => [r.zh, r.vi, r.py].filter((x, k) => x || k < 2).join(' | ').replace(/ \| $/, '')).join('\n');
+// Link chia sẻ: nội dung nằm ngay trong link (không cần máy chủ)
+const b64e = str => btoa(String.fromCharCode(...new TextEncoder().encode(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64d = str => new TextDecoder().decode(Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
+
 export function typingPage(root) {
+  const q = new URLSearchParams(location.hash.split('?')[1] || '');
+  let fromLink = null;
+  if (q.get('d')) { try { const a = JSON.parse(b64d(q.get('d'))); fromLink = { t: a.t || '', rows: (a.r || []).map(([zh, vi, py]) => ({ zh: zh || '', vi: vi || '', py: py || '' })).filter(r => r.zh) }; } catch { toast('Link không đúng hoặc bị thiếu – không đọc được nội dung.', 'bad'); } }
+  const opt = { py: true, vi: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
+  const saveOpt = () => store.update(s => { s.apOpt = { ...opt }; });
   root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Tự nhập nội dung</p><h1>⌨️ Đánh máy</h1></div></div>
+  ${fromLink ? `<div class="note">🔗 Đang mở nội dung từ link được chia sẻ${fromLink.t ? `: <b>${esc(fromLink.t)}</b>` : ''} (${fromLink.rows.length} câu). Nội dung chỉ được lưu vào máy bạn khi bạn sửa ô nhập bên dưới.</div>` : ''}
   <section class="card tp-in">
-    <p class="muted small">Dán hoặc tự viết một đoạn tiếng Trung (tối đa 3.000 ký tự). Ngay bên dưới, <b>mỗi từ bạn nhập đều bấm vào được</b> để xem nghĩa, pinyin, cấp HSK, ngữ pháp liên quan và lưu vào Ôn tập. Nội dung được lưu trên trình duyệt của bạn.</p>
-    <textarea class="inp ty-text" id="tpText" lang="zh-CN" rows="6" maxlength="3000" placeholder="Ví dụ: 我叫小明。我是越南人。我很喜欢学习汉语。">${esc(store.s.typeCustom || '')}</textarea>
-    <div class="row gap wrap"><button class="btn" id="tpStart">⌨️ Luyện gõ đoạn này</button><button class="btn ghost" id="tpClear">🗑️ Xóa nội dung</button><span class="muted small" id="tpCnt"></span></div>
+    <p class="muted small">Nhập mỗi câu một dòng theo dạng <b>Tiếng Trung | Tiếng Việt | Pinyin</b> (có thể dán thẳng bảng 3 cột từ Word/Excel, hoặc ghi câu tiếng Trung rồi xuống dòng ghi nghĩa, pinyin). Thiếu pinyin thì máy tự tạo; chỉ có tiếng Trung cũng được. Mỗi từ đều bấm vào được để xem nghĩa. Nội dung được lưu trên trình duyệt của bạn.</p>
+    <textarea class="inp ty-text" id="tpText" lang="zh-CN" rows="7" maxlength="6000" placeholder="我叫小明。 | Tôi tên là Tiểu Minh. | Wǒ jiào Xiǎo Míng.&#10;我是越南人。 | Tôi là người Việt Nam. | Wǒ shì Yuènán rén.&#10;我很喜欢学习汉语。 | Tôi rất thích học tiếng Trung.">${esc(fromLink ? rowsToText(fromLink.rows) : store.s.typeCustom || '')}</textarea>
+    <div class="row gap wrap"><button class="btn" id="tpRun">▶ Máy chạy tự động</button><button class="btn ghost" id="tpStart">⌨️ Luyện gõ đoạn này</button><button class="btn ghost" id="tpLink">🔗 Tạo link chia sẻ</button><button class="btn ghost" id="tpClear">🗑️ Xóa nội dung</button><span class="muted small" id="tpCnt"></span></div>
+  </section>
+  <section class="card ap" id="ap">
+    <div class="row gap wrap" style="justify-content:space-between;align-items:center"><h2>▶ Máy chạy tự động</h2><span class="muted small">Phím tắt: <kbd>Space</kbd> chạy/dừng · <kbd>←</kbd> <kbd>→</kbd> câu trước/sau</span></div>
+    <div class="ap-bar">
+      <button class="btn" id="apPlay">▶ Chạy</button><button class="btn ghost sm" id="apPrev" aria-label="Câu trước">‹ Trước</button><button class="btn ghost sm" id="apNext" aria-label="Câu sau">Sau ›</button><button class="btn ghost sm" id="apSay">🔊 Đọc câu này</button>
+      <label class="sw"><input type="checkbox" id="apPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
+      <label class="sw"><input type="checkbox" id="apVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>
+      <label class="sel">Tốc độ <select id="apRate">${[0.6, 0.75, 0.9, 1, 1.2].map(v => `<option value="${v}" ${v === +opt.rate ? 'selected' : ''}>${v}x</option>`).join('')}</select></label>
+      <label class="sel">Nghỉ <select id="apGap">${[1, 2, 3, 5, 8].map(v => `<option value="${v}" ${v === +opt.gap ? 'selected' : ''}>${v} giây</option>`).join('')}</select></label>
+      <label class="sel">Đọc <select id="apRep">${[1, 2, 3].map(v => `<option value="${v}" ${v === +opt.rep ? 'selected' : ''}>${v} lần</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" id="apLoop" ${opt.loop ? 'checked' : ''}> Chạy lại từ đầu khi hết bài</label>
+      <button class="btn ghost sm" id="apFull">⛶ Toàn màn hình</button>
+    </div>
+    <div class="ap-stage ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" id="apStage">
+      <div class="ap-n" id="apN"></div>
+      <div class="ap-py" id="apPyT"></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
+      <div class="bar"><i id="apBar" style="width:0"></i></div>
+    </div>
+    <div class="ap-list ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" id="apList"></div>
   </section>
   <section class="card"><h2>📖 Từ mới & ngữ pháp trong đoạn <small class="muted">(bấm vào từng từ)</small></h2><div id="tpWords"></div></section>
   <section class="card ty-sec" id="tpTrain" hidden><h2>⌨️ Luyện gõ</h2><div id="tpTy"></div></section>`;
-  const ta = $('#tpText', root), words = $('#tpWords', root);
-  let tm = 0;
+  const ta = $('#tpText', root), words = $('#tpWords', root), stage = $('#apStage', root), list = $('#apList', root);
+  let rows = [], cur = 0, tm = 0, run = null;
+  const pyOf = r => r.py || sentencePinyin(r.zh);
   const draw = () => {
-    const ss = splitSentences(ta.value);
-    $('#tpCnt', root).textContent = ss.length ? `${ss.length} câu · ${[...ss.join('')].filter(isHan).length} chữ Hán` : '';
-    words.innerHTML = ss.length ? analyzeHtml(ss.map(z => [z, ''])) : '<p class="muted">Nhập nội dung tiếng Trung ở ô phía trên – các từ sẽ hiện ra ở đây để bạn bấm xem.</p>';
+    rows = parseRows(ta.value);
+    if (cur >= rows.length) cur = 0;
+    $('#tpCnt', root).textContent = rows.length ? `${rows.length} câu · ${[...rows.map(r => r.zh).join('')].filter(isHan).length} chữ Hán` : '';
+    words.innerHTML = rows.length ? analyzeHtml(rows.map(r => [r.zh, r.vi])) : '<p class="muted">Nhập nội dung tiếng Trung ở ô phía trên – các từ sẽ hiện ra ở đây để bạn bấm xem.</p>';
+    list.innerHTML = rows.map((r, i) => `<div class="ap-row" data-i="${i}"><span class="ap-no">${i + 1}</span><div class="ap-rz zh" lang="zh-CN">${zhTokens(r.zh, { gloss: false })}</div><div class="ap-rv">${esc(r.vi)}</div><div class="ap-rp">${esc(pyOf(r))}</div></div>`).join('');
+    show();
   };
+  function show() {
+    const r = rows[cur];
+    if (!r) { $('#apN', root).textContent = ''; $('#apZh', root).innerHTML = '<span class="muted" style="font-size:1rem">Nhập nội dung ở ô phía trên để máy chạy.</span>'; $('#apPyT', root).textContent = ''; $('#apViT', root).textContent = ''; $('#apBar', root).style.width = '0'; return; }
+    $('#apN', root).textContent = `Câu ${cur + 1}/${rows.length}`;
+    $('#apPyT', root).textContent = pyOf(r);
+    $('#apZh', root).innerHTML = zhTokens(r.zh, { gloss: false });
+    $('#apViT', root).textContent = r.vi || (opt.vi ? '' : '');
+    $('#apViT', root).classList.toggle('empty', !r.vi);
+    $('#apBar', root).style.width = ((cur + 1) / rows.length * 100) + '%';
+    $$('.ap-row', list).forEach((el, i) => el.classList.toggle('now', i === cur));
+  }
+  const scrollRow = () => { const el = $$('.ap-row', list)[cur]; if (el && !document.fullscreenElement) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  const wait = (ms, tok) => new Promise(res => { const t0 = Date.now(); const iv = setInterval(() => { if (tok.stop || Date.now() - t0 >= ms) { clearInterval(iv); res(); } }, 100); });
+  const setBtn = on => { $('#apPlay', root).textContent = on ? '⏸ Dừng' : '▶ Chạy'; $('#apPlay', root).classList.toggle('rec', on); };
+  function stopRun() { if (run) { run.stop = true; run = null; } stopSeq(); setBtn(false); }
+  async function startRun() {
+    if (!rows.length) { toast('Hãy nhập nội dung trước.', 'bad'); return; }
+    stopRun(); const tok = run = { stop: false }; setBtn(true); logActivity();
+    while (!tok.stop) {
+      show(); scrollRow();
+      for (let k = 0; k < opt.rep && !tok.stop; k++) { await speak(rows[cur].zh, { rate: +opt.rate }); if (k + 1 < opt.rep) await wait(700, tok); }
+      if (tok.stop) break;
+      await wait(opt.gap * 1000, tok); if (tok.stop) break;
+      if (cur + 1 < rows.length) cur++;
+      else if (opt.loop) cur = 0;
+      else { show(); break; }
+    }
+    if (run === tok) { run = null; setBtn(false); }
+  }
+  const go = d => { const was = !!run; stopRun(); cur = Math.min(rows.length - 1, Math.max(0, cur + d)); show(); scrollRow(); if (was) startRun(); };
+  $('#apPlay', root).onclick = () => run ? stopRun() : startRun();
+  $('#tpRun', root).onclick = () => { $('#ap', root).scrollIntoView({ behavior: 'smooth', block: 'start' }); startRun(); };
+  $('#apPrev', root).onclick = () => go(-1); $('#apNext', root).onclick = () => go(1);
+  $('#apSay', root).onclick = () => { if (rows[cur]) { stopRun(); speak(rows[cur].zh, { rate: +opt.rate }); } };
+  const tog = () => { [stage, list].forEach(el => { el.classList.toggle('no-py', !opt.py); el.classList.toggle('no-vi', !opt.vi); }); saveOpt(); };
+  $('#apPy', root).onchange = e => { opt.py = e.target.checked; tog(); };
+  $('#apVi', root).onchange = e => { opt.vi = e.target.checked; tog(); };
+  $('#apRate', root).onchange = e => { opt.rate = +e.target.value; saveOpt(); };
+  $('#apGap', root).onchange = e => { opt.gap = +e.target.value; saveOpt(); };
+  $('#apRep', root).onchange = e => { opt.rep = +e.target.value; saveOpt(); };
+  $('#apLoop', root).onchange = e => { opt.loop = e.target.checked; saveOpt(); };
+  $('#apFull', root).onclick = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage); };
+  list.addEventListener('click', e => { if (e.target.closest('.tk')) return; const r = e.target.closest('.ap-row'); if (!r) return; const was = !!run; stopRun(); cur = +r.dataset.i; show(); if (was) startRun(); else speak(rows[cur].zh, { rate: +opt.rate }); });
+  stage.addEventListener('click', e => { if (document.fullscreenElement && !e.target.closest('.tk')) run ? stopRun() : startRun(); });
+  const onKey = e => {
+    if (!root.isConnected) { document.removeEventListener('keydown', onKey); stopRun(); return; }
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+    if (e.key === ' ') { e.preventDefault(); run ? stopRun() : startRun(); }
+    else if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1);
+  };
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('hashchange', stopRun, { once: true });
+
   ta.oninput = () => { store.update(s => { s.typeCustom = ta.value; }); clearTimeout(tm); tm = setTimeout(draw, 350); };
   words.addEventListener('change', e => { if (e.target.classList.contains('ty-qs')) setQuickSave(e.target.checked); });
-  $('#tpClear', root).onclick = () => { if (ta.value && !confirm('Xóa nội dung đã nhập?')) return; ta.value = ''; store.update(s => { s.typeCustom = ''; }); draw(); $('#tpTrain', root).hidden = true; ta.focus(); };
+  $('#tpClear', root).onclick = () => { if (ta.value && !confirm('Xóa nội dung đã nhập?')) return; stopRun(); ta.value = ''; store.update(s => { s.typeCustom = ''; }); draw(); $('#tpTrain', root).hidden = true; ta.focus(); };
+  $('#tpLink', root).onclick = async () => {
+    if (!rows.length) { toast('Hãy nhập nội dung trước.', 'bad'); return; }
+    const t = (prompt('Đặt tên cho bài (không bắt buộc):', fromLink?.t || '') || '').trim();
+    const d = b64e(JSON.stringify({ t, r: rows.map(r => r.py ? [r.zh, r.vi, r.py] : r.vi ? [r.zh, r.vi] : [r.zh]) }));
+    const url = location.href.split('#')[0] + '#/typing?d=' + d;
+    try { await navigator.clipboard.writeText(url); toast('Đã sao chép link – gửi cho người khác, mở ra sẽ thấy đúng nội dung này.'); }
+    catch { prompt('Sao chép link này:', url); }
+  };
   $('#tpStart', root).onclick = () => {
-    const ss = splitSentences(ta.value);
-    if (!ss.length) { toast('Nội dung cần có chữ Hán.', 'bad'); return; }
+    if (!rows.length) { toast('Nội dung cần có chữ Hán.', 'bad'); return; }
+    stopRun();
     const box = $('#tpTrain', root); box.hidden = false;
-    typingTrainer($('#tpTy', root), { key: 'custom', sentences: ss.map(z => [z, '']) });
+    typingTrainer($('#tpTy', root), { key: 'custom', sentences: rows.map(r => [r.zh, r.vi]) });
     $('.ty-an', box)?.remove(); // phần tra từ đã có ở trên
     box.scrollIntoView({ behavior: 'smooth', block: 'start' }); $('.ty-inp', box)?.focus();
   };

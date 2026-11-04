@@ -917,3 +917,21 @@ html.locked body > :not(.gate) { display: none !important; }
 /* Bài đọc: dạng đoạn văn liền */
 .reading-para .rp-zh { font-size: 1.45rem; line-height: 2.4; text-align: left; text-indent: 2em; word-spacing: 0; } .reading-para .rp-zh .tk { margin: 0; padding: 0 1px; text-indent: 0; }
 .reading-para .rp-vi { margin-top: 10px; } .reading-para .rp-vi p { margin: 6px 0 0; color: var(--ink2); line-height: 1.7; }
+/* Đánh máy › Máy chạy tự động */
+.ap-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0 12px; }
+.ap-stage { position: relative; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); padding: 26px 20px 30px; text-align: center; display: grid; gap: 10px; min-height: 230px; align-content: center; }
+.ap-n { position: absolute; top: 10px; left: 14px; font: 600 .8rem var(--ui); color: var(--ink2); }
+.ap-py { font: 1.25rem var(--py, var(--ui)); color: #2f6f9f; }
+.ap-zh { font-size: 2.6rem; line-height: 1.5; } .ap-zh rt { display: none; } .ap-zh .tk { padding: 0 2px; }
+.ap-vi { font-size: 1.15rem; color: var(--ink2); } .ap-vi.empty { display: none; }
+.ap-stage .bar { position: absolute; left: 16px; right: 16px; bottom: 12px; }
+.ap-stage.no-py .ap-py, .ap-stage.no-vi .ap-vi, .ap-list.no-py .ap-rp, .ap-list.no-vi .ap-rv { display: none; }
+.ap-stage:fullscreen { background: var(--bg, #fff); border: 0; border-radius: 0; padding: 6vh 6vw; cursor: pointer; }
+.ap-stage:fullscreen .ap-zh { font-size: 7vmin; } .ap-stage:fullscreen .ap-py { font-size: 3.4vmin; } .ap-stage:fullscreen .ap-vi { font-size: 3.2vmin; }
+.ap-list { margin-top: 12px; max-height: 420px; overflow: auto; border-top: 1px solid var(--line); }
+.ap-row { display: grid; grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px; align-items: center; padding: 8px 6px; border-bottom: 1px dashed var(--line); cursor: pointer; border-radius: 8px; }
+.ap-row:hover { background: var(--red2); } .ap-row.now { background: var(--gold2); }
+.ap-no { color: var(--ink2); font-size: .8rem; } .ap-rz { font-size: 1.3rem; line-height: 1.5; } .ap-rz rt { display: none; }
+.ap-rv { font-size: .95rem; } .ap-rp { font: .95rem var(--py, var(--ui)); color: #2f6f9f; }
+.ap-list.no-vi .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr); } .ap-list.no-vi.no-py .ap-row { grid-template-columns: 2em 1fr; }
+@media (max-width: 700px) { .ap-zh { font-size: 1.9rem; } .ap-row, .ap-list.no-vi .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em 1fr; } .ap-rv, .ap-rp { grid-column: 2; } }
