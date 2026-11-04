@@ -245,7 +245,7 @@ export function typingPage(root) {
   const q = new URLSearchParams(location.hash.split('?')[1] || '');
   let fromLink = null;
   if (q.get('d')) { try { const a = JSON.parse(b64d(q.get('d'))); fromLink = { t: a.t || '', rows: (a.r || []).map(([zh, vi, py]) => ({ zh: zh || '', vi: vi || '', py: py || '' })).filter(r => r.zh) }; } catch { toast('Link không đúng hoặc bị thiếu – không đọc được nội dung.', 'bad'); } }
-  const opt = { py: true, vi: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
+  const opt = { py: true, vi: true, voice: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
   const saveOpt = () => store.update(s => { s.apOpt = { ...opt }; });
   root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Tự nhập nội dung</p><h1>⌨️ Đánh máy</h1></div></div>
   ${fromLink ? `<div class="note">🔗 Đang mở nội dung từ link được chia sẻ${fromLink.t ? `: <b>${esc(fromLink.t)}</b>` : ''} (${fromLink.rows.length} câu). Nội dung chỉ được lưu vào máy bạn khi bạn sửa ô nhập bên dưới.</div>` : ''}
@@ -258,6 +258,7 @@ export function typingPage(root) {
     <div class="row gap wrap" style="justify-content:space-between;align-items:center"><h2>▶ Máy chạy tự động</h2><span class="muted small">Phím tắt: <kbd>Space</kbd> chạy/dừng · <kbd>←</kbd> <kbd>→</kbd> câu trước/sau</span></div>
     <div class="ap-bar">
       <button class="btn" id="apPlay">▶ Chạy</button><button class="btn ghost sm" id="apPrev" aria-label="Câu trước">‹ Trước</button><button class="btn ghost sm" id="apNext" aria-label="Câu sau">Sau ›</button><button class="btn ghost sm" id="apSay">🔊 Đọc câu này</button>
+      <label class="sw" title="Tắt để máy chạy im lặng: chữ vẫn sáng lần lượt và tự chuyển câu"><input type="checkbox" id="apVoice" ${opt.voice ? 'checked' : ''}><span></span> 🔊 Máy đọc</label>
       <label class="sw"><input type="checkbox" id="apPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
       <label class="sw"><input type="checkbox" id="apVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>
       <label class="sel">Tốc độ <select id="apRate">${[0.6, 0.75, 0.9, 1, 1.2].map(v => `<option value="${v}" ${v === +opt.rate ? 'selected' : ''}>${v}x</option>`).join('')}</select></label>
@@ -283,16 +284,19 @@ export function typingPage(root) {
   const charMap = el => { const out = []; $$('.tk', el).forEach(t => { const st = +t.dataset.i; $$('.ch', t).forEach((c, j) => out.push([st + j, c])); }); return out; };
   let litT = null;
   // đọc câu hiện tại; chữ đang đọc sáng lên (dùng mốc thời gian trình duyệt báo, không có thì ước lượng theo tốc độ đọc)
-  function sayCur() {
+  function sayCur(force = false) {
     const r = rows[cur]; if (!r) return Promise.resolve();
+    const silent = !opt.voice && !force;
     const maps = [charMap($('#apZh', root)), charMap($$('.ap-row', list)[cur] || document.createElement('i'))];
     const lit = (a, b) => maps.forEach(m => m.forEach(([k, c]) => c.classList.toggle('lit', k >= a && k < b)));
     const han = [...r.zh].map((c, i) => isHan(c) ? i : -1).filter(i => i >= 0);
     let got = false; const t0 = performance.now(), per = 0.24 / (+opt.rate || 1);
     clearInterval(litT);
     const timer = litT = setInterval(() => { if (got) return; const k = Math.floor(((performance.now() - t0) / 1000 - 0.25) / per); if (k >= 0 && k < han.length) lit(han[k], han[k] + 1); }, 50);
-    return speak(r.zh, { rate: +opt.rate, onBoundary: (i, len) => { got = true; lit(i, i + Math.max(1, len)); } })
-      .finally(() => { clearInterval(timer); lit(-1, -1); });
+    // tắt máy đọc: chỉ cho chữ sáng lần lượt theo tốc độ đã chọn rồi chuyển câu
+    const done = silent ? new Promise(res => { const tok = run; const end = performance.now() + (0.25 + han.length * per + 0.3) * 1000; const iv = setInterval(() => { if (performance.now() >= end || (tok && tok.stop) || !opt.voice === false) { clearInterval(iv); res(); } }, 50); })
+      : speak(r.zh, { rate: +opt.rate, onBoundary: (i, len) => { got = true; lit(i, i + Math.max(1, len)); } });
+    return done.finally(() => { clearInterval(timer); lit(-1, -1); });
   }
   const draw = () => {
     rows = parseRows(ta.value);
@@ -335,7 +339,8 @@ export function typingPage(root) {
   $('#apPlay', root).onclick = () => run ? stopRun() : startRun();
   $('#tpRun', root).onclick = () => { $('#ap', root).scrollIntoView({ behavior: 'smooth', block: 'start' }); startRun(); };
   $('#apPrev', root).onclick = () => go(-1); $('#apNext', root).onclick = () => go(1);
-  $('#apSay', root).onclick = () => { if (rows[cur]) { stopRun(); sayCur(); } };
+  $('#apSay', root).onclick = () => { if (rows[cur]) { stopRun(); sayCur(true); } };
+  $('#apVoice', root).onchange = e => { opt.voice = e.target.checked; saveOpt(); if (!opt.voice) stopSeq(); };
   const tog = () => { [stage, list].forEach(el => { el.classList.toggle('no-py', !opt.py); el.classList.toggle('no-vi', !opt.vi); }); saveOpt(); };
   $('#apPy', root).onchange = e => { opt.py = e.target.checked; tog(); };
   $('#apVi', root).onchange = e => { opt.vi = e.target.checked; tog(); };
