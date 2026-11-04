@@ -935,3 +935,7 @@ html.locked body > :not(.gate) { display: none !important; }
 .ap-rv { font-size: .95rem; } .ap-rp { font: .95rem var(--py, var(--ui)); color: #2f6f9f; }
 .ap-list.no-vi .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr); } .ap-list.no-vi.no-py .ap-row { grid-template-columns: 2em 1fr; }
 @media (max-width: 700px) { .ap-zh { font-size: 1.9rem; } .ap-row, .ap-list.no-vi .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em 1fr; } .ap-rv, .ap-rp { grid-column: 2; } }
+/* chữ đang đọc sáng lên */
+.ap-stage .ch { display: inline-block; } .ap-stage .ch, .ap-rz .ch { transition: color .12s, background .12s, text-shadow .12s; border-radius: 6px; }
+.ch.lit { color: var(--red); background: var(--gold2); text-shadow: 0 0 10px rgba(255, 196, 0, .95), 0 0 22px rgba(255, 170, 0, .6); }
+.ap-stage .ch.lit { transform: scale(1.12); }

@@ -278,12 +278,28 @@ export function typingPage(root) {
   const ta = $('#tpText', root), words = $('#tpWords', root), stage = $('#apStage', root), list = $('#apList', root);
   let rows = [], cur = 0, tm = 0, run = null;
   const pyOf = r => r.py || sentencePinyin(r.zh);
+  // tách từng chữ trong mỗi từ thành <span class="ch"> để làm sáng đúng chữ đang đọc
+  const zhChars = zh => zhTokens(zh, { gloss: false }).replace(/<span class="hz">([^<]*)<\/span>/g, (_, t) => `<span class="hz">${[...t].map(c => `<span class="ch">${c}</span>`).join('')}</span>`);
+  const charMap = el => { const out = []; $$('.tk', el).forEach(t => { const st = +t.dataset.i; $$('.ch', t).forEach((c, j) => out.push([st + j, c])); }); return out; };
+  let litT = null;
+  // đọc câu hiện tại; chữ đang đọc sáng lên (dùng mốc thời gian trình duyệt báo, không có thì ước lượng theo tốc độ đọc)
+  function sayCur() {
+    const r = rows[cur]; if (!r) return Promise.resolve();
+    const maps = [charMap($('#apZh', root)), charMap($$('.ap-row', list)[cur] || document.createElement('i'))];
+    const lit = (a, b) => maps.forEach(m => m.forEach(([k, c]) => c.classList.toggle('lit', k >= a && k < b)));
+    const han = [...r.zh].map((c, i) => isHan(c) ? i : -1).filter(i => i >= 0);
+    let got = false; const t0 = performance.now(), per = 0.24 / (+opt.rate || 1);
+    clearInterval(litT);
+    const timer = litT = setInterval(() => { if (got) return; const k = Math.floor(((performance.now() - t0) / 1000 - 0.25) / per); if (k >= 0 && k < han.length) lit(han[k], han[k] + 1); }, 50);
+    return speak(r.zh, { rate: +opt.rate, onBoundary: (i, len) => { got = true; lit(i, i + Math.max(1, len)); } })
+      .finally(() => { clearInterval(timer); lit(-1, -1); });
+  }
   const draw = () => {
     rows = parseRows(ta.value);
     if (cur >= rows.length) cur = 0;
     $('#tpCnt', root).textContent = rows.length ? `${rows.length} câu · ${[...rows.map(r => r.zh).join('')].filter(isHan).length} chữ Hán` : '';
     words.innerHTML = rows.length ? analyzeHtml(rows.map(r => [r.zh, r.vi])) : '<p class="muted">Nhập nội dung tiếng Trung ở ô phía trên – các từ sẽ hiện ra ở đây để bạn bấm xem.</p>';
-    list.innerHTML = rows.map((r, i) => `<div class="ap-row" data-i="${i}"><span class="ap-no">${i + 1}</span><div class="ap-rz zh" lang="zh-CN">${zhTokens(r.zh, { gloss: false })}</div><div class="ap-rv">${esc(r.vi)}</div><div class="ap-rp">${esc(pyOf(r))}</div></div>`).join('');
+    list.innerHTML = rows.map((r, i) => `<div class="ap-row" data-i="${i}"><span class="ap-no">${i + 1}</span><div class="ap-rz zh" lang="zh-CN">${zhChars(r.zh)}</div><div class="ap-rv">${esc(r.vi)}</div><div class="ap-rp">${esc(pyOf(r))}</div></div>`).join('');
     show();
   };
   function show() {
@@ -291,7 +307,7 @@ export function typingPage(root) {
     if (!r) { $('#apN', root).textContent = ''; $('#apZh', root).innerHTML = '<span class="muted" style="font-size:1rem">Nhập nội dung ở ô phía trên để máy chạy.</span>'; $('#apPyT', root).textContent = ''; $('#apViT', root).textContent = ''; $('#apBar', root).style.width = '0'; return; }
     $('#apN', root).textContent = `Câu ${cur + 1}/${rows.length}`;
     $('#apPyT', root).textContent = pyOf(r);
-    $('#apZh', root).innerHTML = zhTokens(r.zh, { gloss: false });
+    $('#apZh', root).innerHTML = zhChars(r.zh);
     $('#apViT', root).textContent = r.vi || (opt.vi ? '' : '');
     $('#apViT', root).classList.toggle('empty', !r.vi);
     $('#apBar', root).style.width = ((cur + 1) / rows.length * 100) + '%';
@@ -306,7 +322,7 @@ export function typingPage(root) {
     stopRun(); const tok = run = { stop: false }; setBtn(true); logActivity();
     while (!tok.stop) {
       show(); scrollRow();
-      for (let k = 0; k < opt.rep && !tok.stop; k++) { await speak(rows[cur].zh, { rate: +opt.rate }); if (k + 1 < opt.rep) await wait(700, tok); }
+      for (let k = 0; k < opt.rep && !tok.stop; k++) { await sayCur(); if (k + 1 < opt.rep) await wait(700, tok); }
       if (tok.stop) break;
       await wait(opt.gap * 1000, tok); if (tok.stop) break;
       if (cur + 1 < rows.length) cur++;
@@ -319,7 +335,7 @@ export function typingPage(root) {
   $('#apPlay', root).onclick = () => run ? stopRun() : startRun();
   $('#tpRun', root).onclick = () => { $('#ap', root).scrollIntoView({ behavior: 'smooth', block: 'start' }); startRun(); };
   $('#apPrev', root).onclick = () => go(-1); $('#apNext', root).onclick = () => go(1);
-  $('#apSay', root).onclick = () => { if (rows[cur]) { stopRun(); speak(rows[cur].zh, { rate: +opt.rate }); } };
+  $('#apSay', root).onclick = () => { if (rows[cur]) { stopRun(); sayCur(); } };
   const tog = () => { [stage, list].forEach(el => { el.classList.toggle('no-py', !opt.py); el.classList.toggle('no-vi', !opt.vi); }); saveOpt(); };
   $('#apPy', root).onchange = e => { opt.py = e.target.checked; tog(); };
   $('#apVi', root).onchange = e => { opt.vi = e.target.checked; tog(); };
@@ -328,7 +344,7 @@ export function typingPage(root) {
   $('#apRep', root).onchange = e => { opt.rep = +e.target.value; saveOpt(); };
   $('#apLoop', root).onchange = e => { opt.loop = e.target.checked; saveOpt(); };
   $('#apFull', root).onclick = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage); };
-  list.addEventListener('click', e => { if (e.target.closest('.tk')) return; const r = e.target.closest('.ap-row'); if (!r) return; const was = !!run; stopRun(); cur = +r.dataset.i; show(); if (was) startRun(); else speak(rows[cur].zh, { rate: +opt.rate }); });
+  list.addEventListener('click', e => { if (e.target.closest('.tk')) return; const r = e.target.closest('.ap-row'); if (!r) return; const was = !!run; stopRun(); cur = +r.dataset.i; show(); if (was) startRun(); else sayCur(); });
   stage.addEventListener('click', e => { if (document.fullscreenElement && !e.target.closest('.tk')) run ? stopRun() : startRun(); });
   const onKey = e => {
     if (!root.isConnected) { document.removeEventListener('keydown', onKey); stopRun(); return; }
