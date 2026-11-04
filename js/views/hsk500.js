@@ -1,7 +1,7 @@
 import { store, srsAdd, logActivity } from '../core/store.js';
 import { hsk30List, READINGS, grammarById, POS, TOPICS, HSK30_ORDER, pick, shuffle, curatedExamples } from '../core/dict.js';
 import { vocabSet } from './vocabset.js';
-import { esc, say, sentence, exampleHtml, icon, toast, $, $$ } from '../core/ui.js';
+import { esc, say, sentence, exampleHtml, icon, toast, zhTokens, $, $$ } from '../core/ui.js';
 import { Q, runQuiz } from '../core/quiz.js';
 import { keepState, takeState } from '../core/nav.js';
 import { speakSeq, stopSeq } from '../core/tts.js';
@@ -98,13 +98,14 @@ export function readings(root, id) {
   const i = READINGS.findIndex(r => r.id === id), r = READINGS[i];
   if (!r) { root.innerHTML = '<p>Không có bài đọc này.</p>'; return; }
   const g = grammarById(r.g); const prev = READINGS[i - 1], next = READINGS[i + 1];
-  const isDialog = r.p.every(x => /^[A-Z甲乙]：|^[一-鿿]{1,3}：/.test(x[0]));
   root.innerHTML = `<nav class="crumb"><a href="#/reading">Bài đọc HSK 1</a> › ${esc(r.t)}</nav>
   <div class="lesson-head"><div><p class="eyebrow">Bài đọc ${i + 1} · Cấu trúc trọng tâm</p><h1>${esc(r.t)}</h1></div></div>
   <div class="card gfocus"><span class="formula" lang="zh-CN">${esc(g.formula)}</span><div><b><a href="#/grammar/${g.id}">${esc(g.name)}</a></b><p class="small">${esc(g.explain)}</p></div></div>
   <div class="player card"><button class="btn" id="pa">${icon('play')} Nghe cả bài</button><button class="btn ghost" id="ps">${icon('stop')} Dừng</button>
-    <label class="chk"><input type="checkbox" id="hv" checked> Ẩn nghĩa tiếng Việt (tự đọc hiểu)</label><label class="chk"><input type="checkbox" id="hk" checked> Tô đậm cấu trúc</label></div>
-  <div class="dialog reading-text">${r.p.map(([zh, vi]) => { const m = zh.match(/^([^：]{1,4})：(.*)$/); return m ? sentence(m[2], vi, { speaker: m[1], role: /^(B|阿兰)$/.test(m[1]) ? 1 : 0 }) : sentence(zh, vi); }).join('')}</div>
+    <label class="chk"><input type="checkbox" id="hv" checked> Ẩn nghĩa tiếng Việt (tự đọc hiểu)</label><label class="chk"><input type="checkbox" id="hk" checked> Tô đậm cấu trúc</label><label class="chk"><input type="checkbox" id="hp" ${store.s.readPara === false ? '' : 'checked'}> Xem dạng đoạn văn liền</label>
+    <span class="muted small">${[...r.p.map(x => x[0]).join('')].filter(c => /\p{Script=Han}/u.test(c)).length} chữ · ${r.p.length} câu</span></div>
+  <div class="card reading-para"><div class="zh rp-zh" lang="zh-CN">${zhTokens(r.p.map(x => x[0]).join(''), { gloss: false })}</div><details class="rp-vi"><summary>Nghĩa tiếng Việt cả đoạn</summary><p>${esc(r.p.map(x => x[1]).join(' '))}</p></details></div>
+  <div class="dialog reading-text">${r.p.map(([zh, vi]) => sentence(zh, vi)).join('')}</div>
   <h2 class="sub">Câu hỏi đọc hiểu</h2><div id="rq"></div>
   <div class="lesson-nav">${prev ? `<a class="btn ghost" href="#/reading/${prev.id}">‹ ${esc(prev.t)}</a>` : '<span></span>'}${next ? `<a class="btn" href="#/reading/${next.id}">${esc(next.t)} ›</a>` : ''}</div>`;
   const sents = $$('.reading-text .sent', root);
@@ -112,13 +113,17 @@ export function readings(root, id) {
   const applyHide = () => sents.forEach(s => s.classList.toggle('hide-vi', hv.checked));
   const applyKey = () => sents.forEach(s => $$('.tk', s).forEach(t => t.classList.toggle('key', hk.checked && [g.key, '没' + g.key, '不' + g.key].includes(t.dataset.w))));
   hv.onchange = applyHide; hk.onchange = applyKey; applyHide(); applyKey();
+  const applyPara = () => { const on = $('#hp', root).checked; $('.reading-para', root).hidden = !on; $('.reading-text', root).hidden = on; store.update(s => { s.readPara = on; }); };
+  $('#hp', root).onchange = applyPara; applyPara();
+  const applyKeyP = () => $$('.reading-para .tk', root).forEach(t => t.classList.toggle('key', hk.checked && [g.key, '没' + g.key, '不' + g.key].includes(t.dataset.w)));
+  hk.addEventListener('change', applyKeyP); applyKeyP();
   $('#pa', root).onclick = () => { logActivity(); speakSeq(sents.map(el => ({ text: el.dataset.zh, role: +el.dataset.role, el, onBoundary: k => $$('.tk', el).forEach(t => t.classList.toggle('hl', k >= +t.dataset.i && k < +t.dataset.i + +t.dataset.n)) })), { onItem: k => sents.forEach((s, j) => s.classList.toggle('now', j === k)) }); };
   $('#ps', root).onclick = stopSeq;
   // câu hỏi đọc hiểu + 2 câu áp dụng cấu trúc
   const qs = r.q.map(([qt, opts, ans]) => { const o = opts.map((x, k) => ({ x, k })); const sh = shuffle(o); return { type: 'mc', tag: 'Đọc hiểu', prompt: esc(qt), options: sh.map(y => esc(y.x)), ans: sh.findIndex(y => y.k === ans), explain: `Đáp án: ${opts[ans]}` }; });
   const withKey = r.p.filter(x => x[0].includes(g.key));
   const keys = ['是', '吗', '呢', '很', '不', '的', '有', '在', '个', '会', '能', '想', '了', '都', '太', '去', '怎么', '没', '号'];
-  pick(withKey, 2).forEach(x => { const zh = x[0].replace(/^[^：]{1,4}：/, ''); const fq = Q.fill([zh, x[1]], g.key, keys); if (fq) qs.push(fq); });
+  pick(withKey, 2).forEach(x => { const zh = x[0]; const fq = Q.fill([zh, x[1]], g.key, keys); if (fq) qs.push(fq); });
   runQuiz($('#rq', root), qs, { title: 'Đọc hiểu', onDone: (a, t) => store.update(s => { s.readDone = s.readDone || {}; s.readDone[r.id] = Math.max(s.readDone[r.id] || 0, Math.round(a / t * 100)); }) });
   return `Bài đọc: ${r.t}`;
 }

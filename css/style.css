@@ -913,3 +913,7 @@ html.locked body > :not(.gate) { display: none !important; }
 .ios-voice { border: 1px solid var(--gold); background: var(--gold2); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
 .ios-voice.ok { border-color: var(--line); background: var(--paper); }
 .ios-voice ol { margin: 6px 0; padding-left: 1.3em; display: grid; gap: 4px; }
+
+/* Bài đọc: dạng đoạn văn liền */
+.reading-para .rp-zh { font-size: 1.45rem; line-height: 2.4; text-align: left; text-indent: 2em; word-spacing: 0; } .reading-para .rp-zh .tk { margin: 0; padding: 0 1px; text-indent: 0; }
+.reading-para .rp-vi { margin-top: 10px; } .reading-para .rp-vi p { margin: 6px 0 0; color: var(--ink2); line-height: 1.7; }
