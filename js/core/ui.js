@@ -151,7 +151,7 @@ export function openPop(anchor, html) {
   closePop();
   pop = document.createElement('div'); pop.className = 'pop'; pop.innerHTML = `<button class="close" aria-label="Đóng">${icon('x')}</button>` + html;
   // đang ở chế độ toàn màn hình: phải gắn bảng vào phần tử toàn màn hình thì mới nhìn thấy
-  const fs = document.fullscreenElement || document.webkitFullscreenElement;
+  const fs = document.fullscreenElement || document.webkitFullscreenElement || document.querySelector('.ap-fs');
   (fs || document.body).appendChild(pop);
   if (fs) pop.classList.add('in-fs');
   const mobile = window.innerWidth < 640;

@@ -942,3 +942,15 @@ html.locked body > :not(.gate) { display: none !important; }
 
 /* bảng nghĩa khi đang toàn màn hình */
 .pop.in-fs { position: fixed; z-index: 2147483000; text-align: left; font-size: 1rem; cursor: auto; }
+/* Toàn màn hình trên điện thoại (iPhone không có chế độ toàn màn hình cho trang web → phủ kín màn hình) */
+.ap-fsbar { display: none; }
+.ap-stage:fullscreen .ap-fsbar, .ap-stage.ap-fs .ap-fsbar { display: flex; gap: 8px; justify-content: center; position: absolute; left: 0; right: 0; bottom: calc(26px + env(safe-area-inset-bottom)); }
+.ap-fsbar .btn { min-width: 52px; justify-content: center; font-size: 1.1rem; }
+.ap-stage.ap-fs { position: fixed; inset: 0; z-index: 9000; width: 100vw; height: 100vh; height: 100dvh; margin: 0; border: 0; border-radius: 0; background: var(--bg, #fff); padding: calc(40px + env(safe-area-inset-top)) 6vw calc(90px + env(safe-area-inset-bottom)); overflow: auto; cursor: pointer; }
+.ap-stage.ap-fs .ap-n { top: calc(12px + env(safe-area-inset-top)); }
+.ap-stage.ap-fs .bar { bottom: calc(10px + env(safe-area-inset-bottom)); }
+.ap-stage.ap-fs .ap-zh { font-size: clamp(2rem, 9vmin, 5rem); } .ap-stage.ap-fs .ap-py { font-size: clamp(1.05rem, 4.2vmin, 2rem); } .ap-stage.ap-fs .ap-vi { font-size: clamp(1rem, 4vmin, 1.8rem); }
+.ap-stage:fullscreen .ap-fsbar { bottom: 30px; }
+html.ap-lock, html.ap-lock body { overflow: hidden; }
+.pop.in-fs.sheet { z-index: 9500; }
+.pop.in-fs { z-index: 2147483000; }

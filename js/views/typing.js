@@ -1,8 +1,8 @@
 // Luyện gõ lại bài đọc: chạy từng câu, gõ đúng đến đâu chữ biến mất đến đó; có đồng hồ, chữ/phút, từ/phút, độ chính xác
 import { store, logActivity } from '../core/store.js';
 import { segment, charPinyins, isHan, sentencePinyin } from '../core/dict.js';
-import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, structsInText, quickSaveOn, setQuickSave } from '../core/ui.js';
-import { speak, stopSeq } from '../core/tts.js';
+import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, structsInText, quickSaveOn, setQuickSave, closePop } from '../core/ui.js';
+import { speak, stopSeq, isIOS } from '../core/tts.js';
 import { AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
 
 const tone = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v');
@@ -271,6 +271,7 @@ export function typingPage(root) {
       <div class="ap-n" id="apN"></div>
       <div class="ap-py" id="apPyT"></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
       <div class="bar"><i id="apBar" style="width:0"></i></div>
+      <div class="ap-fsbar"><button class="btn ghost sm" data-fs="prev" aria-label="Câu trước">‹</button><button class="btn sm" data-fs="play" aria-label="Chạy hoặc dừng">▶</button><button class="btn ghost sm" data-fs="next" aria-label="Câu sau">›</button><button class="btn ghost sm" data-fs="exit" aria-label="Thoát toàn màn hình">✕ Thoát</button></div>
     </div>
     <div class="ap-list ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" id="apList"></div>
   </section>
@@ -317,9 +318,9 @@ export function typingPage(root) {
     $('#apBar', root).style.width = ((cur + 1) / rows.length * 100) + '%';
     $$('.ap-row', list).forEach((el, i) => el.classList.toggle('now', i === cur));
   }
-  const scrollRow = () => { const el = $$('.ap-row', list)[cur]; if (el && !document.fullscreenElement) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  const scrollRow = () => { const el = $$('.ap-row', list)[cur]; if (el && !isFs()) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
   const wait = (ms, tok) => new Promise(res => { const t0 = Date.now(); const iv = setInterval(() => { if (tok.stop || Date.now() - t0 >= ms) { clearInterval(iv); res(); } }, 100); });
-  const setBtn = on => { $('#apPlay', root).textContent = on ? '⏸ Dừng' : '▶ Chạy'; $('#apPlay', root).classList.toggle('rec', on); };
+  const setBtn = on => { $('#apPlay', root).textContent = on ? '⏸ Dừng' : '▶ Chạy'; $('#apPlay', root).classList.toggle('rec', on); const b = $('[data-fs=play]', root); if (b) b.textContent = on ? '⏸' : '▶'; };
   function stopRun() { if (run) { run.stop = true; run = null; } stopSeq(); setBtn(false); }
   async function startRun() {
     if (!rows.length) { toast('Hãy nhập nội dung trước.', 'bad'); return; }
@@ -348,16 +349,30 @@ export function typingPage(root) {
   $('#apGap', root).onchange = e => { opt.gap = +e.target.value; saveOpt(); };
   $('#apRep', root).onchange = e => { opt.rep = +e.target.value; saveOpt(); };
   $('#apLoop', root).onchange = e => { opt.loop = e.target.checked; saveOpt(); };
-  $('#apFull', root).onclick = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage); };
+  // Toàn màn hình: dùng chế độ toàn màn hình của trình duyệt; iPhone không hỗ trợ → phóng khung đọc phủ kín màn hình
+  const realFs = () => document.fullscreenElement || document.webkitFullscreenElement;
+  function isFs() { return !!realFs() || stage.classList.contains('ap-fs'); }
+  const pseudoFs = on => { stage.classList.toggle('ap-fs', on); document.documentElement.classList.toggle('ap-lock', on); if (!on) closePop(); };
+  async function enterFs() {
+    const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+    if (req && !isIOS) { try { await req.call(stage); return; } catch {} }
+    pseudoFs(true);
+  }
+  function exitFs() { if (realFs()) (document.exitFullscreen || document.webkitExitFullscreen)?.call(document); pseudoFs(false); }
+  $('#apFull', root).onclick = () => isFs() ? exitFs() : enterFs();
+  const syncFsBtn = () => { const b = $('[data-fs=play]', stage); if (b) b.textContent = run ? '⏸' : '▶'; };
+  stage.addEventListener('click', e => { const b = e.target.closest('[data-fs]'); if (!b) return; e.stopPropagation(); const a = b.dataset.fs; if (a === 'exit') exitFs(); else if (a === 'prev') go(-1); else if (a === 'next') go(1); else { run ? stopRun() : startRun(); } setTimeout(syncFsBtn, 50); }, true);
+  window.addEventListener('hashchange', () => pseudoFs(false), { once: true });
   list.addEventListener('click', e => { if (e.target.closest('.tk')) return; const r = e.target.closest('.ap-row'); if (!r) return; const was = !!run; stopRun(); cur = +r.dataset.i; show(); if (was) startRun(); else sayCur(); });
   stage.addEventListener('click', e => {
     if (e.target.closest('.pop')) return;
     if (e.target.closest('.tk')) { stopRun(); return; }          // bấm vào từ: dừng lại để xem nghĩa (bảng nghĩa hiện ngay trên màn hình)
-    if (document.fullscreenElement || document.webkitFullscreenElement) run ? stopRun() : startRun();
+    if (isFs()) { run ? stopRun() : startRun(); setTimeout(syncFsBtn, 50); }
   });
   const onKey = e => {
     if (!root.isConnected) { document.removeEventListener('keydown', onKey); stopRun(); return; }
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+    if (e.key === 'Escape' && stage.classList.contains('ap-fs')) { pseudoFs(false); return; }
     if (e.key === ' ') { e.preventDefault(); run ? stopRun() : startRun(); }
     else if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1);
   };
