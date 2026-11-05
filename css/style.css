@@ -936,9 +936,9 @@ html.locked body > :not(.gate) { display: none !important; }
 .ap-list.no-vi .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr); } .ap-list.no-vi.no-py .ap-row { grid-template-columns: 2em 1fr; }
 @media (max-width: 700px) { .ap-zh { font-size: 1.9rem; } .ap-row, .ap-list.no-vi .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em 1fr; } .ap-rv, .ap-rp { grid-column: 2; } }
 /* chữ đang đọc sáng lên */
-.ap-stage .ch { display: inline-block; } .ap-stage .ch, .ap-rz .ch { transition: color .12s, background .12s, text-shadow .12s; border-radius: 6px; }
+.ap-stage .ch, .ap-rz .ch { transition: color .12s, background .12s, text-shadow .12s; border-radius: 6px; }
 .ch.lit { color: var(--red); background: var(--gold2); text-shadow: 0 0 10px rgba(255, 196, 0, .95), 0 0 22px rgba(255, 170, 0, .6); }
-.ap-stage .ch.lit { transform: scale(1.12); }
+
 
 /* bảng nghĩa khi đang toàn màn hình */
 .pop.in-fs { position: fixed; z-index: 2147483000; text-align: left; font-size: 1rem; cursor: auto; }
@@ -958,3 +958,16 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 /* toàn màn hình: nút ẩn, chạm màn hình mới hiện */
 .ap-stage:fullscreen .ap-fsbar, .ap-stage.ap-fs .ap-fsbar { transition: opacity .25s, transform .25s; opacity: 0; transform: translateY(24px); pointer-events: none; }
 .ap-stage:fullscreen.ui-on .ap-fsbar, .ap-stage.ap-fs.ui-on .ap-fsbar { opacity: 1; transform: none; pointer-events: auto; }
+/* pinyin nằm ngay trên đầu từng chữ Hán */
+.ap-zh .ch, .ap-rz .ch { ruby-position: over; }
+.ap-zh rt, .ap-rz rt { display: ruby-text; font: 400 .36em var(--py, var(--ui)); color: #2f6f9f; letter-spacing: 0; padding-bottom: .1em; }
+.ap-rz rt { font-size: .5em; }
+.ap-zh { line-height: 1.9; } .ap-rz { line-height: 2.1; }
+.ap-stage.no-py rt, .ap-list.no-py rt { display: none; }
+.ch.lit rt { color: var(--red); }
+.ap-row, .ap-list.no-vi .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em minmax(0, 1.3fr) minmax(0, 1fr); }
+.ap-list.no-vi .ap-row { grid-template-columns: 2em 1fr; }
+@media (max-width: 700px) { .ap-row, .ap-list.no-py .ap-row { grid-template-columns: 2em 1fr; } .ap-rv { grid-column: 2; } }
+.ap-zh .tk, .ap-rz .tk { padding: 0 1px; margin: 0; }
+.ap-zh ruby.ch, .ap-rz ruby.ch { display: ruby; padding: 0 .04em; }
+.ap-stage.ap-fs .ap-zh rt, .ap-stage:fullscreen .ap-zh rt { font-size: .42em; }

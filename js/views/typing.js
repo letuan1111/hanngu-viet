@@ -269,7 +269,7 @@ export function typingPage(root) {
     </div>
     <div class="ap-stage ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" id="apStage">
       <div class="ap-n" id="apN"></div>
-      <div class="ap-py" id="apPyT"></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
+      <div class="ap-py" id="apPyT" hidden></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
       <div class="bar"><i id="apBar" style="width:0"></i></div>
       <div class="ap-fsbar"><button class="btn ghost sm" data-fs="prev" aria-label="Câu trước">‹</button><button class="btn sm" data-fs="play" aria-label="Chạy hoặc dừng">▶</button><button class="btn ghost sm" data-fs="next" aria-label="Câu sau">›</button><button class="btn ghost sm" data-fs="exit" aria-label="Thoát toàn màn hình">✕ Thoát</button></div>
     </div>
@@ -281,7 +281,15 @@ export function typingPage(root) {
   let rows = [], cur = 0, tm = 0, run = null;
   const pyOf = r => r.py || sentencePinyin(r.zh);
   // tách từng chữ trong mỗi từ thành <span class="ch"> để làm sáng đúng chữ đang đọc
-  const zhChars = zh => zhTokens(zh, { gloss: false }).replace(/<span class="hz">([^<]*)<\/span>/g, (_, t) => `<span class="hz">${[...t].map(c => `<span class="ch">${c}</span>`).join('')}</span>`);
+  // chữ Hán kèm pinyin ngay trên đầu từng chữ; dùng pinyin bạn nhập nếu số âm tiết khớp số chữ, không thì lấy theo từ điển
+  const sylOf = py => String(py || '').toLowerCase().replace(/[^a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü\s]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  const zhChars = (zh, py) => {
+    const hanIdx = [...zh].map((c, i) => isHan(c) ? i : -1).filter(i => i >= 0);
+    const us = sylOf(py), dict = charPinyins(hanIdx.map(i => [...zh][i]).join('')) || [];
+    const pyAt = {}; hanIdx.forEach((ci, k) => { pyAt[ci] = (us.length === hanIdx.length ? us[k] : dict[k]) || ''; });
+    return zhTokens(zh, { gloss: false }).replace(/data-i="(\d+)"([^>]*)><ruby><span class="hz">([^<]*)<\/span><rt>[^<]*<\/rt><\/ruby>/g,
+      (_, st, rest, t) => `data-i="${st}"${rest}><span class="hz">${[...t].map((c, j) => `<ruby class="ch">${c}<rt>${esc(pyAt[+st + j] || '')}</rt></ruby>`).join('')}</span>`);
+  };
   const charMap = el => { const out = []; $$('.tk', el).forEach(t => { const st = +t.dataset.i; $$('.ch', t).forEach((c, j) => out.push([st + j, c])); }); return out; };
   let litT = null;
   // đọc câu hiện tại; chữ đang đọc sáng lên (dùng mốc thời gian trình duyệt báo, không có thì ước lượng theo tốc độ đọc)
@@ -304,7 +312,7 @@ export function typingPage(root) {
     if (cur >= rows.length) cur = 0;
     $('#tpCnt', root).textContent = rows.length ? `${rows.length} câu · ${[...rows.map(r => r.zh).join('')].filter(isHan).length} chữ Hán` : '';
     words.innerHTML = rows.length ? analyzeHtml(rows.map(r => [r.zh, r.vi])) : '<p class="muted">Nhập nội dung tiếng Trung ở ô phía trên – các từ sẽ hiện ra ở đây để bạn bấm xem.</p>';
-    list.innerHTML = rows.map((r, i) => `<div class="ap-row" data-i="${i}"><span class="ap-no">${i + 1}</span><div class="ap-rz zh" lang="zh-CN">${zhChars(r.zh)}</div><div class="ap-rv">${esc(r.vi)}</div><div class="ap-rp">${esc(pyOf(r))}</div></div>`).join('');
+    list.innerHTML = rows.map((r, i) => `<div class="ap-row" data-i="${i}"><span class="ap-no">${i + 1}</span><div class="ap-rz zh" lang="zh-CN">${zhChars(r.zh, r.py)}</div><div class="ap-rv">${esc(r.vi)}</div></div>`).join('');
     show();
   };
   function show() {
@@ -312,7 +320,7 @@ export function typingPage(root) {
     if (!r) { $('#apN', root).textContent = ''; $('#apZh', root).innerHTML = '<span class="muted" style="font-size:1rem">Nhập nội dung ở ô phía trên để máy chạy.</span>'; $('#apPyT', root).textContent = ''; $('#apViT', root).textContent = ''; $('#apBar', root).style.width = '0'; return; }
     $('#apN', root).textContent = `Câu ${cur + 1}/${rows.length}`;
     $('#apPyT', root).textContent = pyOf(r);
-    $('#apZh', root).innerHTML = zhChars(r.zh);
+    $('#apZh', root).innerHTML = zhChars(r.zh, r.py);
     $('#apViT', root).textContent = r.vi || (opt.vi ? '' : '');
     $('#apViT', root).classList.toggle('empty', !r.vi);
     $('#apBar', root).style.width = ((cur + 1) / rows.length * 100) + '%';
