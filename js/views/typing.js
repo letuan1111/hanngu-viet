@@ -245,12 +245,12 @@ export function typingPage(root) {
   const q = new URLSearchParams(location.hash.split('?')[1] || '');
   let fromLink = null;
   if (q.get('d')) { try { const a = JSON.parse(b64d(q.get('d'))); fromLink = { t: a.t || '', rows: (a.r || []).map(([zh, vi, py]) => ({ zh: zh || '', vi: vi || '', py: py || '' })).filter(r => r.zh) }; } catch { toast('Link không đúng hoặc bị thiếu – không đọc được nội dung.', 'bad'); } }
-  const opt = { py: true, vi: true, voice: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
+  const opt = { py: true, pyMode: 'line', vi: true, voice: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
   const saveOpt = () => store.update(s => { s.apOpt = { ...opt }; });
   root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Tự nhập nội dung</p><h1>⌨️ Đánh máy</h1></div></div>
   ${fromLink ? `<div class="note">🔗 Đang mở nội dung từ link được chia sẻ${fromLink.t ? `: <b>${esc(fromLink.t)}</b>` : ''} (${fromLink.rows.length} câu). Nội dung chỉ được lưu vào máy bạn khi bạn sửa ô nhập bên dưới.</div>` : ''}
   <section class="card tp-in">
-    <p class="muted small">Nhập mỗi câu một dòng theo dạng <b>Tiếng Trung | Tiếng Việt</b> (có thể dán thẳng bảng từ Word/Excel, hoặc ghi câu tiếng Trung rồi xuống dòng ghi nghĩa). <b>Pinyin do máy tự tạo</b> và hiện ngay trên đầu từng chữ; chỉ có tiếng Trung cũng được. Mỗi từ đều bấm vào được để xem nghĩa. Nội dung được lưu trên trình duyệt của bạn.</p>
+    <p class="muted small">Nhập mỗi câu một dòng theo dạng <b>Tiếng Trung | Tiếng Việt</b> (có thể dán thẳng bảng từ Word/Excel, hoặc ghi câu tiếng Trung rồi xuống dòng ghi nghĩa). <b>Pinyin do máy tự tạo</b> và tự hiện (thành dòng riêng hoặc trên đầu từng chữ – chọn ở mục “Pinyin hiện”); chỉ có tiếng Trung cũng được. Mỗi từ đều bấm vào được để xem nghĩa. Nội dung được lưu trên trình duyệt của bạn.</p>
     <textarea class="inp ty-text" id="tpText" lang="zh-CN" rows="7" maxlength="6000" placeholder="我叫小明。 | Tôi tên là Tiểu Minh.&#10;我是越南人。 | Tôi là người Việt Nam.&#10;我很喜欢学习汉语。 | Tôi rất thích học tiếng Trung.">${esc(fromLink ? rowsToText(fromLink.rows) : store.s.typeCustom || '')}</textarea>
     <div class="row gap wrap"><button class="btn" id="tpRun">▶ Máy chạy tự động</button><button class="btn ghost" id="tpStart">⌨️ Luyện gõ đoạn này</button><button class="btn ghost" id="tpLink">🔗 Tạo link chia sẻ</button><button class="btn ghost" id="tpClear">🗑️ Xóa nội dung</button><span class="muted small" id="tpCnt"></span></div>
   </section>
@@ -260,6 +260,7 @@ export function typingPage(root) {
       <button class="btn" id="apPlay">▶ Chạy</button><button class="btn ghost sm" id="apPrev" aria-label="Câu trước">‹ Trước</button><button class="btn ghost sm" id="apNext" aria-label="Câu sau">Sau ›</button><button class="btn ghost sm" id="apSay">🔊 Đọc câu này</button>
       <label class="sw" title="Tắt để máy chạy im lặng: chữ vẫn sáng lần lượt và tự chuyển câu"><input type="checkbox" id="apVoice" ${opt.voice ? 'checked' : ''}><span></span> 🔊 Máy đọc</label>
       <label class="sw"><input type="checkbox" id="apPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
+      <label class="sel">Pinyin hiện <select id="apPyMode"><option value="line" ${opt.pyMode !== 'ruby' ? 'selected' : ''}>thành dòng riêng</option><option value="ruby" ${opt.pyMode === 'ruby' ? 'selected' : ''}>trên đầu từng chữ</option></select></label>
       <label class="sw"><input type="checkbox" id="apVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>
       <label class="sel">Tốc độ <select id="apRate">${[0.6, 0.75, 0.9, 1, 1.2].map(v => `<option value="${v}" ${v === +opt.rate ? 'selected' : ''}>${v}x</option>`).join('')}</select></label>
       <label class="sel">Nghỉ <select id="apGap">${[1, 2, 3, 5, 8].map(v => `<option value="${v}" ${v === +opt.gap ? 'selected' : ''}>${v} giây</option>`).join('')}</select></label>
@@ -269,7 +270,7 @@ export function typingPage(root) {
     </div>
     <div class="ap-stage ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" id="apStage">
       <div class="ap-n" id="apN"></div>
-      <div class="ap-py" id="apPyT" hidden></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
+      <div class="ap-py" id="apPyT"></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
       <div class="bar"><i id="apBar" style="width:0"></i></div>
       <div class="ap-fsbar"><button class="btn ghost sm" data-fs="prev" aria-label="Câu trước">‹</button><button class="btn sm" data-fs="play" aria-label="Chạy hoặc dừng">▶</button><button class="btn ghost sm" data-fs="next" aria-label="Câu sau">›</button><button class="btn ghost sm" data-fs="exit" aria-label="Thoát toàn màn hình">✕ Thoát</button></div>
     </div>
@@ -279,7 +280,7 @@ export function typingPage(root) {
   <section class="card ty-sec" id="tpTrain" hidden><h2>⌨️ Luyện gõ</h2><div id="tpTy"></div></section>`;
   const ta = $('#tpText', root), words = $('#tpWords', root), stage = $('#apStage', root), list = $('#apList', root);
   let rows = [], cur = 0, tm = 0, run = null;
-  const pyOf = r => r.py || sentencePinyin(r.zh);
+  const pyOf = r => sentencePinyin(r.zh);   // pinyin máy tự tạo
   // tách từng chữ trong mỗi từ thành <span class="ch"> để làm sáng đúng chữ đang đọc
   // chữ Hán kèm pinyin ngay trên đầu từng chữ – pinyin do máy tự tạo theo từ điển (có biến điệu 一, 不)
   const zhChars = (zh, py) => {
@@ -311,7 +312,7 @@ export function typingPage(root) {
     if (cur >= rows.length) cur = 0;
     $('#tpCnt', root).textContent = rows.length ? `${rows.length} câu · ${[...rows.map(r => r.zh).join('')].filter(isHan).length} chữ Hán` : '';
     words.innerHTML = rows.length ? analyzeHtml(rows.map(r => [r.zh, r.vi])) : '<p class="muted">Nhập nội dung tiếng Trung ở ô phía trên – các từ sẽ hiện ra ở đây để bạn bấm xem.</p>';
-    list.innerHTML = rows.map((r, i) => `<div class="ap-row" data-i="${i}"><span class="ap-no">${i + 1}</span><div class="ap-rz zh" lang="zh-CN">${zhChars(r.zh, r.py)}</div><div class="ap-rv">${esc(r.vi)}</div></div>`).join('');
+    list.innerHTML = rows.map((r, i) => `<div class="ap-row" data-i="${i}"><span class="ap-no">${i + 1}</span><div class="ap-rz zh" lang="zh-CN">${zhChars(r.zh, r.py)}</div><div class="ap-rv">${esc(r.vi)}</div><div class="ap-rp">${esc(pyOf(r))}</div></div>`).join('');
     show();
   };
   function show() {
@@ -349,7 +350,9 @@ export function typingPage(root) {
   $('#apPrev', root).onclick = () => go(-1); $('#apNext', root).onclick = () => go(1);
   $('#apSay', root).onclick = () => { if (rows[cur]) { stopRun(); sayCur(true); } };
   $('#apVoice', root).onchange = e => { opt.voice = e.target.checked; saveOpt(); if (!opt.voice) stopSeq(); };
-  const tog = () => { [stage, list].forEach(el => { el.classList.toggle('no-py', !opt.py); el.classList.toggle('no-vi', !opt.vi); }); saveOpt(); };
+  const tog = () => { [stage, list].forEach(el => { el.classList.toggle('no-py', !opt.py); el.classList.toggle('no-vi', !opt.vi); el.classList.toggle('py-ruby', opt.pyMode === 'ruby'); }); saveOpt(); };
+  $('#apPyMode', root).onchange = e => { opt.pyMode = e.target.value; tog(); };
+  [stage, list].forEach(el => el.classList.toggle('py-ruby', opt.pyMode === 'ruby'));
   $('#apPy', root).onchange = e => { opt.py = e.target.checked; tog(); };
   $('#apVi', root).onchange = e => { opt.vi = e.target.checked; tog(); };
   $('#apRate', root).onchange = e => { opt.rate = +e.target.value; saveOpt(); };

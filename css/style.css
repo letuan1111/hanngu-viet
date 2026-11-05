@@ -971,3 +971,11 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .ap-zh .tk, .ap-rz .tk { padding: 0 1px; margin: 0; }
 .ap-zh ruby.ch, .ap-rz ruby.ch { display: ruby; padding: 0 .04em; }
 .ap-stage.ap-fs .ap-zh rt, .ap-stage:fullscreen .ap-zh rt { font-size: .42em; }
+
+/* Kiểu pinyin: dòng riêng (mặc định) hoặc trên đầu từng chữ */
+.ap-stage:not(.py-ruby) .ap-zh rt, .ap-list:not(.py-ruby) .ap-rz rt { display: none; }
+.ap-stage:not(.py-ruby) .ap-zh { line-height: 1.5; } .ap-list:not(.py-ruby) .ap-rz { line-height: 1.5; }
+.ap-stage.py-ruby .ap-py, .ap-list.py-ruby .ap-rp { display: none; }
+.ap-list:not(.py-ruby):not(.no-py) .ap-row { grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
+.ap-list:not(.py-ruby):not(.no-py).no-vi .ap-row { grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr); }
+@media (max-width: 700px) { .ap-list .ap-row, .ap-list:not(.py-ruby):not(.no-py) .ap-row, .ap-list:not(.py-ruby):not(.no-py).no-vi .ap-row { grid-template-columns: 2em 1fr; } .ap-rp { grid-column: 2; } }
