@@ -250,8 +250,8 @@ export function typingPage(root) {
   root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Tự nhập nội dung</p><h1>⌨️ Đánh máy</h1></div></div>
   ${fromLink ? `<div class="note">🔗 Đang mở nội dung từ link được chia sẻ${fromLink.t ? `: <b>${esc(fromLink.t)}</b>` : ''} (${fromLink.rows.length} câu). Nội dung chỉ được lưu vào máy bạn khi bạn sửa ô nhập bên dưới.</div>` : ''}
   <section class="card tp-in">
-    <p class="muted small">Nhập mỗi câu một dòng theo dạng <b>Tiếng Trung | Tiếng Việt | Pinyin</b> (có thể dán thẳng bảng 3 cột từ Word/Excel, hoặc ghi câu tiếng Trung rồi xuống dòng ghi nghĩa, pinyin). Thiếu pinyin thì máy tự tạo; chỉ có tiếng Trung cũng được. Mỗi từ đều bấm vào được để xem nghĩa. Nội dung được lưu trên trình duyệt của bạn.</p>
-    <textarea class="inp ty-text" id="tpText" lang="zh-CN" rows="7" maxlength="6000" placeholder="我叫小明。 | Tôi tên là Tiểu Minh. | Wǒ jiào Xiǎo Míng.&#10;我是越南人。 | Tôi là người Việt Nam. | Wǒ shì Yuènán rén.&#10;我很喜欢学习汉语。 | Tôi rất thích học tiếng Trung.">${esc(fromLink ? rowsToText(fromLink.rows) : store.s.typeCustom || '')}</textarea>
+    <p class="muted small">Nhập mỗi câu một dòng theo dạng <b>Tiếng Trung | Tiếng Việt</b> (có thể dán thẳng bảng từ Word/Excel, hoặc ghi câu tiếng Trung rồi xuống dòng ghi nghĩa). <b>Pinyin do máy tự tạo</b> và hiện ngay trên đầu từng chữ; chỉ có tiếng Trung cũng được. Mỗi từ đều bấm vào được để xem nghĩa. Nội dung được lưu trên trình duyệt của bạn.</p>
+    <textarea class="inp ty-text" id="tpText" lang="zh-CN" rows="7" maxlength="6000" placeholder="我叫小明。 | Tôi tên là Tiểu Minh.&#10;我是越南人。 | Tôi là người Việt Nam.&#10;我很喜欢学习汉语。 | Tôi rất thích học tiếng Trung.">${esc(fromLink ? rowsToText(fromLink.rows) : store.s.typeCustom || '')}</textarea>
     <div class="row gap wrap"><button class="btn" id="tpRun">▶ Máy chạy tự động</button><button class="btn ghost" id="tpStart">⌨️ Luyện gõ đoạn này</button><button class="btn ghost" id="tpLink">🔗 Tạo link chia sẻ</button><button class="btn ghost" id="tpClear">🗑️ Xóa nội dung</button><span class="muted small" id="tpCnt"></span></div>
   </section>
   <section class="card ap" id="ap">
@@ -281,12 +281,11 @@ export function typingPage(root) {
   let rows = [], cur = 0, tm = 0, run = null;
   const pyOf = r => r.py || sentencePinyin(r.zh);
   // tách từng chữ trong mỗi từ thành <span class="ch"> để làm sáng đúng chữ đang đọc
-  // chữ Hán kèm pinyin ngay trên đầu từng chữ; dùng pinyin bạn nhập nếu số âm tiết khớp số chữ, không thì lấy theo từ điển
-  const sylOf = py => String(py || '').toLowerCase().replace(/[^a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü\s]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  // chữ Hán kèm pinyin ngay trên đầu từng chữ – pinyin do máy tự tạo theo từ điển (có biến điệu 一, 不)
   const zhChars = (zh, py) => {
     const hanIdx = [...zh].map((c, i) => isHan(c) ? i : -1).filter(i => i >= 0);
-    const us = sylOf(py), dict = charPinyins(hanIdx.map(i => [...zh][i]).join('')) || [];
-    const pyAt = {}; hanIdx.forEach((ci, k) => { pyAt[ci] = (us.length === hanIdx.length ? us[k] : dict[k]) || ''; });
+    const dict = charPinyins(hanIdx.map(i => [...zh][i]).join('')) || [];
+    const pyAt = {}; hanIdx.forEach((ci, k) => { pyAt[ci] = dict[k] || ''; });
     return zhTokens(zh, { gloss: false }).replace(/data-i="(\d+)"([^>]*)><ruby><span class="hz">([^<]*)<\/span><rt>[^<]*<\/rt><\/ruby>/g,
       (_, st, rest, t) => `data-i="${st}"${rest}><span class="hz">${[...t].map((c, j) => `<ruby class="ch">${c}<rt>${esc(pyAt[+st + j] || '')}</rt></ruby>`).join('')}</span>`);
   };
