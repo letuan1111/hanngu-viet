@@ -79,6 +79,12 @@ export function parseKeyText(text, lv) {
     const q = qs.find(z => z.n === +m[1]); if (!q || q.t === 'text' || key[q.n]) continue;
     const r = normTok(m[2], q.t); if (r) key[q.n] = r;
   }
+  // dạng gộp “1-5 √×√××”, “6～10 ACBDA”
+  for (const m of flat.matchAll(/(\d{1,2})\s*[-–—~～]\s*(\d{1,2})\s*[.．:：、]?\s*((?:[A-Fa-f√×✓✗✔✕xX对错]\s*){2,10})(?![A-Za-z])/g)) {
+    const a = +m[1], b = +m[2], toks = m[3].replace(/\s+/g, '').split('');
+    if (b - a + 1 !== toks.length) continue;
+    toks.forEach((v, j) => { const q = qs.find(z => z.n === a + j); if (!q || q.t === 'text' || key[q.n]) return; const r = normTok(v, q.t); if (r) key[q.n] = r; });
+  }
   const tq = qs.filter(q => q.t === 'text');
   if (tq.length) for (const m of flat.matchAll(/(\d{2})\s*[．.、:：]\s*([^]*?)(?=\s\d{1,2}\s*[．.、:：]|\n|$)/g)) {
     const n = +m[1]; if (!tq.some(q => q.n === n) || key[n]) continue;
@@ -150,6 +156,51 @@ async function renderPages(pdf, list, onp) {
   return out;
 }
 async function pdfText(file) { const pdf = await openPdf(file); let s = ''; for (let i = 1; i <= pdf.numPages; i++) { const tc = await (await pdf.getPage(i)).getTextContent(); s += tc.items.map(x => x.str).join(' ') + '\n'; } return s; }
+// ── Đề và đáp án (và lời thoại) nằm chung một file PDF: tìm các trang đáp án / lời thoại ở phía sau ──
+async function pageTexts(pdf) { const out = []; for (let i = 1; i <= pdf.numPages; i++) { const tc = await (await pdf.getPage(i)).getTextContent(); out.push(tc.items.map(x => x.str).join(' ')); } return out; }
+// File quét (chỉ có ảnh, không có chữ): nhận dạng chữ (OCR) các trang cuối để tìm đáp án
+let tessLib = null;
+const loadTess = () => tessLib || (tessLib = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; sc.onload = () => res(window.Tesseract); sc.onerror = () => { tessLib = null; rej(new Error('không tải được bộ nhận dạng chữ')); }; document.head.appendChild(sc); }));
+async function ocrPages(pdf, list, onp) {
+  const T = await loadTess(), w = await T.createWorker('chi_sim+eng'), out = {};
+  try {
+    for (let k = 0; k < list.length; k++) {
+      const [blob] = await renderPages(pdf, [list[k]]);
+      out[list[k]] = (await w.recognize(blob)).data.text.replace(/√/g, '√').replace(/[Xx×]/g, '×');
+      onp && onp(k + 1, list.length);
+    }
+  } finally { await w.terminate(); }
+  return out;
+}
+const KEY_H = /答案|参考答案|đáp án|dap an|answer ?key|answers/i;
+const TR_H = /听力材料|听力文本|听力原文|录音材料|录音文本|录音稿|lời thoại|transcript/i;
+const keyCount = (t, lv) => Object.keys(parseKeyText(t, lv)).length;
+// Phân loại từng trang: 'exam' (đề), 'tr' (lời thoại), 'key' (đáp án), 'trkey' (lời thoại + đáp án cùng trang)
+export function classifyPages(texts, lv) {
+  const need = qList(lv).filter(q => q.t !== 'text').length;
+  let inTr = false;
+  return texts.map((t, i) => {
+    const n = keyCount(t, lv), han = (t.match(/\p{Script=Han}/gu) || []).length;
+    const key = (KEY_H.test(t) && n >= 5) || n >= Math.max(12, need * 0.4);
+    if (i > 0 && TR_H.test(t)) inTr = true;
+    if (key) { const both = inTr && han > 250; inTr = false; return both ? 'trkey' : 'key'; }
+    return inTr ? 'tr' : 'exam';
+  });
+}
+// Đọc một file PDF chung: trả về các trang đề, trang lời thoại và đáp án tìm được
+async function splitCombined(pdf, lv, P, pre = '') {
+  let texts = await pageTexts(pdf);
+  let ocr = false;
+  if (texts.every(t => (t.match(/[\p{Script=Han}A-Za-z0-9]/gu) || []).length < 20)) { // file quét
+    const last = range(Math.max(1, pdf.numPages - 3), pdf.numPages);
+    try { const o = await ocrPages(pdf, last, (i, n) => P && P.set(pre + `nhận dạng chữ trang cuối ${i}/${n} (file quét)…`)); texts = texts.map((t, i) => o[i + 1] ?? t); ocr = true; }
+    catch (e) { console.warn(e); }
+  }
+  const kind = classifyPages(texts, lv), pick = k => kind.map((x, i) => k.includes(x) ? i + 1 : 0).filter(Boolean);
+  const keyText = pick(['key', 'trkey']).map(i => texts[i - 1]).join('\n');
+  return { exam: pick(['exam']), tr: pick(['tr', 'trkey']), key: keyText ? parseKeyText(keyText, lv) : {}, keyPages: pick(['key', 'trkey']), ocr };
+}
+
 // Sách nhiều đề đã biết cấu trúc: web tự tách đề + có sẵn đáp án
 const BOOKS = [{ id: 'hsk1-wj', level: 1, name: 'Sách HSK1 (王江)', pages: 173, tests: 10, first: 19, step: 10, len: 10, cover: true, tr: [119, 122, 125, 129, 132, 136, 139, 142, 146, 149, 152],
   keys: ['NYYNNABABCFCADEABCBANNYNYEFDCADBFAEDACFB', 'NNNYNCBAABCEFBABCBCBYNNYYFABEDCAEFBFABCD', 'YYNNNABBABCDAFBBACCANYYNNDACFBFEBADCADFB', 'NYNNYCABBBDAFBEABCBANYNYNBECFAEDAFBCADFB', 'NNYNYBCBBBEAFBCBBCACNYNNYBCADEEDFACDACFB', 'YYNNNACBCACABDEBBACAYNYNNDBEAFDFACEDBFAC', 'NNYNNACBACDAFCBCBABCNYNYYDAFBCCDFABBDFAC', 'NNNYYACBBCBDFAEABACBNNYYYCABDEDFBEABADFC', 'NNYNYACCBCAEFBCCBBBANNNYYCFEADDFCAEADBFC', 'NYNYNAABACCFAEDBBAACNNYYNDAEBFDEBACCDFBA'] }];
@@ -275,7 +326,7 @@ export async function importFiles(files, lvSel, done) {
   files = files.filter(f => /\.(pdf|mp3|m4a|wav|ogg)$/i.test(f.name));
   if (!files.length) return toast('Không thấy file .pdf hoặc .mp3', 'bad');
   const forced = lvSel === 'auto' ? 0 : +lvSel;
-  let made = 0, P = null;
+  let made = 0, P = null; const foundIn = [];
   try {
     // sách nhiều đề (PDF > 30 trang): tách thành từng đề
     for (const f of files.filter(f => /\.pdf$/i.test(f.name) && f.size > 3e6)) {
@@ -312,11 +363,20 @@ export async function importFiles(files, lvSel, done) {
         const examF = pdfs.filter(f => f !== keyF && f !== trF).sort((a, b) => b.size - a.size)[0];
         if (!examF && !audio && !keyF) continue;
         const pre = `Bộ ${gi}/${groups.size} (${g.code}): `;
-        let imgs = [];
-        if (examF) { const pe = await openPdf(examF); imgs = await renderPages(pe, range(1, pe.numPages), (i, n) => P.set(pre + `đọc trang đề ${i}/${n}`, (gi - 1 + i / n * .7) / groups.size)); }
-        let key = {};
+        let imgs = [], key = {}, tr = [];
+        if (examF) {
+          const pe = await openPdf(examF); let pages = range(1, pe.numPages);
+          // đáp án / lời thoại nằm chung trong file đề (thường ở các trang cuối)
+          if (!keyF || !trF) {
+            P.set(pre + 'tìm đáp án và lời thoại trong file đề…', (gi - 1 + .05) / groups.size);
+            const sp = await splitCombined(pe, lv, P, pre);
+            if (!keyF && Object.keys(sp.key).length) { key = sp.key; foundIn.push(`${g.code}: ${Object.keys(key).length} đáp án ở trang ${sp.keyPages.join(', ')}${sp.ocr ? ' (nhận dạng từ ảnh – nên kiểm tra lại)' : ''}`); }
+            if (!trF && sp.tr.length) { tr = await renderPages(pe, sp.tr, (i, n) => P.set(pre + `đọc lời thoại ${i}/${n}`, (gi - 1 + .8 + i / n * .2) / groups.size)); }
+            if (Object.keys(sp.key).length || sp.tr.length) pages = sp.exam.length ? sp.exam : pages;   // không cho trang đáp án lẫn vào tờ đề
+          }
+          imgs = await renderPages(pe, pages, (i, n) => P.set(pre + `đọc trang đề ${i}/${n}`, (gi - 1 + .1 + i / n * .6) / groups.size));
+        }
         if (keyF) { P.set(pre + 'đọc đáp án', (gi - 1 + .75) / groups.size); key = parseKeyText(await pdfText(keyF), lv); }
-        let tr = [];
         if (trF) { const p2 = await openPdf(trF); tr = await renderPages(p2, range(1, p2.numPages), (i, n) => P.set(pre + `đọc lời thoại ${i}/${n}`, (gi - 1 + .8 + i / n * .2) / groups.size)); }
         await DB.put({ id: 's' + Date.now().toString(36) + gi, level: lv, code: g.code, name: (g.dir && !g.dir.includes(g.code) ? g.dir + ' · ' : '') + g.code, created: Date.now(), pages: imgs, transcript: tr, audio: audio || null, audioName: audio ? audio.name : '', key, tries: [], lvGuess: !forced && !g.lv });
         made++;
@@ -324,7 +384,7 @@ export async function importFiles(files, lvSel, done) {
       P.close(); P = null;
     }
   } catch (e) { console.error(e); P && P.close(); toast('Lỗi khi đọc file: ' + e.message, 'bad'); }
-  if (made) toast(`Đã thêm ${made} bộ đề. Kiểm tra đáp án ở nút “Đáp án & link”.`, 'good');
+  if (made) toast(`Đã thêm ${made} bộ đề.${foundIn.length ? ' Đã tự đọc đáp án ở cuối file – ' + foundIn.join('; ') + '.' : ''} Kiểm tra đáp án ở nút “Đáp án & link”.`, 'good');
   done && done();
 }
 
@@ -347,6 +407,8 @@ export async function examEdit(root, id) {
       <label class="wide">📄 Link tờ đề (không bắt buộc) <input class="inp" id="mPaper" placeholder="Link PDF, ảnh hoặc Google Drive" value="${esc(d.paperUrl || '')}">${d.pages && d.pages.length ? `<span class="muted small">Đã có ${d.pages.length} trang đề tải từ PDF.</span>` : ''}</label>
       <label class="wide">Ghi chú <textarea class="inp" id="mNote" rows="2" maxlength="1000" placeholder="Nguồn đề, năm thi…">${esc(d.note || '')}</textarea></label>
     </div></section>
+    <section class="card me-keyfile"><b>📄 Đọc đáp án từ file PDF</b> <span class="muted small">Chọn file đáp án, hoặc chính file đề có đáp án ở các trang cuối – máy tự tìm trang đáp án và điền vào phiếu bên dưới.</span>
+      <div class="row gap wrap" style="margin-top:6px"><label class="btn ghost sm">Chọn file PDF<input type="file" id="mKeyPdf" accept=".pdf,application/pdf" hidden></label><span class="small" id="mKeyMsg"></span></div></section>
     <div id="mSheet"></div>
     <div class="me-save card"><span class="muted" id="mStat"></span><span class="grow"></span><a class="btn ghost" href="#/exam">Hủy</a><button class="btn ghost" id="mSave">💾 Lưu</button><button class="btn" id="mSaveGo">Lưu & thi</button></div>`;
   const key = { ...d.key };
@@ -387,6 +449,18 @@ export async function examEdit(root, id) {
     if (!Object.keys(d.key).length) toast('Chưa có đáp án – vẫn làm bài được nhưng không chấm điểm.');
     await DB.put(d); if (Object.keys(d.key).length) toast('Đã lưu.', 'good');
     location.hash = go ? '#/exam/do/' + d.id : '#/exam';
+  };
+  $('#mKeyPdf', root).onchange = async e => {
+    const f = e.target.files[0]; if (!f) return; const msg = $('#mKeyMsg', root); msg.innerHTML = '<span class="muted">Đang đọc file…</span>';
+    try {
+      const pdf = await openPdf(f), sp = await splitCombined(pdf, d.level, { set: t => { msg.innerHTML = `<span class="muted">${esc(t)}</span>`; } });
+      let k = sp.key; if (!Object.keys(k).length && !sp.ocr) k = parseKeyText(await pdfText(f), d.level);
+      const n = Object.keys(k).length;
+      if (!n) { msg.innerHTML = '<span class="bad-t">Không tìm thấy đáp án trong file này. Nếu là file ảnh quét mờ, hãy dán đáp án bằng ô “⚡ Dán nhanh”.</span>'; return; }
+      readKey(); Object.assign(key, k); drawSheet();
+      msg.innerHTML = `<span class="ok-t">Đã điền ${n} đáp án${sp.keyPages.length ? ` (trang ${sp.keyPages.join(', ')})` : ''}.</span>${sp.ocr ? ' <span class="bad-t">Đọc từ ảnh quét – hãy kiểm tra lại.</span>' : ''} Nhớ bấm “Lưu”.`;
+    } catch (err) { msg.innerHTML = `<span class="bad-t">Lỗi khi đọc file: ${esc(err.message || err)}</span>`; }
+    e.target.value = '';
   };
   $('#mSave', root).onclick = () => save(false); $('#mSaveGo', root).onclick = () => save(true);
   return isNew ? 'Tạo đề thi' : 'Đáp án đề thi';
