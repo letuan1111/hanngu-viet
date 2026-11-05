@@ -954,3 +954,7 @@ html.locked body > :not(.gate) { display: none !important; }
 html.ap-lock, html.ap-lock body { overflow: hidden; }
 .pop.in-fs.sheet { z-index: 9500; }
 .pop.in-fs { z-index: 2147483000; }
+
+/* toàn màn hình: nút ẩn, chạm màn hình mới hiện */
+.ap-stage:fullscreen .ap-fsbar, .ap-stage.ap-fs .ap-fsbar { transition: opacity .25s, transform .25s; opacity: 0; transform: translateY(24px); pointer-events: none; }
+.ap-stage:fullscreen.ui-on .ap-fsbar, .ap-stage.ap-fs.ui-on .ap-fsbar { opacity: 1; transform: none; pointer-events: auto; }

@@ -353,7 +353,12 @@ export function typingPage(root) {
   const realFs = () => document.fullscreenElement || document.webkitFullscreenElement;
   function isFs() { return !!realFs() || stage.classList.contains('ap-fs'); }
   const pseudoFs = on => { stage.classList.toggle('ap-fs', on); document.documentElement.classList.toggle('ap-lock', on); if (!on) closePop(); };
+  // các nút ở chế độ toàn màn hình: ẩn đi cho gọn, chạm vào màn hình thì hiện lại 4 giây
+  let uiT = 0;
+  function showUi() { stage.classList.add('ui-on'); clearTimeout(uiT); uiT = setTimeout(() => stage.classList.remove('ui-on'), 4000); }
+  document.addEventListener('fullscreenchange', () => { if (realFs() === stage) showUi(); });
   async function enterFs() {
+    showUi();
     const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
     if (req && !isIOS) { try { await req.call(stage); return; } catch {} }
     pseudoFs(true);
@@ -361,13 +366,13 @@ export function typingPage(root) {
   function exitFs() { if (realFs()) (document.exitFullscreen || document.webkitExitFullscreen)?.call(document); pseudoFs(false); }
   $('#apFull', root).onclick = () => isFs() ? exitFs() : enterFs();
   const syncFsBtn = () => { const b = $('[data-fs=play]', stage); if (b) b.textContent = run ? '⏸' : '▶'; };
-  stage.addEventListener('click', e => { const b = e.target.closest('[data-fs]'); if (!b) return; e.stopPropagation(); const a = b.dataset.fs; if (a === 'exit') exitFs(); else if (a === 'prev') go(-1); else if (a === 'next') go(1); else { run ? stopRun() : startRun(); } setTimeout(syncFsBtn, 50); }, true);
+  stage.addEventListener('click', e => { const b = e.target.closest('[data-fs]'); if (!b) return; e.stopPropagation(); const a = b.dataset.fs; if (a === 'exit') exitFs(); else if (a === 'prev') go(-1); else if (a === 'next') go(1); else { run ? stopRun() : startRun(); } setTimeout(syncFsBtn, 50); showUi(); }, true);
   window.addEventListener('hashchange', () => pseudoFs(false), { once: true });
   list.addEventListener('click', e => { if (e.target.closest('.tk')) return; const r = e.target.closest('.ap-row'); if (!r) return; const was = !!run; stopRun(); cur = +r.dataset.i; show(); if (was) startRun(); else sayCur(); });
   stage.addEventListener('click', e => {
     if (e.target.closest('.pop')) return;
     if (e.target.closest('.tk')) { stopRun(); return; }          // bấm vào từ: dừng lại để xem nghĩa (bảng nghĩa hiện ngay trên màn hình)
-    if (isFs()) { run ? stopRun() : startRun(); setTimeout(syncFsBtn, 50); }
+    if (isFs()) showUi();     // chạm vào màn hình: hiện các nút (tự ẩn sau vài giây)
   });
   const onKey = e => {
     if (!root.isConnected) { document.removeEventListener('keydown', onKey); stopRun(); return; }
