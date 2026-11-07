@@ -524,7 +524,8 @@ const answeredN = ans => Object.values(ans).filter(v => v && String(v).trim()).l
 function sheetExam(root, s) {
   const lv = s.level, qs = qList(lv), ans = {};
   const am = !s.yt && s.audioUrl ? mediaOf(s.audioUrl) : null;
-  const audioHtml = s.yt ? `<div class="me-yt"><iframe id="ytf" data-src="${esc(ytSrc(s.yt, true))}" src="${esc(ytSrc(s.yt, false))}" title="File nghe" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
+  const audioHtml = s.yt ? `<div class="me-ytbar"><div class="me-yt mini" id="ytBox"><iframe id="ytf" data-src="${esc(ytSrc(s.yt, true))}" src="${esc(ytSrc(s.yt, false))}" title="File nghe" allow="autoplay; encrypted-media; picture-in-picture"></iframe></div>
+      <div class="me-ytinfo"><b>🎧 File nghe</b><span class="muted small">Chỉ cần nghe tiếng – dùng nút ▶ / ⏸ và thanh tua trên khung nhỏ bên cạnh.</span><button type="button" class="mini" id="ytBig">🔍 Phóng to video</button></div></div>`
     : am && am.kind === 'drive' ? `<iframe class="me-drive" src="${esc(am.src)}" title="File nghe" allow="autoplay"></iframe>`
     : am ? `<audio id="au" controls preload="auto" src="${esc(am.src || s.audioUrl)}"></audio><div class="muted small">Không phát được? <a href="${esc(s.audioUrl)}" target="_blank" rel="noopener">Mở link âm thanh</a></div>`
     : s.audio ? `<audio id="au" controls preload="auto" src="${objURL(s.audio)}"></audio><div class="muted small">🔊 ${esc(s.audioName || 'File nghe')}</div>` : '';
@@ -549,6 +550,7 @@ function sheetExam(root, s) {
   $('#hdl', root).onclick = () => $('#sheet', root).classList.toggle('open');
   $('#sheet', root).addEventListener('click', e => { const b = e.target.closest('.ex-op'); if (!b) return; const n = +b.dataset.n; ans[n] = ans[n] === b.dataset.v ? '' : b.dataset.v; $$(`.ex-op[data-n="${n}"]`, root).forEach(x => x.classList.toggle('on', x.dataset.v === ans[n])); cnt(); });
   $('#sheet', root).addEventListener('input', e => { const i = e.target.closest('[data-tn]'); if (i) { ans[+i.dataset.tn] = i.value; cnt(); } });
+  const ytBig = $('#ytBig', root); if (ytBig) ytBig.onclick = () => { const b = $('#ytBox', root), mini = b.classList.toggle('mini'); ytBig.textContent = mini ? '🔍 Phóng to video' : '➖ Thu nhỏ (chỉ nghe)'; };
   $('#tFile', root).onchange = ev => { const f = ev.target.files[0]; if (f) $('#tLocal', root).innerHTML = `<audio controls autoplay src="${objURL(f)}"></audio>`; };
   let tm = null;
   const submit = async () => {

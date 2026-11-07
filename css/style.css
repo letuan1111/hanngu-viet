@@ -989,3 +989,10 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .tl-q { font-size: 1.05rem; } .tl-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .tl-cur { display: grid; gap: 10px; } .tl-tabs { margin: 0; }
 .tl-item { align-content: space-between; } .tl-btns .mini { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; text-decoration: none; }
+
+/* Thi thử: file nghe YouTube – khung nhỏ, chỉ cần nghe tiếng */
+.me-ytbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--paper); }
+.me-ytbar .me-yt { flex: 1 1 100%; }
+.me-ytbar .me-yt.mini { flex: 0 0 200px; width: 200px; aspect-ratio: auto; height: 113px; border-radius: 8px; }
+.me-ytinfo { display: grid; gap: 4px; flex: 1 1 200px; min-width: 0; }
+.me-ytinfo .mini { justify-self: start; }
