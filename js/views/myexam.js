@@ -207,7 +207,14 @@ const BOOKS = [{ id: 'hsk1-wj', level: 1, name: 'Sách HSK1 (王江)', pages: 17
   // 新汉语水平考试模拟试题集 HSK二级 (北京语言大学出版社): 10 đề, lời thoại trang 162–241, đáp án trang 242–251; file nghe trên YouTube
   { id: 'hsk2-mn', level: 2, name: 'Sách HSK2 模拟试题集', pages: 261, tests: 10, first: 23, step: 14, len: 13, cover: true, tr: [162, 170, 178, 186, 194, 202, 210, 218, 226, 234, 241],
   keys: ["YNYYYYNYNYDAFECCABEDBACCBABCBABAACBACBFEBFDCAYYNNNADBFCCDEBA", "YNYYNNNYNNBCAEDCABEDBACABCCBACCBCBCBFEDCDFBAENYYYYBCAFEBDAEC", "YYYYNYYNNNEDFCBCDBAECCBABACABACABCBFBEDADBEACYNYNYDECFBDABEC", "YNYYNYYYNYCAFBDECDABCBABCBBCBCACBCAEBAFDFBADEYNYYYCAEBDDEBAC", "YYNNNYYNYYEAFCDCEBDAABBCABCBABABCBAFBCAEDBCFAYYNYNBFDACBDAEC", "YNNYNYNNYNCFEBDBCDAECABBCBACBABCACBCABEDBDAFEYYNNNDFBACCEABD", "YNNYYNYNNNAFECDCEABDBACABCACBCBACABBCDFEDEABCYYYNYBFDAEBDAEC", "NYNYYNNYNYCDAFEDCEBABACABBACBCABCCBBCEFADFCABYNYNYBDAFCBDACE", "NYNYNYNYNYBCFEAECABDABBCAACACABABCBFDACBFDEBCNYYNNBAFDCBDAEC", "YNNYNYYYNYCADFEDAECBBABCABCABBACCABDFEABBFDEANYNYYEAFBDDABEC"],
-  yt: ["U9sW3zQWioc", "_emHda3Uiq0", "n9Xw_mP7qZ8", "gACghJe6QGc", null, "mslfRXby3AM", null, "A6KCXiono-Y", null, null] }];
+  yt: ["U9sW3zQWioc", "_emHda3Uiq0", "n9Xw_mP7qZ8", "gACghJe6QGc", "qYffX6p8HuM", "mslfRXby3AM", "Y86IZwnNulc", "A6KCXiono-Y", "YMbKW0ANOLs", "QApNd3sAdIo"] }];
+// Đề đã tách từ sách trước đây mà chưa có link nghe: tự gắn link YouTube có sẵn
+async function fillBookLinks(sets) {
+  for (const b of BOOKS.filter(b => b.yt)) for (const x of sets) {
+    const m = !x.yt && !x.audio && !x.audioUrl && String(x.name || '').startsWith(b.name + ' · Đề ') && x.name.match(/Đề (\d+)$/);
+    if (m && b.yt[+m[1] - 1]) { x.yt = { id: b.yt[+m[1] - 1], t: 0 }; await DB.put(x); }
+  }
+}
 const keyFromStr = s => { const k = {}; [...s].forEach((c, i) => { k[i + 1] = c === 'Y' ? '✓' : c === 'N' ? '✗' : c; }); return k; };
 
 // ══════════ Tiện ích ══════════
@@ -254,7 +261,7 @@ export async function examHome(root) {
   d.ondrop = async e => { e.preventDefault(); d.classList.remove('over'); take(await dropFiles(e.dataTransfer)); };
 
   let sets = [];
-  try { await migrateOld(); sets = (await DB.all()).sort((a, b) => b.created - a.created); } catch (e) { console.error(e); }
+  try { await migrateOld(); sets = (await DB.all()).sort((a, b) => b.created - a.created); await fillBookLinks(sets); } catch (e) { console.error(e); }
   if (!alive(root, hash)) return;
   const mine = sets.filter(s => !s.generated), gens = sets.filter(s => s.generated);
   const badge = s => { const b = bestOf(s); return b >= 0 ? `<span class="badge ${b >= HSK[s.level].pass ? 'ok' : 'bad'}">Cao nhất ${b}/${maxScore(s.level)}</span> <span class="muted small">${s.tries.length} lần thi</span>` : ''; };
