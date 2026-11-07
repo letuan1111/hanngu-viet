@@ -1011,4 +1011,3 @@ html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
 .pages[data-view="clear"] img { filter: contrast(1.25) brightness(1.04); }
 .pages[data-view="bold"] img { filter: grayscale(1) contrast(1.7) brightness(1.08); }
 .pages[data-view="warm"] img { filter: contrast(1.2) sepia(.35) brightness(1.02); }
-.pages[data-view="color"] img { filter: contrast(1.1) saturate(1.15); }
