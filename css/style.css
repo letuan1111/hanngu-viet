@@ -996,3 +996,13 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .me-ytbar .me-yt.mini { flex: 0 0 200px; width: 200px; aspect-ratio: auto; height: 113px; border-radius: 8px; }
 .me-ytinfo { display: grid; gap: 4px; flex: 1 1 200px; min-width: 0; }
 .me-ytinfo .mini { justify-self: start; }
+
+/* Thi thử – chế độ toàn màn hình khi làm bài */
+html.exam-full .top, html.exam-full .bottom, html.exam-full .foot, html.exam-full #backBar, html.exam-full .tip-bar, html.exam-full .skip { display: none !important; }
+html.exam-full .view { max-width: none; padding: 8px 12px 12px; }
+html.exam-full .view > .crumb, html.exam-full .view > h1, html.exam-full .view > h1 + .muted { display: none; }
+html.exam-full .me-timer { top: 0; margin-bottom: 8px; padding: 8px 14px; }
+html.exam-full .ex-layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; }
+html.exam-full .ex-sheet { top: 64px; max-height: calc(100vh - 76px); max-height: calc(100dvh - 76px); }
+html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
+@media (max-width: 900px) { html.exam-full .ex-layout { grid-template-columns: minmax(0, 1fr); } html.exam-full .ex-sheet { top: auto; max-height: 62vh; } }

@@ -534,7 +534,7 @@ function sheetExam(root, s) {
     <h1>${esc(s.name)} <span class="lv-badge lv${lv}">HSK ${lv}</span></h1>${s.note ? `<p class="muted">${esc(s.note)}</p>` : ''}
     ${introHtml(s, `<p class="muted small">Bấm “Bắt đầu” để chạy đồng hồ và phát file nghe. Chọn đáp án trên phiếu trả lời${lv === 3 ? ', phần Viết gõ chữ Hán vào ô' : ''}, rồi bấm “Nộp bài”.${hasKey ? '' : ' <b>Đề chưa có đáp án nên sẽ không chấm điểm được</b> – <a href="#/exam/edit/' + s.id + '">nhập đáp án</a>.'}</p>`)}
     <div id="tBody" hidden>
-      <div class="me-timer card"><span>⏱ <b id="tT">--:--</b></span><span class="muted small">Đã làm <span class="tCnt">0/${qs.length}</span></span><span class="grow"></span><button class="btn" id="tSubmit">Nộp bài</button></div>
+      <div class="me-timer card"><span>⏱ <b id="tT">--:--</b></span><span class="muted small">Đã làm <span class="tCnt">0/${qs.length}</span></span><span class="grow"></span><button class="btn ghost sm" id="tFull">⤢ Thoát toàn màn hình</button><button class="btn" id="tSubmit">Nộp bài</button></div>
       <div class="ex-layout">
         <div class="ex-paper">${audioHtml ? `<div class="ex-audiobox">${audioHtml}</div>` : `<p class="note">⚠ Bộ đề chưa có file nghe. <a href="#/exam/edit/${s.id}">Gắn link</a> hoặc chọn tệp bên dưới.</p>`}
           <details class="small ex-local"><summary>Dùng tệp âm thanh trên máy</summary><input type="file" accept="audio/*" id="tFile"><div id="tLocal"></div></details>
@@ -553,7 +553,23 @@ function sheetExam(root, s) {
   const ytBig = $('#ytBig', root); if (ytBig) ytBig.onclick = () => { const b = $('#ytBox', root), mini = b.classList.toggle('mini'); ytBig.textContent = mini ? '🔍 Phóng to video' : '➖ Thu nhỏ (chỉ nghe)'; };
   $('#tFile', root).onchange = ev => { const f = ev.target.files[0]; if (f) $('#tLocal', root).innerHTML = `<audio controls autoplay src="${objURL(f)}"></audio>`; };
   let tm = null;
+  // Chế độ thi toàn màn hình: ẩn menu, đầu trang, chân trang – chỉ còn đề, đồng hồ và phiếu trả lời
+  const isIOSDev = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const fsOn = () => document.documentElement.classList.contains('exam-full');
+  const setFullBtn = () => { const b = $('#tFull', root); if (b) b.textContent = fsOn() ? '⤢ Thoát toàn màn hình' : '⛶ Toàn màn hình'; };
+  function examFull(on) {
+    document.documentElement.classList.toggle('exam-full', on);
+    const real = document.fullscreenElement || document.webkitFullscreenElement;
+    if (on && !real && !isIOSDev) { const el = document.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen; try { rq && Promise.resolve(rq.call(el)).catch(() => {}); } catch {} }
+    if (!on && real) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} }
+    setFullBtn();
+  }
+  const onFsChange = () => { if (!(document.fullscreenElement || document.webkitFullscreenElement) && fsOn() && !isIOSDev) { document.documentElement.classList.remove('exam-full'); setFullBtn(); } };
+  document.addEventListener('fullscreenchange', onFsChange);
+  window.addEventListener('hashchange', () => { document.removeEventListener('fullscreenchange', onFsChange); examFull(false); }, { once: true });
+  $('#tFull', root).onclick = () => examFull(!fsOn());
   const submit = async () => {
+    examFull(false);
     tm && tm.stop(); $$('audio', root).forEach(a => a.pause()); const f = $('#ytf', root); if (f) f.src = 'about:blank';
     const spent = tm ? tm.spent() : 0, prev = bestOf(s), g = grade(lv, s.key || {}, ans);
     await saveTry(s, { ...ans }, g, spent);
@@ -571,6 +587,7 @@ function sheetExam(root, s) {
   $('#tGo', root).onclick = () => {
     $('#tIntro', root).classList.add('gone-intro'); const free = $('#tFree', root).checked; $('#tIntro', root).remove(); $('#tBody', root).hidden = false;
     tm = timerBar(root, HSK[lv].min, free, submit);
+    examFull(true); window.scrollTo(0, 0);
     const f = $('#ytf', root); if (f) f.src = f.dataset.src;
     const au = $('#au', root); if (au) au.play().catch(() => toast('Bấm ▶ trên trình phát để nghe'));
   };
