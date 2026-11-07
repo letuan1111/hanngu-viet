@@ -203,7 +203,11 @@ async function splitCombined(pdf, lv, P, pre = '') {
 
 // Sách nhiều đề đã biết cấu trúc: web tự tách đề + có sẵn đáp án
 const BOOKS = [{ id: 'hsk1-wj', level: 1, name: 'Sách HSK1 (王江)', pages: 173, tests: 10, first: 19, step: 10, len: 10, cover: true, tr: [119, 122, 125, 129, 132, 136, 139, 142, 146, 149, 152],
-  keys: ['NYYNNABABCFCADEABCBANNYNYEFDCADBFAEDACFB', 'NNNYNCBAABCEFBABCBCBYNNYYFABEDCAEFBFABCD', 'YYNNNABBABCDAFBBACCANYYNNDACFBFEBADCADFB', 'NYNNYCABBBDAFBEABCBANYNYNBECFAEDAFBCADFB', 'NNYNYBCBBBEAFBCBBCACNYNNYBCADEEDFACDACFB', 'YYNNNACBCACABDEBBACAYNYNNDBEAFDFACEDBFAC', 'NNYNNACBACDAFCBCBABCNYNYYDAFBCCDFABBDFAC', 'NNNYYACBBCBDFAEABACBNNYYYCABDEDFBEABADFC', 'NNYNYACCBCAEFBCCBBBANNNYYCFEADDFCAEADBFC', 'NYNYNAABACCFAEDBBAACNNYYNDAEBFDEBACCDFBA'] }];
+  keys: ['NYYNNABABCFCADEABCBANNYNYEFDCADBFAEDACFB', 'NNNYNCBAABCEFBABCBCBYNNYYFABEDCAEFBFABCD', 'YYNNNABBABCDAFBBACCANYYNNDACFBFEBADCADFB', 'NYNNYCABBBDAFBEABCBANYNYNBECFAEDAFBCADFB', 'NNYNYBCBBBEAFBCBBCACNYNNYBCADEEDFACDACFB', 'YYNNNACBCACABDEBBACAYNYNNDBEAFDFACEDBFAC', 'NNYNNACBACDAFCBCBABCNYNYYDAFBCCDFABBDFAC', 'NNNYYACBBCBDFAEABACBNNYYYCABDEDFBEABADFC', 'NNYNYACCBCAEFBCCBBBANNNYYCFEADDFCAEADBFC', 'NYNYNAABACCFAEDBBAACNNYYNDAEBFDEBACCDFBA'] },
+  // 新汉语水平考试模拟试题集 HSK二级 (北京语言大学出版社): 10 đề, lời thoại trang 162–241, đáp án trang 242–251; file nghe trên YouTube
+  { id: 'hsk2-mn', level: 2, name: 'Sách HSK2 模拟试题集', pages: 261, tests: 10, first: 23, step: 14, len: 13, cover: true, tr: [162, 170, 178, 186, 194, 202, 210, 218, 226, 234, 241],
+  keys: ["YNYYYYNYNYDAFECCABEDBACCBABCBABAACBACBFEBFDCAYYNNNADBFCCDEBA", "YNYYNNNYNNBCAEDCABEDBACABCCBACCBCBCBFEDCDFBAENYYYYBCAFEBDAEC", "YYYYNYYNNNEDFCBCDBAECCBABACABACABCBFBEDADBEACYNYNYDECFBDABEC", "YNYYNYYYNYCAFBDECDABCBABCBBCBCACBCAEBAFDFBADEYNYYYCAEBDDEBAC", "YYNNNYYNYYEAFCDCEBDAABBCABCBABABCBAFBCAEDBCFAYYNYNBFDACBDAEC", "YNNYNYNNYNCFEBDBCDAECABBCBACBABCACBCABEDBDAFEYYNNNDFBACCEABD", "YNNYYNYNNNAFECDCEABDBACABCACBCBACABBCDFEDEABCYYYNYBFDAEBDAEC", "NYNYYNNYNYCDAFEDCEBABACABBACBCABCCBBCEFADFCABYNYNYBDAFCBDACE", "NYNYNYNYNYBCFEAECABDABBCAACACABABCBFDACBFDEBCNYYNNBAFDCBDAEC", "YNNYNYYYNYCADFEDAECBBABCABCABBACCABDFEABBFDEANYNYYEAFBDDABEC"],
+  yt: ["U9sW3zQWioc", "_emHda3Uiq0", "n9Xw_mP7qZ8", "gACghJe6QGc", null, "mslfRXby3AM", null, "A6KCXiono-Y", null, null] }];
 const keyFromStr = s => { const k = {}; [...s].forEach((c, i) => { k[i + 1] = c === 'Y' ? '✓' : c === 'N' ? '✗' : c; }); return k; };
 
 // ══════════ Tiện ích ══════════
@@ -339,7 +343,7 @@ export async function importFiles(files, lvSel, done) {
         const st = prof.first + prof.step * t, pages = range(st + (prof.cover ? 1 : 0), st + prof.len - 1), trp = prof.tr ? range(prof.tr[t], prof.tr[t + 1]) : [], tot = pages.length + trp.length;
         const imgs = await renderPages(pdf, pages, i => P.set(`Đề ${t + 1}/${prof.tests}: trang ${i}/${pages.length}`, (t + i / tot) / prof.tests));
         const tr = trp.length ? await renderPages(pdf, trp, i => P.set(`Đề ${t + 1}/${prof.tests}: lời thoại ${i}/${trp.length}`, (t + (pages.length + i) / tot) / prof.tests)) : [];
-        await DB.put({ id: 'b' + Date.now().toString(36) + t, level: prof.level, code: 'Đề ' + (t + 1), name: `${prof.name} · Đề ${t + 1}`, created: Date.now() - t, pages: imgs, transcript: tr, audio: null, key: prof.keys && prof.keys[t] ? keyFromStr(prof.keys[t]) : {}, tries: [] });
+        await DB.put({ id: 'b' + Date.now().toString(36) + t, level: prof.level, code: 'Đề ' + (t + 1), name: `${prof.name} · Đề ${t + 1}`, created: Date.now() - t, pages: imgs, transcript: tr, audio: null, key: prof.keys && prof.keys[t] ? keyFromStr(prof.keys[t]) : {}, ...(prof.yt && prof.yt[t] ? { yt: { id: prof.yt[t], t: 0 } } : {}), tries: [] });
         made++;
       }
       P.close(); P = null;
