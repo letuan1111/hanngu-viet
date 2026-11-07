@@ -534,7 +534,7 @@ function sheetExam(root, s) {
     <h1>${esc(s.name)} <span class="lv-badge lv${lv}">HSK ${lv}</span></h1>${s.note ? `<p class="muted">${esc(s.note)}</p>` : ''}
     ${introHtml(s, `<p class="muted small">Bấm “Bắt đầu” để chạy đồng hồ và phát file nghe. Chọn đáp án trên phiếu trả lời${lv === 3 ? ', phần Viết gõ chữ Hán vào ô' : ''}, rồi bấm “Nộp bài”.${hasKey ? '' : ' <b>Đề chưa có đáp án nên sẽ không chấm điểm được</b> – <a href="#/exam/edit/' + s.id + '">nhập đáp án</a>.'}</p>`)}
     <div id="tBody" hidden>
-      <div class="me-timer card"><span>⏱ <b id="tT">--:--</b></span><span class="muted small">Đã làm <span class="tCnt">0/${qs.length}</span></span><span class="grow"></span>${s.pages && s.pages.length ? `<label class="sel small">Đề <select id="tView">${[['', 'Gốc'], ['clear', 'Rõ nét'], ['bold', 'Rất rõ (chữ đậm)'], ['warm', 'Nền vàng dịu mắt']].map(([v, n]) => `<option value="${v}" ${(store.s.paperView || 'clear') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}<button class="btn ghost sm" id="tFull">⤢ Thoát toàn màn hình</button><button class="btn" id="tSubmit">Nộp bài</button></div>
+      <div class="me-timer card"><span>⏱ <b id="tT">--:--</b></span><span class="muted small">Đã làm <span class="tCnt">0/${qs.length}</span></span><span class="grow"></span>${s.pages && s.pages.length ? `<label class="sel small">Đề <select id="tView">${[['', 'Gốc'], ['clear', 'Rõ nét'], ['bold', 'Rất rõ (chữ đậm)'], ['warm', 'Nền vàng dịu mắt'], ['color', '🎨 Có màu (AI tô)']].map(([v, n]) => `<option value="${v}" ${(store.s.paperView || 'clear') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label><span class="small muted" id="tColMsg"></span>` : ''}<button class="btn ghost sm" id="tFull">⤢ Thoát toàn màn hình</button><button class="btn" id="tSubmit">Nộp bài</button></div>
       <div class="ex-layout">
         <div class="ex-paper">${audioHtml ? `<div class="ex-audiobox">${audioHtml}</div>` : `<p class="note">⚠ Bộ đề chưa có file nghe. <a href="#/exam/edit/${s.id}">Gắn link</a> hoặc chọn tệp bên dưới.</p>`}
           <details class="small ex-local"><summary>Dùng tệp âm thanh trên máy</summary><input type="file" accept="audio/*" id="tFile"><div id="tLocal"></div></details>
@@ -569,7 +569,34 @@ function sheetExam(root, s) {
   window.addEventListener('hashchange', () => { document.removeEventListener('fullscreenchange', onFsChange); examFull(false); }, { once: true });
   $('#tFull', root).onclick = () => examFull(!fsOn());
   // cách hiển thị tờ đề (ảnh quét): làm rõ nét / chữ đậm / nền vàng dịu mắt
-  const applyView = v => { const pg = $('.ex-paper .pages', root); if (pg) pg.dataset.view = v; };
+  const imgsEl = () => $$('.ex-paper .pages img', root);
+  const showPages = list => imgsEl().forEach((im, i) => { if (list[i]) im.src = objURL(list[i]); });
+  let coloring = false;
+  async function colorPages() {   // tô màu bằng AI (lần đầu), lưu lại để lần sau hiện ngay
+    const msg = $('#tColMsg', root), tv = $('#tView', root);
+    if (s.pagesColor && s.pagesColor.length === s.pages.length) { showPages(s.pagesColor); return; }
+    if (coloring) return;
+    const { colorReady, colorizeBlob, colorCached } = await import('../core/colorize.js');
+    if (!(await colorCached()) && !confirm('Tô màu cần tải mô hình AI khoảng 130 MB (chỉ tải lần đầu, nên dùng Wi‑Fi), sau đó máy tô từng trang – mất vài phút. Màu do AI đoán nên có thể không giống màu thật. Tiếp tục?')) { tv.value = 'clear'; applyView('clear'); return; }
+    coloring = true; const out = [];
+    try {
+      msg.textContent = '🎨 Đang tải AI tô màu…';
+      await colorReady((got, tot) => { msg.textContent = `🎨 Đang tải AI: ${Math.round(got / 1048576)}${tot ? '/' + Math.round(tot / 1048576) : ''} MB…`; });
+      for (let i = 0; i < s.pages.length; i++) {
+        if (!root.isConnected) return;
+        msg.textContent = `🎨 Đang tô màu trang ${i + 1}/${s.pages.length}…`;
+        out[i] = await colorizeBlob(s.pages[i]);
+        if ($('#tView', root)?.value === 'color') { const im = imgsEl()[i]; if (im) im.src = objURL(out[i]); }
+      }
+      s.pagesColor = out; await DB.put(s); msg.textContent = '';
+      toast('Đã tô màu xong tờ đề – lần sau mở đề này sẽ có màu ngay.', 'good');
+    } catch (e) { console.error(e); msg.textContent = ''; toast('Không tô màu được: ' + (e.message || e), 'bad'); if (tv) { tv.value = 'clear'; applyView('clear'); } }
+    finally { coloring = false; }
+  }
+  const applyView = v => {
+    const pg = $('.ex-paper .pages', root); if (!pg) return; pg.dataset.view = v;
+    if (v === 'color') colorPages(); else if (s.pagesColor) showPages(s.pages);
+  };
   applyView(store.s.paperView ?? 'clear');
   const tv = $('#tView', root); if (tv) tv.onchange = () => { store.update(x => { x.paperView = tv.value; }); applyView(tv.value); };
   const submit = async () => {
