@@ -979,3 +979,13 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .ap-list:not(.py-ruby):not(.no-py) .ap-row { grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
 .ap-list:not(.py-ruby):not(.no-py).no-vi .ap-row { grid-template-columns: 2em minmax(0, 1.2fr) minmax(0, 1fr); }
 @media (max-width: 700px) { .ap-list .ap-row, .ap-list:not(.py-ruby):not(.no-py) .ap-row, .ap-list:not(.py-ruby):not(.no-py).no-vi .ap-row { grid-template-columns: 2em 1fr; } .ap-rp { grid-column: 2; } }
+
+/* Đánh máy › 21 bài có sẵn */
+.tl-lib summary { cursor: pointer; }
+.tl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 12px; max-height: 520px; overflow: auto; }
+.tl-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px; background: var(--paper); }
+.tl-item.on { border-color: var(--red); background: var(--red2); }
+.tl-h { display: flex; gap: 10px; align-items: flex-start; } .tl-n { font: 700 1.1rem var(--ui); color: var(--red); min-width: 1.6em; }
+.tl-q { font-size: 1.05rem; } .tl-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.tl-cur { display: grid; gap: 10px; } .tl-tabs { margin: 0; }
+.tl-item { align-content: space-between; } .tl-btns .mini { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; text-decoration: none; }

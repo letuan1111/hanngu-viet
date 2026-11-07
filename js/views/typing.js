@@ -3,6 +3,7 @@ import { store, logActivity } from '../core/store.js';
 import { segment, charPinyins, isHan, sentencePinyin } from '../core/dict.js';
 import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, structsInText, quickSaveOn, setQuickSave, closePop } from '../core/ui.js';
 import { speak, stopSeq, isIOS } from '../core/tts.js';
+import { TYPE_LESSONS } from '../data/typing-lessons.js';
 import { AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
 
 const tone = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ü/g, 'v');
@@ -244,11 +245,21 @@ const b64d = str => new TextDecoder().decode(Uint8Array.from(atob(str.replace(/-
 export function typingPage(root) {
   const q = new URLSearchParams(location.hash.split('?')[1] || '');
   let fromLink = null;
-  if (q.get('d')) { try { const a = JSON.parse(b64d(q.get('d'))); fromLink = { t: a.t || '', rows: (a.r || []).map(([zh, vi, py]) => ({ zh: zh || '', vi: vi || '', py: py || '' })).filter(r => r.zh) }; } catch { toast('Link không đúng hoặc bị thiếu – không đọc được nội dung.', 'bad'); } }
+  // 21 bài có sẵn: #/typing?b=số bài&m=read (máy luyện đọc cả bài) | 1 | 2 (gõ phần 1 / phần 2)
+  const L = q.get('b') ? TYPE_LESSONS.find(x => x.n === +q.get('b')) : null, mode = q.get('m') || 'read';
+  if (L) { const all = L.p.map(([zh, vi]) => ({ zh, vi, py: '' })); fromLink = { lesson: L, mode, t: `Bài ${String(L.n).padStart(2, '0')} – ${L.q}`, rows: mode === '1' ? all.slice(0, L.cut) : mode === '2' ? all.slice(L.cut) : all }; }
+  else if (q.get('d')) { try { const a = JSON.parse(b64d(q.get('d'))); fromLink = { t: a.t || '', rows: (a.r || []).map(([zh, vi, py]) => ({ zh: zh || '', vi: vi || '', py: py || '' })).filter(r => r.zh) }; } catch { toast('Link không đúng hoặc bị thiếu – không đọc được nội dung.', 'bad'); } }
   const opt = { py: true, pyMode: 'line', vi: true, voice: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
   const saveOpt = () => store.update(s => { s.apOpt = { ...opt }; });
   root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Tự nhập nội dung</p><h1>⌨️ Đánh máy</h1></div></div>
-  ${fromLink ? `<div class="note">🔗 Đang mở nội dung từ link được chia sẻ${fromLink.t ? `: <b>${esc(fromLink.t)}</b>` : ''} (${fromLink.rows.length} câu). Nội dung chỉ được lưu vào máy bạn khi bạn sửa ô nhập bên dưới.</div>` : ''}
+  ${fromLink && fromLink.lesson ? (() => { const L = fromLink.lesson, b = `#/typing?b=${L.n}&m=`; return `<div class="card tl-cur"><div><p class="eyebrow">Bài ${String(L.n).padStart(2, '0')} · ${fromLink.mode === 'read' ? 'Máy luyện đọc cả bài' : `Đánh máy phần ${fromLink.mode}/2`}</p><h2 lang="zh-CN" style="margin:2px 0">${esc(L.q)}</h2><p class="muted" style="margin:0">${esc(L.qvi)}</p></div>
+    <div class="tabs tl-tabs"><a class="tab ${fromLink.mode === 'read' ? 'on' : ''}" href="${b}read">▶ Máy luyện đọc</a><a class="tab ${fromLink.mode === '1' ? 'on' : ''}" href="${b}1">⌨️ Phần 1 (câu 1–${L.cut})</a><a class="tab ${fromLink.mode === '2' ? 'on' : ''}" href="${b}2">⌨️ Phần 2 (câu ${L.cut + 1}–${L.p.length})</a></div>
+    <div class="row gap wrap small">${L.n > 1 ? `<a href="#/typing?b=${L.n - 1}&m=${fromLink.mode}">‹ Bài trước</a>` : ''}${L.n < TYPE_LESSONS.length ? `<a href="#/typing?b=${L.n + 1}&m=${fromLink.mode}">Bài sau ›</a>` : ''}<a href="#/typing">📝 Về nội dung tự nhập của tôi</a></div></div>`; })()
+  : fromLink ? `<div class="note">🔗 Đang mở nội dung từ link được chia sẻ${fromLink.t ? `: <b>${esc(fromLink.t)}</b>` : ''} (${fromLink.rows.length} câu). Nội dung chỉ được lưu vào máy bạn khi bạn sửa ô nhập bên dưới.</div>` : ''}
+  <details class="card tl-lib" ${fromLink && fromLink.lesson ? '' : 'open'}><summary><b>📚 ${TYPE_LESSONS.length} bài có sẵn</b> <span class="muted small">– mỗi bài chia 2 phần để đánh máy, kèm máy luyện đọc</span></summary>
+    <div class="tl-grid">${TYPE_LESSONS.map(L => `<div class="tl-item ${fromLink && fromLink.lesson === L ? 'on' : ''}"><div class="tl-h"><span class="tl-n">${String(L.n).padStart(2, '0')}</span><div><div lang="zh-CN" class="tl-q">${esc(L.q)}</div><div class="muted small">${esc(L.qvi)}</div></div></div>
+      <div class="tl-btns"><a class="mini" href="#/typing?b=${L.n}&m=read">▶ Luyện đọc</a><a class="mini" href="#/typing?b=${L.n}&m=1">⌨️ Phần 1</a><a class="mini" href="#/typing?b=${L.n}&m=2">⌨️ Phần 2</a></div></div>`).join('')}</div>
+  </details>
   <section class="card tp-in">
     <p class="muted small">Nhập mỗi câu một dòng theo dạng <b>Tiếng Trung | Tiếng Việt</b> (có thể dán thẳng bảng từ Word/Excel, hoặc ghi câu tiếng Trung rồi xuống dòng ghi nghĩa). <b>Pinyin do máy tự tạo</b> và tự hiện (thành dòng riêng hoặc trên đầu từng chữ – chọn ở mục “Pinyin hiện”); chỉ có tiếng Trung cũng được. Mỗi từ đều bấm vào được để xem nghĩa. Nội dung được lưu trên trình duyệt của bạn.</p>
     <textarea class="inp ty-text" id="tpText" lang="zh-CN" rows="7" maxlength="6000" placeholder="我叫小明。 | Tôi tên là Tiểu Minh.&#10;我是越南人。 | Tôi là người Việt Nam.&#10;我很喜欢学习汉语。 | Tôi rất thích học tiếng Trung.">${esc(fromLink ? rowsToText(fromLink.rows) : store.s.typeCustom || '')}</textarea>
@@ -414,5 +425,9 @@ export function typingPage(root) {
     box.scrollIntoView({ behavior: 'smooth', block: 'start' }); $('.ty-inp', box)?.focus();
   };
   draw();
-  return 'Đánh máy';
+  if (fromLink && fromLink.lesson) {   // mở bài có sẵn: phần đánh máy thì mở khung gõ ngay; luyện đọc thì đưa tới máy đọc
+    if (fromLink.mode === 'read') setTimeout(() => $('#ap', root)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    else setTimeout(() => $('#tpStart', root)?.click(), 60);
+  }
+  return fromLink && fromLink.lesson ? `Bài ${fromLink.lesson.n} – Đánh máy` : 'Đánh máy';
 }
