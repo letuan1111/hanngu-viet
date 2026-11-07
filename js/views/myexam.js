@@ -534,7 +534,7 @@ function sheetExam(root, s) {
     <h1>${esc(s.name)} <span class="lv-badge lv${lv}">HSK ${lv}</span></h1>${s.note ? `<p class="muted">${esc(s.note)}</p>` : ''}
     ${introHtml(s, `<p class="muted small">Bấm “Bắt đầu” để chạy đồng hồ và phát file nghe. Chọn đáp án trên phiếu trả lời${lv === 3 ? ', phần Viết gõ chữ Hán vào ô' : ''}, rồi bấm “Nộp bài”.${hasKey ? '' : ' <b>Đề chưa có đáp án nên sẽ không chấm điểm được</b> – <a href="#/exam/edit/' + s.id + '">nhập đáp án</a>.'}</p>`)}
     <div id="tBody" hidden>
-      <div class="me-timer card"><span>⏱ <b id="tT">--:--</b></span><span class="muted small">Đã làm <span class="tCnt">0/${qs.length}</span></span><span class="grow"></span><button class="btn ghost sm" id="tFull">⤢ Thoát toàn màn hình</button><button class="btn" id="tSubmit">Nộp bài</button></div>
+      <div class="me-timer card"><span>⏱ <b id="tT">--:--</b></span><span class="muted small">Đã làm <span class="tCnt">0/${qs.length}</span></span><span class="grow"></span>${s.pages && s.pages.length ? `<label class="sel small">Đề <select id="tView">${[['', 'Gốc'], ['clear', 'Rõ nét'], ['bold', 'Rất rõ (chữ đậm)'], ['warm', 'Nền vàng dịu mắt']].map(([v, n]) => `<option value="${v}" ${(store.s.paperView || 'clear') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}<button class="btn ghost sm" id="tFull">⤢ Thoát toàn màn hình</button><button class="btn" id="tSubmit">Nộp bài</button></div>
       <div class="ex-layout">
         <div class="ex-paper">${audioHtml ? `<div class="ex-audiobox">${audioHtml}</div>` : `<p class="note">⚠ Bộ đề chưa có file nghe. <a href="#/exam/edit/${s.id}">Gắn link</a> hoặc chọn tệp bên dưới.</p>`}
           <details class="small ex-local"><summary>Dùng tệp âm thanh trên máy</summary><input type="file" accept="audio/*" id="tFile"><div id="tLocal"></div></details>
@@ -568,6 +568,10 @@ function sheetExam(root, s) {
   document.addEventListener('fullscreenchange', onFsChange);
   window.addEventListener('hashchange', () => { document.removeEventListener('fullscreenchange', onFsChange); examFull(false); }, { once: true });
   $('#tFull', root).onclick = () => examFull(!fsOn());
+  // cách hiển thị tờ đề (ảnh quét): làm rõ nét / chữ đậm / nền vàng dịu mắt
+  const applyView = v => { const pg = $('.ex-paper .pages', root); if (pg) pg.dataset.view = v; };
+  applyView(store.s.paperView ?? 'clear');
+  const tv = $('#tView', root); if (tv) tv.onchange = () => { store.update(x => { x.paperView = tv.value; }); applyView(tv.value); };
   const submit = async () => {
     examFull(false);
     tm && tm.stop(); $$('audio', root).forEach(a => a.pause()); const f = $('#ytf', root); if (f) f.src = 'about:blank';

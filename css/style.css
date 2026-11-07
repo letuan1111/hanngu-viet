@@ -1006,3 +1006,8 @@ html.exam-full .ex-layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 12
 html.exam-full .ex-sheet { top: 64px; max-height: calc(100vh - 76px); max-height: calc(100dvh - 76px); }
 html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
 @media (max-width: 900px) { html.exam-full .ex-layout { grid-template-columns: minmax(0, 1fr); } html.exam-full .ex-sheet { top: auto; max-height: 62vh; } }
+
+/* Thi thử: làm rõ tờ đề quét */
+.pages[data-view="clear"] img { filter: contrast(1.25) brightness(1.04); }
+.pages[data-view="bold"] img { filter: grayscale(1) contrast(1.7) brightness(1.08); }
+.pages[data-view="warm"] img { filter: contrast(1.2) sepia(.35) brightness(1.02); }
