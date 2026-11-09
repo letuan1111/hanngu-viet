@@ -399,7 +399,7 @@ export function typingPage(root) {
     const L = store.s.apUnknown || [];
     unkBox.innerHTML = `<div class="uk-head"><b>📌 Từ chưa thuộc (${L.length})</b>${L.length ? '<span><button class="mini" data-uk="save" title="Lưu tất cả vào Ôn tập">⭐ Lưu ôn tập</button> <button class="mini" data-uk="clear">Xóa hết</button></span>' : ''}</div>
       ${L.length ? `<div class="uk-list">${L.map(h => { const e = entry(h); return `<div class="uk-it" data-h="${esc(h)}"><b lang="zh-CN">${esc(h)}</b><span class="uk-py">${esc(e?.p || sentencePinyin(h))}</span><span class="uk-vi">${esc(((e?.vi) || '').split(/[;；]/)[0])}</span><button class="uk-x" data-ukdel="${esc(h)}" aria-label="Bỏ từ này">✕</button></div>`; }).join('')}</div>` : '<p class="muted small">Chạm vào từ nào chưa thuộc trong câu, từ đó sẽ được ghi vào đây.</p>'}`;
-    const set = new Set(L); $$('#apZh .tk', root).forEach(t => t.classList.toggle('unk-w', set.has(t.dataset.w)));
+    const set = new Set(L); $$('#apZh .tk, #apList .tk', root).forEach(t => t.classList.toggle('unk-w', set.has(t.dataset.w)));
   }
   stage.addEventListener('click', e => {
     if (!isFs()) return;
@@ -414,6 +414,9 @@ export function typingPage(root) {
       const h = tk.dataset.w; if (!h || ![...h].some(isHan)) return;
       if (!unk().includes(h)) store.update(x => { x.apUnknown = [h, ...unk()].slice(0, 200); });
       tk.classList.add('unk-flash'); setTimeout(() => tk.classList.remove('unk-flash'), 600);
+      stopRun(); closePop(); drawUnk();
+      const t2 = $$('#apZh .tk', root).find(t => t.dataset.i === tk.dataset.i) || tk;
+      openPop(t2, wordCard(h)); showUi(); return;         // hiện luôn nghĩa, từ mới, ví dụ
     }
     drawUnk(); showUi();
   }, true);

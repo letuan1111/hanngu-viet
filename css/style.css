@@ -1028,3 +1028,8 @@ html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
   .ap-stage:fullscreen, .ap-stage.ap-fs { padding-right: 6vw; padding-bottom: calc(34vh + 70px); }
   .ap-stage:fullscreen .ap-unk, .ap-stage.ap-fs .ap-unk { left: 10px; right: 10px; width: auto; top: auto; bottom: calc(66px + env(safe-area-inset-bottom)); max-height: 30vh; }
 }
+
+/* từ chưa thuộc: tô đỏ */
+.ap-zh .tk.unk-w, .ap-rz .tk.unk-w { color: var(--red); background: var(--red2); border-radius: 6px; text-decoration: none; }
+.ap-zh .tk.unk-w rt, .ap-rz .tk.unk-w rt { color: var(--red); }
+.ap-zh .tk.unk-w .ch.lit { color: #fff; background: var(--red); }
