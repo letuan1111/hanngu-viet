@@ -1,7 +1,7 @@
 // Luyện gõ lại bài đọc: chạy từng câu, gõ đúng đến đâu chữ biến mất đến đó; có đồng hồ, chữ/phút, từ/phút, độ chính xác
-import { store, logActivity } from '../core/store.js';
-import { segment, charPinyins, isHan, sentencePinyin } from '../core/dict.js';
-import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, structsInText, quickSaveOn, setQuickSave, closePop } from '../core/ui.js';
+import { store, logActivity, srsAdd } from '../core/store.js';
+import { segment, charPinyins, isHan, sentencePinyin, entry } from '../core/dict.js';
+import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, structsInText, quickSaveOn, setQuickSave, closePop, openPop, wordCard } from '../core/ui.js';
 import { speak, stopSeq, isIOS } from '../core/tts.js';
 import { TYPE_LESSONS } from '../data/typing-lessons.js';
 import { AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
@@ -283,6 +283,7 @@ export function typingPage(root) {
       <div class="ap-n" id="apN"></div>
       <div class="ap-py" id="apPyT"></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
       <div class="bar"><i id="apBar" style="width:0"></i></div>
+      <aside class="ap-unk" id="apUnk" aria-label="Từ chưa thuộc"></aside>
       <div class="ap-fsbar"><button class="btn ghost sm" data-fs="prev" aria-label="Câu trước">‹</button><button class="btn sm" data-fs="play" aria-label="Chạy hoặc dừng">▶</button><button class="btn ghost sm" data-fs="next" aria-label="Câu sau">›</button><button class="btn ghost sm" data-fs="exit" aria-label="Thoát toàn màn hình">✕ Thoát</button></div>
     </div>
     <div class="ap-list ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" id="apList"></div>
@@ -336,6 +337,7 @@ export function typingPage(root) {
     $('#apViT', root).classList.toggle('empty', !r.vi);
     $('#apBar', root).style.width = ((cur + 1) / rows.length * 100) + '%';
     $$('.ap-row', list).forEach((el, i) => el.classList.toggle('now', i === cur));
+    drawUnk();
   }
   const scrollRow = () => { const el = $$('.ap-row', list)[cur]; if (el && !isFs()) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
   const wait = (ms, tok) => new Promise(res => { const t0 = Date.now(); const iv = setInterval(() => { if (tok.stop || Date.now() - t0 >= ms) { clearInterval(iv); res(); } }, 100); });
@@ -390,6 +392,31 @@ export function typingPage(root) {
   stage.addEventListener('click', e => { const b = e.target.closest('[data-fs]'); if (!b) return; e.stopPropagation(); const a = b.dataset.fs; if (a === 'exit') exitFs(); else if (a === 'prev') go(-1); else if (a === 'next') go(1); else { run ? stopRun() : startRun(); } setTimeout(syncFsBtn, 50); showUi(); }, true);
   window.addEventListener('hashchange', () => pseudoFs(false), { once: true });
   list.addEventListener('click', e => { if (e.target.closest('.tk')) return; const r = e.target.closest('.ap-row'); if (!r) return; const was = !!run; stopRun(); cur = +r.dataset.i; show(); if (was) startRun(); else sayCur(); });
+  // ── Toàn màn hình: chạm vào từ chưa thuộc → ghi vào khung “Từ chưa thuộc” ngay trên màn hình ──
+  const unk = () => store.s.apUnknown || [];
+  function drawUnk() {
+    const unkBox = $('#apUnk', root); if (!unkBox) return;
+    const L = store.s.apUnknown || [];
+    unkBox.innerHTML = `<div class="uk-head"><b>📌 Từ chưa thuộc (${L.length})</b>${L.length ? '<span><button class="mini" data-uk="save" title="Lưu tất cả vào Ôn tập">⭐ Lưu ôn tập</button> <button class="mini" data-uk="clear">Xóa hết</button></span>' : ''}</div>
+      ${L.length ? `<div class="uk-list">${L.map(h => { const e = entry(h); return `<div class="uk-it" data-h="${esc(h)}"><b lang="zh-CN">${esc(h)}</b><span class="uk-py">${esc(e?.p || sentencePinyin(h))}</span><span class="uk-vi">${esc(((e?.vi) || '').split(/[;；]/)[0])}</span><button class="uk-x" data-ukdel="${esc(h)}" aria-label="Bỏ từ này">✕</button></div>`; }).join('')}</div>` : '<p class="muted small">Chạm vào từ nào chưa thuộc trong câu, từ đó sẽ được ghi vào đây.</p>'}`;
+    const set = new Set(L); $$('#apZh .tk', root).forEach(t => t.classList.toggle('unk-w', set.has(t.dataset.w)));
+  }
+  stage.addEventListener('click', e => {
+    if (!isFs()) return;
+    const del = e.target.closest('[data-ukdel]'), act = e.target.closest('[data-uk]'), it = e.target.closest('.uk-it'), tk = e.target.closest('#apZh .tk');
+    if (!del && !act && !it && !tk) return;
+    e.stopPropagation(); e.preventDefault();
+    if (del) store.update(x => { x.apUnknown = unk().filter(h => h !== del.dataset.ukdel); });
+    else if (act && act.dataset.uk === 'clear') { if (!confirm('Xóa hết danh sách từ chưa thuộc?')) return; store.update(x => { x.apUnknown = []; }); }
+    else if (act) { unk().forEach(h => srsAdd(h)); toast(`Đã lưu ${unk().length} từ vào Ôn tập.`, 'good'); return; }
+    else if (it) { closePop(); openPop(it, wordCard(it.dataset.h)); return; }
+    else if (tk) {
+      const h = tk.dataset.w; if (!h || ![...h].some(isHan)) return;
+      if (!unk().includes(h)) store.update(x => { x.apUnknown = [h, ...unk()].slice(0, 200); });
+      tk.classList.add('unk-flash'); setTimeout(() => tk.classList.remove('unk-flash'), 600);
+    }
+    drawUnk(); showUi();
+  }, true);
   stage.addEventListener('click', e => {
     if (e.target.closest('.pop')) return;
     if (e.target.closest('.tk')) { stopRun(); return; }          // bấm vào từ: dừng lại để xem nghĩa (bảng nghĩa hiện ngay trên màn hình)

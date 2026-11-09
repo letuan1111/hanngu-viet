@@ -1011,3 +1011,20 @@ html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
 .pages[data-view="clear"] img { filter: contrast(1.25) brightness(1.04); }
 .pages[data-view="bold"] img { filter: grayscale(1) contrast(1.7) brightness(1.08); }
 .pages[data-view="warm"] img { filter: contrast(1.2) sepia(.35) brightness(1.02); }
+
+/* Toàn màn hình: khung Từ chưa thuộc */
+.ap-unk { display: none; }
+.ap-stage:fullscreen .ap-unk, .ap-stage.ap-fs .ap-unk { display: grid; align-content: start; gap: 8px; position: absolute; right: 14px; top: calc(44px + env(safe-area-inset-top)); bottom: calc(76px + env(safe-area-inset-bottom)); width: 270px; overflow: auto; text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.08); cursor: auto; z-index: 2; }
+.ap-stage:fullscreen, .ap-stage.ap-fs { padding-right: 300px; }
+.uk-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .9rem; }
+.uk-list { display: grid; gap: 6px; }
+.uk-it { display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--gold2); cursor: pointer; }
+.uk-it b { grid-row: 1 / span 2; font: 600 1.5rem var(--zh); color: var(--red); }
+.uk-py { font: .85rem var(--py, var(--ui)); color: #2f6f9f; } .uk-vi { grid-column: 2; font-size: .82rem; color: var(--ink2); line-height: 1.3; }
+.uk-x { grid-row: 1 / span 2; grid-column: 3; border: 0; background: none; color: var(--ink2); cursor: pointer; font-size: .9rem; }
+.ap-zh .tk.unk-w { text-decoration: underline wavy var(--gold); text-underline-offset: .25em; }
+.ap-zh .tk.unk-flash { background: var(--gold2); border-radius: 6px; }
+@media (max-width: 700px) {
+  .ap-stage:fullscreen, .ap-stage.ap-fs { padding-right: 6vw; padding-bottom: calc(34vh + 70px); }
+  .ap-stage:fullscreen .ap-unk, .ap-stage.ap-fs .ap-unk { left: 10px; right: 10px; width: auto; top: auto; bottom: calc(66px + env(safe-area-inset-bottom)); max-height: 30vh; }
+}
