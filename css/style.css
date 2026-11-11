@@ -1044,3 +1044,18 @@ html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
 .g-uc { font-size: .78rem; color: var(--ink2); white-space: nowrap; }
 .g-use .ex-list { padding: 6px 12px 10px; }
 .gcnt { font-size: .75rem; color: var(--ink2); white-space: nowrap; }
+/* nhãn ngữ pháp bấm được trong câu (Đánh máy, máy chạy tự động) */
+.ty-sg { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.gchip { font: inherit; font-size: .82rem; line-height: 1.3; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; cursor: pointer; text-align: left; }
+.gchip b { font-size: .72rem; color: var(--muted); margin-right: 2px; }
+.gchip span { color: var(--red); }
+.gchip.l3 { border-color: var(--gold); background: var(--gold2); } .gchip.l2 { border-color: var(--blue); background: var(--blue2); }
+.gchip.c-bo { border-style: dashed; }
+.gchip:hover { filter: brightness(.97); }
+.ap-gr { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+.ap-stage.no-gr .ap-gr { display: none; }
+.ap-stage.ap-fs .ap-gr .gchip, .ap-stage:fullscreen .ap-gr .gchip { font-size: clamp(.8rem, 2.4vmin, 1.1rem); }
+.gcard { font-family: var(--ui); } .gcard .zh, .gcard [lang="zh-CN"] { font-family: var(--zh); }
+.gcard mark { background: var(--gold2); outline: 1px solid var(--gold); color: inherit; border-radius: 4px; padding: 0 2px; }
+.gcard .gc-s { font-size: 1.25rem; margin: 6px 0; } .gcard .gc-f { margin: 4px 0; }
+.gc-ex { padding-left: 18px; margin: 6px 0; } .gc-ex li { margin-bottom: 6px; }

@@ -1,7 +1,7 @@
 // Luyện gõ lại bài đọc: chạy từng câu, gõ đúng đến đâu chữ biến mất đến đó; có đồng hồ, chữ/phút, từ/phút, độ chính xác
 import { store, logActivity, srsAdd } from '../core/store.js';
 import { segment, charPinyins, isHan, sentencePinyin, entry } from '../core/dict.js';
-import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, structsInText, quickSaveOn, setQuickSave, closePop, openPop, wordCard } from '../core/ui.js';
+import { esc, icon, $, $$, toast, recAudio, sentence, zhTokens, grammarInText, grammarChips, structsInText, quickSaveOn, setQuickSave, closePop, openPop, wordCard } from '../core/ui.js';
 import { speak, stopSeq, isIOS } from '../core/tts.js';
 import { TYPE_LESSONS } from '../data/typing-lessons.js';
 import { AI_DEFAULT, aiModelOptions, aiPreload, aiLong, toPcm16k, recordVoice, alignZh, onAIStatus } from '../core/ai.js';
@@ -35,11 +35,13 @@ function buildUnits(zh) {
 // Bảng tra: mỗi từ bấm được (nghĩa, cấp độ, ngữ pháp liên quan), mỗi câu liệt kê điểm ngữ pháp có trong câu
 export function analyzeHtml(sentences) {
   const all = sentences.map(x => x[0]).join('');
-  const gAll = grammarInText(all), sAll = structsInText(all);
+  const cnt = new Map(); sentences.forEach(([zh]) => new Set(grammarInText(zh)).forEach(g => cnt.set(g, (cnt.get(g) || 0) + 1)));
+  const gAll = [...cnt.keys()].sort((a, b) => b.level - a.level || cnt.get(b) - cnt.get(a)), sAll = structsInText(all);
   return `<div class="ty-save"><label class="chk"><input type="checkbox" class="ty-qs" ${quickSaveOn() ? 'checked' : ''}> ⚡ Bấm vào từ là <b>lưu ngay vào Ôn tập</b></label> <span class="muted small">· Muốn lưu một <b>cụm từ</b>: bôi đen cụm đó → bấm “⭐ Lưu cụm này”. Từ đã lưu được gạch chân vàng. <a href="#/review/mine">Xem từ đã lưu (Ôn tập › ⭐ Từ tôi đã thêm)</a></span></div>
-    <div class="ty-gsum"><b>📐 Ngữ pháp trong đoạn (${gAll.length}):</b> ${gAll.map(g => `<a class="chip" href="#/grammar/${g.id}" title="${esc(g.formula || '')}">HSK${g.level} · ${esc(g.name)}</a>`).join(' ') || '<span class="muted">không tìm thấy</span>'}
+    <div class="ty-gsum"><b>📐 Ngữ pháp trong đoạn (${gAll.length}):</b> ${gAll.map(g => `<a class="chip" href="#/grammar/${g.id}" title="${esc(g.formula || '')}">HSK${g.level} · ${esc(g.name)} <b>×${cnt.get(g)}</b></a>`).join(' ') || '<span class="muted">không tìm thấy</span>'}
     ${sAll.length ? `<div style="margin-top:6px"><b>🧩 Cấu trúc câu:</b> ${sAll.map(t => `<span class="chip" lang="zh-CN" title="${esc(t.vi)}">${esc(t.f)}</span>`).join(' ')}</div>` : ''}</div>
-    ${sentences.map(([zh, vi]) => { const gs = grammarInText(zh).filter(g => g.level >= 2); return sentence(zh, vi, { extra: gs.length ? `<div class="ty-sg small">📐 ${gs.map(g => `<a href="#/grammar/${g.id}">${esc(g.name)}</a>`).join(' · ')}</div>` : '' }); }).join('')}`;
+    <p class="muted small" style="margin:6px 0">📐 Mỗi câu bên dưới được máy phân tích ngữ pháp – <b>bấm vào nhãn</b> để xem giải thích, công thức và ví dụ.</p>
+    ${sentences.map(([zh, vi]) => { const ch = grammarChips(zh); return sentence(zh, vi, { extra: `<div class="ty-sg">${ch || '<span class="muted small">Không nhận ra điểm ngữ pháp đặc biệt</span>'}</div>` }); }).join('')}`;
 }
 
 /**
@@ -249,7 +251,7 @@ export function typingPage(root) {
   const L = q.get('b') ? TYPE_LESSONS.find(x => x.n === +q.get('b')) : null, mode = q.get('m') || 'read';
   if (L) { const all = L.p.map(([zh, vi]) => ({ zh, vi, py: '' })); fromLink = { lesson: L, mode, t: `Bài ${String(L.n).padStart(2, '0')} – ${L.q}`, rows: mode === '1' ? all.slice(0, L.cut) : mode === '2' ? all.slice(L.cut) : all }; }
   else if (q.get('d')) { try { const a = JSON.parse(b64d(q.get('d'))); fromLink = { t: a.t || '', rows: (a.r || []).map(([zh, vi, py]) => ({ zh: zh || '', vi: vi || '', py: py || '' })).filter(r => r.zh) }; } catch { toast('Link không đúng hoặc bị thiếu – không đọc được nội dung.', 'bad'); } }
-  const opt = { py: true, pyMode: 'line', vi: true, voice: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
+  const opt = { py: true, pyMode: 'line', vi: true, gr: true, voice: true, rate: 0.9, gap: 2, rep: 1, loop: false, ...(store.s.apOpt || {}) };
   const saveOpt = () => store.update(s => { s.apOpt = { ...opt }; });
   root.innerHTML = `<div class="page-head"><div><p class="eyebrow">Tự nhập nội dung</p><h1>⌨️ Đánh máy</h1></div></div>
   ${fromLink && fromLink.lesson ? (() => { const L = fromLink.lesson, b = `#/typing?b=${L.n}&m=`; return `<div class="card tl-cur"><div><p class="eyebrow">Bài ${String(L.n).padStart(2, '0')} · ${fromLink.mode === 'read' ? 'Máy luyện đọc cả bài' : `Đánh máy phần ${fromLink.mode}/2`}</p><h2 lang="zh-CN" style="margin:2px 0">${esc(L.q)}</h2><p class="muted" style="margin:0">${esc(L.qvi)}</p></div>
@@ -273,15 +275,16 @@ export function typingPage(root) {
       <label class="sw"><input type="checkbox" id="apPy" ${opt.py ? 'checked' : ''}><span></span> Pinyin</label>
       <label class="sel">Pinyin hiện <select id="apPyMode"><option value="line" ${opt.pyMode !== 'ruby' ? 'selected' : ''}>thành dòng riêng</option><option value="ruby" ${opt.pyMode === 'ruby' ? 'selected' : ''}>trên đầu từng chữ</option></select></label>
       <label class="sw"><input type="checkbox" id="apVi" ${opt.vi ? 'checked' : ''}><span></span> Tiếng Việt</label>
+      <label class="sw" title="Hiện các điểm ngữ pháp có trong câu đang đọc – bấm vào để xem giải thích"><input type="checkbox" id="apGrOn" ${opt.gr ? 'checked' : ''}><span></span> 📐 Ngữ pháp</label>
       <label class="sel">Tốc độ <select id="apRate">${[0.6, 0.75, 0.9, 1, 1.2].map(v => `<option value="${v}" ${v === +opt.rate ? 'selected' : ''}>${v}x</option>`).join('')}</select></label>
       <label class="sel">Nghỉ <select id="apGap">${[1, 2, 3, 5, 8].map(v => `<option value="${v}" ${v === +opt.gap ? 'selected' : ''}>${v} giây</option>`).join('')}</select></label>
       <label class="sel">Đọc <select id="apRep">${[1, 2, 3].map(v => `<option value="${v}" ${v === +opt.rep ? 'selected' : ''}>${v} lần</option>`).join('')}</select></label>
       <label class="chk"><input type="checkbox" id="apLoop" ${opt.loop ? 'checked' : ''}> Chạy lại từ đầu khi hết bài</label>
       <button class="btn ghost sm" id="apFull">⛶ Toàn màn hình</button>
     </div>
-    <div class="ap-stage ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'}" id="apStage">
+    <div class="ap-stage ${opt.py ? '' : 'no-py'} ${opt.vi ? '' : 'no-vi'} ${opt.gr ? '' : 'no-gr'}" id="apStage">
       <div class="ap-n" id="apN"></div>
-      <div class="ap-py" id="apPyT"></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div>
+      <div class="ap-py" id="apPyT"></div><div class="ap-zh zh" id="apZh" lang="zh-CN"></div><div class="ap-vi" id="apViT"></div><div class="ap-gr" id="apGr"></div>
       <div class="bar"><i id="apBar" style="width:0"></i></div>
       <aside class="ap-unk" id="apUnk" aria-label="Từ chưa thuộc"></aside>
       <div class="ap-fsbar"><button class="btn ghost sm" data-fs="prev" aria-label="Câu trước">‹</button><button class="btn sm" data-fs="play" aria-label="Chạy hoặc dừng">▶</button><button class="btn ghost sm" data-fs="next" aria-label="Câu sau">›</button><button class="btn ghost sm" data-fs="exit" aria-label="Thoát toàn màn hình">✕ Thoát</button></div>
@@ -329,12 +332,13 @@ export function typingPage(root) {
   };
   function show() {
     const r = rows[cur];
-    if (!r) { $('#apN', root).textContent = ''; $('#apZh', root).innerHTML = '<span class="muted" style="font-size:1rem">Nhập nội dung ở ô phía trên để máy chạy.</span>'; $('#apPyT', root).textContent = ''; $('#apViT', root).textContent = ''; $('#apBar', root).style.width = '0'; return; }
+    if (!r) { $('#apN', root).textContent = ''; $('#apZh', root).innerHTML = '<span class="muted" style="font-size:1rem">Nhập nội dung ở ô phía trên để máy chạy.</span>'; $('#apGr', root).innerHTML = ''; $('#apPyT', root).textContent = ''; $('#apViT', root).textContent = ''; $('#apBar', root).style.width = '0'; return; }
     $('#apN', root).textContent = `Câu ${cur + 1}/${rows.length}`;
     $('#apPyT', root).textContent = pyOf(r);
     $('#apZh', root).innerHTML = zhChars(r.zh, r.py);
     $('#apViT', root).textContent = r.vi || (opt.vi ? '' : '');
     $('#apViT', root).classList.toggle('empty', !r.vi);
+    $('#apGr', root).innerHTML = grammarChips(r.zh, { min: 2 });
     $('#apBar', root).style.width = ((cur + 1) / rows.length * 100) + '%';
     $$('.ap-row', list).forEach((el, i) => el.classList.toggle('now', i === cur));
     drawUnk();
@@ -368,6 +372,7 @@ export function typingPage(root) {
   [stage, list].forEach(el => el.classList.toggle('py-ruby', opt.pyMode === 'ruby'));
   $('#apPy', root).onchange = e => { opt.py = e.target.checked; tog(); };
   $('#apVi', root).onchange = e => { opt.vi = e.target.checked; tog(); };
+  $('#apGrOn', root).onchange = e => { opt.gr = e.target.checked; stage.classList.toggle('no-gr', !opt.gr); saveOpt(); };
   $('#apRate', root).onchange = e => { opt.rate = +e.target.value; saveOpt(); };
   $('#apGap', root).onchange = e => { opt.gap = +e.target.value; saveOpt(); };
   $('#apRep', root).onchange = e => { opt.rep = +e.target.value; saveOpt(); };
@@ -422,6 +427,7 @@ export function typingPage(root) {
   }, true);
   stage.addEventListener('click', e => {
     if (e.target.closest('.pop')) return;
+    if (e.target.closest('[data-gp]')) { stopRun(); return; }
     if (e.target.closest('.tk')) { stopRun(); return; }          // bấm vào từ: dừng lại để xem nghĩa (bảng nghĩa hiện ngay trên màn hình)
     if (isFs()) showUi();     // chạm vào màn hình: hiện các nút (tự ẩn sau vài giây)
   });

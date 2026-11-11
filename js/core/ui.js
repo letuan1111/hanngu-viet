@@ -3,6 +3,7 @@ import { rebuild, tokensWithPinyin, entry, lookup, examplesFor, collocations, ch
 import { SPEAK_STRUCT } from '../data/speaking.js';
 import { speak } from './tts.js';
 import { RADICALS } from '../data/radicals.js';
+import { detectGrammar } from './grammar-detect.js';
 
 // Bản ghi âm của người học: trình phát + nút xóa (xóa khỏi trang và giải phóng bộ nhớ)
 export const recAudio = url => url ? `<span class="rec-a"><audio controls src="${url}"></audio><button class="mini rec-del" type="button" title="Xóa bản ghi này" aria-label="Xóa bản ghi này">🗑️ Xóa</button></span>` : '';
@@ -92,12 +93,28 @@ export function modal(html, { wide = false } = {}) {
 const hanParts = t => String(t || '').match(/\p{Script=Han}+/gu) || [];
 export const grammarOfWord = h => GRAMMAR.filter(g => g.key === h || hanParts(g.name).includes(h));
 export const structsOfWord = h => SPEAK_STRUCT.filter(t => hanParts(t.f).includes(h));
-export function grammarInText(z) {
-  const out = [];
-  const NOISY = new Set(['g1-liandong', 'g3-chongdie', 'g1-num', 'g1-time', 'g1-vbuv', 'g2-duo', 'g2-dui', 'g3-jieci', 'g3-cunxian', 'g3-dedide', 'g3-xhyin', 'g3-renzhi']); // từ khóa quá chung, dễ nhận nhầm
-  const RE = { 'g3-yue': /越来越|越.{1,8}越/ }; // tránh nhận nhầm như 越南
-  for (const g of GRAMMAR) { if (NOISY.has(g.id)) continue; if (RE[g.id]) { if (RE[g.id].test(z)) out.push(g); continue; } const keys = g.id === 'g1-bu' ? ['不', '没'] : [g.key]; if (keys.some(k => k && z.includes(k))) out.push(g); }
-  return out.sort((a, b) => b.level - a.level);
+export const grammarInText = z => detectGrammar(z).map(d => d.g);
+// Nhãn ngữ pháp bấm được: hiện bảng giải thích + ví dụ (dùng cả ở chế độ toàn màn hình)
+export const grammarChips = (zh, { min = 1 } = {}) => detectGrammar(zh).filter(d => d.g.level >= min).map(({ g, m }) =>
+  `<button type="button" class="gchip l${g.level}${g.cat ? ' c-' + g.cat : ''}" data-gp="${g.id}" data-z="${esc(zh)}" data-m="${esc(m)}" title="${esc(g.formula || '')}"><b>HSK${g.level}</b> ${esc(g.name)} <span lang="zh-CN">«${esc(m)}»</span></button>`).join('');
+export function grammarCard(id, zh = '', m = '') {
+  const g = GRAMMAR.find(x => x.id === id); if (!g) return '';
+  const at = m ? zh.indexOf(m) : -1;
+  const hz = at >= 0 ? `${esc(zh.slice(0, at))}<mark>${esc(m)}</mark>${esc(zh.slice(at + m.length))}` : esc(zh);
+  // nhóm cách dùng có nhiều ví dụ giống đoạn khớp nhất
+  const core = [...m].filter(c => /\p{Script=Han}/u.test(c));
+  const score = u => u.ex.reduce((a, e) => a + core.filter(c => e[0].includes(c)).length, 0) / Math.max(1, u.ex.length);
+  const use = (g.uses || []).filter(u => u.t !== 'Ví dụ thêm' && u.ex.length).sort((a, b) => score(b) - score(a))[0];
+  const exs = (use ? use.ex : g.ex).slice(0, 3);
+  const cat = g.cat === 'bo' ? ' · Bổ ngữ' : g.cat === 'hu' ? ' · Hư từ' : '';
+  return `<div class="gcard"><p class="eyebrow">📐 Ngữ pháp HSK ${g.level}${cat}</p><h3 style="margin:2px 0 6px">${esc(g.name)}</h3>
+    ${zh ? `<p class="gc-s zh" lang="zh-CN">${hz}</p>` : ''}
+    <p class="gc-f" lang="zh-CN"><b>Công thức:</b> ${esc(g.formula || '')}</p>
+    <p>${esc(g.explain || '')}</p>
+    ${use ? `<p class="small" style="margin:8px 0 2px"><b>Cách dùng gần nhất:</b> ${esc(use.t)}${use.d ? ` <span class="muted">– ${esc(use.d)}</span>` : ''}</p>` : ''}
+    <ul class="gc-ex">${exs.map(([z, v]) => `<li><span lang="zh-CN" class="zh">${esc(z)}</span> <button class="mini" data-say="${esc(z)}" aria-label="Nghe">🔊</button><br><span class="muted small">${esc(v)}</span></li>`).join('')}</ul>
+    ${g.limits ? `<p class="small muted">⚠️ ${esc(g.limits)}</p>` : ''}
+    <a class="btn sm" href="#/grammar/${g.id}">Xem đủ ${g.ex.length} ví dụ & cách dùng ›</a></div>`;
 }
 export const structsInText = z => SPEAK_STRUCT.filter(t => { try { return new RegExp(t.re).test(z); } catch { return false; } });
 let pop = null;
@@ -220,6 +237,7 @@ export function initGlobalEvents() {
     if (sayBtn) { e.preventDefault(); const sent = sayBtn.closest('.sent'); speak(sayBtn.dataset.say, { rate: sayBtn.dataset.rate ? +sayBtn.dataset.rate * store.s.settings.rate : undefined, el: sent || sayBtn, role: sent ? +sent.dataset.role : 0, onBoundary: sent ? hl(sent) : null }); logActivity(); return; }
     const peek = t.closest('.peek'); if (peek) { peek.closest('.sent').classList.toggle('show-all'); return; }
     if (pop && t.closest('.pop .close')) { closePop(); return; }
+    const gp = t.closest('[data-gp]'); if (gp) { e.preventDefault(); e.stopPropagation(); openPop(gp, grammarCard(gp.dataset.gp, gp.dataset.z, gp.dataset.m)); return; }
     const act = t.closest('[data-act]');
     if (act && act.dataset.h) {
       const h = act.dataset.h;

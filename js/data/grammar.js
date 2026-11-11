@@ -328,6 +328,7 @@ import { GP3 } from './grammar-plus3.js';
 import { GP4 } from './grammar-plus4.js';
 import { GP5 } from './grammar-plus5.js';
 import { GP6 } from './grammar-plus6.js';
+import { GP7 } from './grammar-plus7.js';
 const BO = new Set(['g2-de', 'g2-ci', 'g2-shiliang', 'g3-kq', 'g3-xh', 'g3-kn']);
 function mergePlus(txt) {
   let g = null, use = null;
@@ -354,7 +355,7 @@ function mergePlus(txt) {
     use.ex.push(e);
   }
 }
-[GP1, GP2, GP3, GP4, GP5, GP6].forEach(mergePlus);
+[GP1, GP2, GP3, GP4, GP5, GP6, GP7].forEach(mergePlus);
 for (const g of GRAMMAR) {
   if (BO.has(g.id)) g.cat = 'bo';
   if (!g.uses || !g.uses.length) continue;
