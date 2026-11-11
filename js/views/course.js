@@ -153,13 +153,13 @@ function usesHtml(g) {
   const groups = base.length ? [{ t: 'Ví dụ cơ bản', d: '', ex: base }, ...g.uses] : g.uses;
   return `<div class="g-uses"><p class="muted small">${groups.length} cách dùng · ${g.ex.length} ví dụ – bấm vào từng mục để xem ví dụ, bấm vào từ để tra nghĩa.</p>
     ${groups.map((u, i) => `<details class="g-use" ${i < 2 ? 'open' : ''}><summary><span class="g-un">${i + 1}</span><span><b>${esc(u.t)}</b>${u.d ? `<span class="muted small"> – ${esc(u.d)}</span>` : ''}</span><span class="g-uc">${u.ex.length} ví dụ</span></summary>
-      <div class="ex-list">${u.ex.map(e => sentence(e[0], e[1])).join('')}</div></details>`).join('')}</div>`;
+      <div class="ex-list py-ch">${u.ex.map(e => sentence(e[0], e[1], { perChar: true })).join('')}</div></details>`).join('')}</div>`;
 }
 export function grammarBlock(g, { full = false } = {}) {
   return `<article class="gcard"><header><span class="badge">HSK ${g.level}</span><h3><a href="#/grammar/${g.id}">${esc(g.name)}</a></h3></header>
     <div class="formula" lang="zh-CN">${esc(g.formula)}</div>
     <p>${esc(g.explain)}</p>
-    ${full && g.uses && g.uses.length ? usesHtml(g) : `<div class="ex-list">${(full ? g.ex : g.ex.slice(0, 3)).map(e => sentence(e[0], e[1])).join('')}</div>`}
+    ${full && g.uses && g.uses.length ? usesHtml(g) : `<div class="ex-list py-ch">${(full ? g.ex : g.ex.slice(0, 3)).map(e => sentence(e[0], e[1], { perChar: true })).join('')}</div>`}
     ${g.limits ? `<p class="note"><b>Lưu ý:</b> ${esc(g.limits)}</p>` : ''}
     ${!full ? `<a class="more" href="#/grammar/${g.id}">Xem đầy đủ, lỗi sai thường gặp và bài tập ›</a>` : ''}
   </article>`;

@@ -1059,3 +1059,7 @@ html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
 .gcard mark { background: var(--gold2); outline: 1px solid var(--gold); color: inherit; border-radius: 4px; padding: 0 2px; }
 .gcard .gc-s { font-size: 1.25rem; margin: 6px 0; } .gcard .gc-f { margin: 4px 0; }
 .gc-ex { padding-left: 18px; margin: 6px 0; } .gc-ex li { margin-bottom: 6px; }
+/* Ví dụ ngữ pháp: pinyin luôn nằm ngay trên đầu từng chữ Hán */
+.py-ch .zh rt, .zh.py-ch rt { display: ruby-text !important; visibility: visible !important; font-size: .5em; }
+.py-ch .py-line { display: none !important; }
+.py-ch .zh ruby.ch { ruby-align: center; } .py-ch .zh { line-height: 2.1; }

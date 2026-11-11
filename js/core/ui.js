@@ -20,23 +20,23 @@ export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 export const short = vi => (vi || '').split(/[;,(]/)[0].trim();
 
 // ── Hiển thị câu có thể bấm vào từng từ ──
-export function zhTokens(zh, { gloss = true } = {}) {
+export function zhTokens(zh, { gloss = true, perChar = false } = {}) {
   let off = 0;
   return tokensWithPinyin(zh).map(t => {
     const start = off; off += t.t.length;
     if (!t.han) return `<span class="pn">${esc(t.t)}</span>`;
     const g = gloss && t.w ? `<i class="gl">${esc(short(t.w.vi))}</i>` : '';
-    return `<span class="tk${t.w ? '' : ' unk'}${store.s.srs[t.t] ? ' in-srs' : ''}" data-w="${esc(t.t)}" data-i="${start}" data-n="${t.t.length}"><ruby><span class="hz">${esc(t.t)}</span><rt>${esc(t.py || '')}</rt></ruby>${g}</span>`;
+    return `<span class="tk${t.w ? '' : ' unk'}${store.s.srs[t.t] ? ' in-srs' : ''}" data-w="${esc(t.t)}" data-i="${start}" data-n="${t.t.length}">${perChar ? `<span class="hz">${[...t.t].map((c, j) => `<ruby class="ch">${esc(c)}<rt>${esc((t.cpy || [])[j] || '')}</rt></ruby>`).join('')}</span>` : `<ruby><span class="hz">${esc(t.t)}</span><rt>${esc(t.py || '')}</rt></ruby>`}${g}</span>`;
   }).join('');
 }
 export function say(text, label = '') {
   return `<button class="say" data-say="${esc(text)}" title="Nghe" aria-label="Nghe phát âm">${icon('vol')}${label}</button>`;
 }
-export function sentence(zh, vi, { speaker = '', role = 0, extra = '' } = {}) {
+export function sentence(zh, vi, { speaker = '', role = 0, extra = '', perChar = false } = {}) {
   return `<div class="sent" data-zh="${esc(zh)}" data-role="${role}">
     ${speaker ? `<span class="spk spk${role}">${esc(speaker)}</span>` : ''}
     <div class="sent-body">
-      <div class="zh">${zhTokens(zh)}</div>
+      <div class="zh">${zhTokens(zh, { perChar })}</div>
       <div class="py-line">${esc(sentencePinyin(zh))}</div>
       ${vi ? `<div class="vi">${esc(vi)}</div>` : ''}
       ${extra}
@@ -112,7 +112,7 @@ export function grammarCard(id, zh = '', m = '') {
     <p class="gc-f" lang="zh-CN"><b>Công thức:</b> ${esc(g.formula || '')}</p>
     <p>${esc(g.explain || '')}</p>
     ${use ? `<p class="small" style="margin:8px 0 2px"><b>Cách dùng gần nhất:</b> ${esc(use.t)}${use.d ? ` <span class="muted">– ${esc(use.d)}</span>` : ''}</p>` : ''}
-    <ul class="gc-ex">${exs.map(([z, v]) => `<li><span lang="zh-CN" class="zh">${esc(z)}</span> <button class="mini" data-say="${esc(z)}" aria-label="Nghe">🔊</button><br><span class="muted small">${esc(v)}</span></li>`).join('')}</ul>
+    <ul class="gc-ex">${exs.map(([z, v]) => `<li><span lang="zh-CN" class="zh py-ch">${zhTokens(z, { gloss: false, perChar: true })}</span> <button class="mini" data-say="${esc(z)}" aria-label="Nghe">🔊</button><br><span class="muted small">${esc(v)}</span></li>`).join('')}</ul>
     ${g.limits ? `<p class="small muted">⚠️ ${esc(g.limits)}</p>` : ''}
     <a class="btn sm" href="#/grammar/${g.id}">Xem đủ ${g.ex.length} ví dụ & cách dùng ›</a></div>`;
 }

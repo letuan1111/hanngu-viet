@@ -97,6 +97,7 @@ export function tokensWithPinyin(text) {
     if (!t.han) continue;
     const n = t.t.length;
     const ctx = arr ? arr.slice(k, k + n) : null; k += n;
+    t.cpy = ctx && ctx.length === n ? ctx : [...t.t].map(c => charPinyin(c));
     if (t.w && n > 1) t.py = t.w.p;
     else if (ctx) t.py = ctx.join(' ');
     else if (t.w) t.py = t.w.p;
