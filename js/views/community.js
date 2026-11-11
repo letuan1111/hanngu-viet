@@ -83,7 +83,7 @@ function simpleList(cz, kind, fields, render, label) {
       const zhField = fields.find(f => f[2]?.zh && f[2]?.req);
       const err = req ? `Hãy nhập “${req[1]}”.` : zhField && !/\p{Script=Han}/u.test(it[zhField[0]]) ? 'Nội dung tiếng Trung cần có chữ Hán.' : guard(Object.values(it).filter(v => typeof v === 'string'));
       if (err) { $('#cerr', cz).textContent = err; return; }
-      store.update(s => s.community[kind].push(it)); toast('Đã lưu'); history.replaceState(null, '', location.hash.split('?')[0]); draw();
+      store.update(s => s.community[kind].push(it)); toast('Đã lưu'); history.replaceState(history.state, '', location.hash.split('?')[0]); draw();
     };
   };
   draw();
