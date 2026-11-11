@@ -314,3 +314,51 @@ export const GRAMMAR = [
   ex:[['我看了一个关于熊猫的节目。','Tôi đã xem một chương trình về gấu trúc.'],['关于这个问题，我们明天再说吧。','Về vấn đề này, mai chúng ta nói tiếp nhé.']],
   topic:'Học tập'},
 ];
+
+// ── Mở rộng: mỗi điểm ngữ pháp ≥ 20 ví dụ chia theo từng cách dùng, thêm hư từ và các loại bổ ngữ ──
+// Định dạng văn bản (grammar-plus*.js):
+//   @id                                   → thêm cách dùng / ví dụ cho điểm ngữ pháp đã có
+//   @@id|cấp|tên|công thức|từ khóa|nhóm   → điểm ngữ pháp mới (nhóm: bo = bổ ngữ, hu = hư từ, ''), dòng sau:
+//   =giải thích   ?cách dùng chung   ~lưu ý   !câu sai|câu đúng|giải thích   >id so sánh|ghi chú   ^chủ đề
+//   #Tên cách dùng|mô tả ngắn             → nhóm ví dụ
+//   câu tiếng Trung|nghĩa tiếng Việt      → ví dụ
+import { GP1 } from './grammar-plus1.js';
+import { GP2 } from './grammar-plus2.js';
+import { GP3 } from './grammar-plus3.js';
+import { GP4 } from './grammar-plus4.js';
+import { GP5 } from './grammar-plus5.js';
+import { GP6 } from './grammar-plus6.js';
+const BO = new Set(['g2-de', 'g2-ci', 'g2-shiliang', 'g3-kq', 'g3-xh', 'g3-kn']);
+function mergePlus(txt) {
+  let g = null, use = null;
+  for (const raw of txt.split('\n')) {
+    const line = raw.trim(); if (!line || line.startsWith('//')) continue;
+    if (line.startsWith('@@')) {
+      const [id, lv, name, formula, key, cat] = line.slice(2).split('|');
+      g = { id, level: +lv, name, formula, key, cat: cat || '', explain: '', usage: '', ex: [], uses: [], mistakes: [] };
+      GRAMMAR.push(g); use = null; continue;
+    }
+    if (line.startsWith('@')) { g = GRAMMAR.find(x => x.id === line.slice(1)); use = null; if (g) g.uses = g.uses || []; continue; }
+    if (!g) continue;
+    const c = line[0], rest = line.slice(1);
+    if (c === '=') { g.explain = rest; continue; }
+    if (c === '?') { g.usage = rest; continue; }
+    if (c === '~') { g.limits = rest; continue; }
+    if (c === '^') { g.topic = rest; continue; }
+    if (c === '!') { (g.mistakes = g.mistakes || []).push(rest.split('|')); continue; }
+    if (c === '>') { const [id, note] = rest.split('|'); g.compare = [id, note || '']; continue; }
+    if (c === '#') { const [t, d] = rest.split('|'); use = g.uses.find(u => u.t === t) || null; if (!use) { use = { t, d: d || '', ex: [] }; g.uses.push(use); } continue; }
+    const [zh, vi] = line.split('|'); if (!zh || !vi) continue;
+    const e = [zh.trim(), vi.trim()];
+    if (!use) { use = { t: 'Ví dụ', d: '', ex: [] }; g.uses.push(use); }
+    use.ex.push(e);
+  }
+}
+[GP1, GP2, GP3, GP4, GP5, GP6].forEach(mergePlus);
+for (const g of GRAMMAR) {
+  if (BO.has(g.id)) g.cat = 'bo';
+  if (!g.uses || !g.uses.length) continue;
+  const seen = new Set(g.ex.map(e => e[0]));
+  for (const u of g.uses) for (const e of u.ex) if (!seen.has(e[0])) { seen.add(e[0]); g.ex.push(e); }
+}
+GRAMMAR.sort((a, b) => a.level - b.level);

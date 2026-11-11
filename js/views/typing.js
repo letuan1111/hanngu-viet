@@ -341,7 +341,7 @@ export function typingPage(root) {
   }
   const scrollRow = () => { const el = $$('.ap-row', list)[cur]; if (el && !isFs()) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
   const wait = (ms, tok) => new Promise(res => { const t0 = Date.now(); const iv = setInterval(() => { if (tok.stop || Date.now() - t0 >= ms) { clearInterval(iv); res(); } }, 100); });
-  const setBtn = on => { $('#apPlay', root).textContent = on ? '⏸ Dừng' : '▶ Chạy'; $('#apPlay', root).classList.toggle('rec', on); const b = $('[data-fs=play]', root); if (b) b.textContent = on ? '⏸' : '▶'; };
+  const setBtn = on => { const pb = $('#apPlay', root); if (pb) { pb.textContent = on ? '⏸ Dừng' : '▶ Chạy'; pb.classList.toggle('rec', on); } const b = $('[data-fs=play]', root); if (b) b.textContent = on ? '⏸' : '▶'; };
   function stopRun() { if (run) { run.stop = true; run = null; } stopSeq(); setBtn(false); }
   async function startRun() {
     if (!rows.length) { toast('Hãy nhập nội dung trước.', 'bad'); return; }

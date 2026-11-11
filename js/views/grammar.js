@@ -9,15 +9,15 @@ const plain = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').repl
 
 export function grammarList(root) {
   const seen = store.s.grammarSeen;
-  root.innerHTML = `<div class="page-head"><h1>Ngữ pháp HSK 1–3</h1><div class="row gap"><a class="btn sm ghost" href="#/check">Kiểm tra câu của bạn</a><a class="btn sm ghost" href="#/compare/g2-bi/g3-meiyou">So sánh hai cấu trúc</a></div></div>
+  root.innerHTML = `<div class="page-head"><h1>Ngữ pháp HSK 1–3 <small class="muted" style="font-size:.55em">${GRAMMAR.length} điểm · ${GRAMMAR.reduce((a, g) => a + g.ex.length, 0)} ví dụ</small></h1><div class="row gap"><a class="btn sm ghost" href="#/check">Kiểm tra câu của bạn</a><a class="btn sm ghost" href="#/compare/g2-bi/g3-meiyou">So sánh hai cấu trúc</a></div></div>
   <div class="search-box"><input id="gq" class="inp big" placeholder="Tìm theo tiếng Việt hoặc tiếng Trung, ví dụ: so sánh, 把, sắp…" aria-label="Tìm ngữ pháp"></div>
-  <div class="chips" id="gl">${[['0', 'Tất cả'], ['1', 'HSK 1'], ['2', 'HSK 2'], ['3', 'HSK 3'], ['seen', 'Đã học']].map(([k, n], i) => `<button class="chip ${i ? '' : 'on'}" data-k="${k}">${n}</button>`).join('')}</div>
+  <div class="chips" id="gl">${[['0', 'Tất cả'], ['1', 'HSK 1'], ['2', 'HSK 2'], ['3', 'HSK 3'], ['bo', 'Bổ ngữ'], ['hu', 'Hư từ (từ ngữ pháp)'], ['seen', 'Đã học']].map(([k, n], i) => `<button class="chip ${i ? '' : 'on'}" data-k="${k}">${n}</button>`).join('')}</div>
   <div id="glist" class="glist"></div>`;
   let lv = '0';
   const draw = () => {
     const q = plain($('#gq', root).value.trim());
-    const gs = GRAMMAR.filter(g => (lv === '0' || (lv === 'seen' ? seen[g.id] : g.level === +lv)) && (!q || plain(g.name + g.formula + g.explain + g.usage + (g.topic || '') + g.ex.map(e => e[0]).join('')).includes(q)));
-    $('#glist', root).innerHTML = [1, 2, 3].map(L => { const x = gs.filter(g => g.level === L); return x.length ? `<h3 class="sub">HSK ${L}</h3>${x.map(g => `<a class="grow-row" href="#/grammar/${g.id}"><span class="gname">${seen[g.id] ? '✓ ' : ''}${esc(g.name)}</span><span class="gform" lang="zh-CN">${esc(g.formula)}</span></a>`).join('')}` : ''; }).join('') || '<p class="muted">Không tìm thấy cấu trúc phù hợp.</p>';
+    const gs = GRAMMAR.filter(g => (lv === '0' || (lv === 'seen' ? seen[g.id] : lv === 'bo' || lv === 'hu' ? g.cat === lv : g.level === +lv)) && (!q || plain(g.name + g.formula + g.explain + g.usage + (g.topic || '') + g.ex.map(e => e[0]).join('')).includes(q)));
+    $('#glist', root).innerHTML = [1, 2, 3].map(L => { const x = gs.filter(g => g.level === L); return x.length ? `<h3 class="sub">HSK ${L}</h3>${x.map(g => `<a class="grow-row" href="#/grammar/${g.id}"><span class="gname">${seen[g.id] ? '✓ ' : ''}${esc(g.name)}</span><span class="gform" lang="zh-CN">${esc(g.formula)}</span><span class="gcnt">${g.ex.length} ví dụ</span></a>`).join('')}` : ''; }).join('') || '<p class="muted">Không tìm thấy cấu trúc phù hợp.</p>';
   };
   $('#gq', root).oninput = draw;
   $('#gl', root).onclick = e => { const b = e.target.closest('.chip'); if (!b) return; lv = b.dataset.k; $$('#gl .chip', root).forEach(x => x.classList.toggle('on', x === b)); draw(); };

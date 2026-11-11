@@ -1033,3 +1033,14 @@ html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
 .ap-zh .tk.unk-w, .ap-rz .tk.unk-w { color: var(--red); background: var(--red2); border-radius: 6px; text-decoration: none; }
 .ap-zh .tk.unk-w rt, .ap-rz .tk.unk-w rt { color: var(--red); }
 .ap-zh .tk.unk-w .ch.lit { color: #fff; background: var(--red); }
+
+/* Ngữ pháp: các cách dùng, bấm mở ví dụ */
+.g-uses { display: grid; gap: 8px; margin: 10px 0; }
+.g-use { border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.g-use > summary { display: grid; grid-template-columns: 2em 1fr auto; gap: 8px; align-items: center; padding: 10px 12px; cursor: pointer; list-style: none; }
+.g-use > summary::-webkit-details-marker { display: none; }
+.g-use[open] > summary { border-bottom: 1px dashed var(--line); }
+.g-un { width: 1.8em; height: 1.8em; border-radius: 50%; display: grid; place-items: center; background: var(--red2); color: var(--red); font-weight: 700; font-size: .85rem; }
+.g-uc { font-size: .78rem; color: var(--ink2); white-space: nowrap; }
+.g-use .ex-list { padding: 6px 12px 10px; }
+.gcnt { font-size: .75rem; color: var(--ink2); white-space: nowrap; }
