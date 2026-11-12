@@ -66,7 +66,9 @@ function render() {
       const t = view(root, ...m.slice(1));
       document.title = (t || title) + ' · HànNgữ Việt';
       if (!/^\/(settings|progress)?$/.test(path)) setLast('#' + path, t || title);
-      $$('.nav a').forEach(a => a.classList.toggle('on', path === a.getAttribute('href').slice(1) || (a.dataset.match && new RegExp(a.dataset.match).test(path))));
+      $$('.nav a, .bottom a').forEach(a => a.classList.toggle('on', path === a.getAttribute('href').slice(1) || (a.dataset.match && new RegExp(a.dataset.match).test(path))));
+      { const bar = $('#bnav'), on = bar && bar.querySelector('a.on');   // thanh menu dưới: đưa mục đang mở vào giữa
+        if (on && bar.scrollWidth > bar.clientWidth) { const l = on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2; bar.scrollTo({ left: Math.max(0, l), behavior: 'smooth' }); } }
       root.focus({ preventScroll: true });
       afterRender(t || title);
       return;

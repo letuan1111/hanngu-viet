@@ -814,7 +814,6 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .ls-exp[hidden] { display: none; }
 @media (max-width: 1400px) and (min-width: 901px) { .nav a { padding: 0 8px; font-size: .9rem; } }
 @media (max-width: 1180px) and (min-width: 901px) { .nav a { padding: 0 6px; font-size: .85rem; } .bt { display: none; } }
-@media (max-width: 900px) { .bottom a { white-space: nowrap; font-size: .68rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; } }
 .ls-ai { background: var(--paper); margin-top: 10px; } .ai-prog { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; } .ai-prog .my-bar { flex: 1; min-width: 160px; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; } .ai-prog .my-bar span { display: block; height: 100%; width: 0; background: var(--jade); transition: width .3s; }
 .ls-sbar { align-items: center; margin: 8px 0; } .inp.sm { padding: 3px 6px; font-size: .9rem; }
 .ls-sp.hide-zh .sp-row:not(.shown):not(:has(.ok, .tone, .miss)) .sp-zh, .ls-sp.hide-zh .sp-row:not(.shown) .sp-vi { filter: blur(7px); }
@@ -1063,3 +1062,12 @@ html.exam-full .ex-paper .pages img { width: 100%; max-width: none; }
 .py-ch .zh rt, .zh.py-ch rt { display: ruby-text !important; visibility: visible !important; font-size: .5em; }
 .py-ch .py-line { display: none !important; }
 .py-ch .zh ruby.ch { ruby-align: center; } .py-ch .zh { line-height: 2.1; }
+
+/* Thanh menu dưới (điện thoại): vuốt ngang để xem hết các mục */
+@media (max-width: 860px) {
+  .bottom { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x; scroll-snap-type: x proximity; scrollbar-width: none; gap: 2px;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); }
+  .bottom::-webkit-scrollbar { display: none; }
+  .bottom a { flex: 0 0 auto; min-width: 64px; padding: 4px 6px; white-space: nowrap; scroll-snap-align: start; border-radius: 10px; }
+  .bottom a.on { color: var(--red); background: var(--red2); font-weight: 600; }
+}

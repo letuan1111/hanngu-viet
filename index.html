@@ -11,14 +11,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/lxgwwenkaigbscreen.css">
-<link rel="stylesheet" href="css/style.css?v=20261111d">
+<link rel="stylesheet" href="css/style.css?v=20261112a">
 <script defer src="vendor/pinyin-pro.js"></script>
 <script defer src="vendor/hanzi-writer.min.js"></script>
 <script>
 // Cổng đăng nhập: chỉ người có tên đăng nhập + mật khẩu mới mở được web (máy đã đăng nhập sẽ được ghi nhớ)
 (function () {
   var H = '08a476cee8efa86a9d63e1d8985b7b59f765c00e8fa6c4c0ef0b0a5c2010d214', K = 'hv-auth';
-  function boot() { var sc = document.createElement('script'); sc.type = 'module'; sc.src = 'js/app.js?v=20261111d'; document.head.appendChild(sc); }
+  function boot() { var sc = document.createElement('script'); sc.type = 'module'; sc.src = 'js/app.js?v=20261112a'; document.head.appendChild(sc); }
   var ok = false; try { ok = localStorage.getItem(K) === H; } catch (e) {}
   if (ok) { boot(); return; }
   document.documentElement.classList.add('locked');
@@ -69,8 +69,8 @@
 <script>try{if(localStorage.getItem('hanngu-tip-off')==='1')document.getElementById('tipBar').hidden=true;}catch(e){}document.getElementById('tipX').onclick=function(){document.getElementById('tipBar').hidden=true;try{localStorage.setItem('hanngu-tip-off','1');}catch(e){}};</script>
 <div class="backbar" id="backBar" hidden></div>
 <main id="view" class="view" tabindex="-1"><div class="loading"><span lang="zh-CN">学</span> Đang tải…</div></main>
-<nav class="bottom" aria-label="Điều hướng nhanh">
-  <a href="#/"><span>🏠</span>Trang chủ</a><a href="#/pinyin"><span>🗣</span>Phát âm</a><a href="#/hsk30/1"><span>🃏</span>Quizlet</a><a href="#/course/1"><span>📘</span>Học</a><a href="#/review"><span>🔁</span>Ôn tập</a><a href="#/speaking"><span>🗣️</span>Nói</a><a href="#/typing"><span>⌨️</span>Gõ</a><a href="#/listen"><span>🎧</span>Nghe</a><a href="#/vocab"><span>🀄</span>Tra từ</a>
+<nav class="bottom" id="bnav" aria-label="Điều hướng nhanh">
+  <a href="#/" data-match="^/$"><span>🏠</span>Trang chủ</a><a href="#/pinyin" data-match="^/pinyin"><span>🗣</span>Phát âm</a><a href="#/hsk30/1" data-match="^/(hsk30|hsk1-500)"><span>🃏</span>Quizlet</a><a href="#/course/1" data-match="^/(course|lesson|chapter|reading)"><span>📘</span>Học</a><a href="#/vocab" data-match="^/(vocab|word|topics)"><span>🀄</span>Từ vựng</a><a href="#/grammar" data-match="^/(grammar|compare|check)"><span>📐</span>Ngữ pháp</a><a href="#/measure" data-match="^/measure"><span>🔢</span>Lượng từ</a><a href="#/practice" data-match="^/practice"><span>✏️</span>Luyện tập</a><a href="#/speaking" data-match="^/speaking"><span>🗣️</span>Nói</a><a href="#/listen" data-match="^/listen"><span>🎧</span>Nghe</a><a href="#/typing" data-match="^/typing"><span>⌨️</span>Đánh máy</a><a href="#/review" data-match="^/review"><span>🔁</span>Ôn tập</a><a href="#/exam" data-match="^/(exam|placement)"><span>📝</span>Thi thử</a><a href="#/community" data-match="^/community"><span>🤝</span>Đóng góp</a>
 </nav>
 <footer class="foot">
   <p><b>HànNgữ Việt</b> · Học tiếng Trung phổ thông (普通话) bằng chữ giản thể, HSK 1–3. Dữ liệu học tập lưu trên trình duyệt của bạn.</p>
