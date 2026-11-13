@@ -629,7 +629,7 @@ const TTS={
   stop(){ try{ if(this.audio){ this.audio.pause(); this.audio=null; } }catch(e){} try{speechSynthesis.cancel()}catch(e){} try{this.claude&&this.claude.stop()}catch(e){} this.speaking=false; },
   speak(text,rate){
     rate = rate||S.rate; this.stop();
-    if(text && !hanOnly(text)) return this._vi(text,rate);
+    if(!hanOnly(text)) return Promise.resolve(); // chỉ đọc tiếng Trung
     const cur=this.current();
     if(!cur){ toast('Máy chưa có giọng tiếng Trung. Hãy dùng Chrome/Edge hoặc cài gói giọng zh-CN.'); return Promise.resolve(); }
     this.speaking=true;
@@ -645,14 +645,14 @@ const TTS={
     return this._web(text,rate,cur.v).finally(()=>{this.speaking=false});
   },
   async _gemUrl(text,slow){
-    const k=(S.gemVoice||'Kore')+'|'+(slow?1:0)+'|'+text;
-    if(!this.cache.has(k)) this.cache.set(k, geminiTTS(text,slow).catch(e=>{ this.cache.delete(k); throw e; }));
+    const k=(S.gemVoice||'Kore')+'|'+text;
+    if(!this.cache.has(k)) this.cache.set(k, geminiTTS(text).catch(e=>{ this.cache.delete(k); throw e; }));
     return this.cache.get(k);
   },
   prefetch(text){ if(text && this.current()&&this.current().type==='gemini') this._gemUrl(text,false).catch(()=>{}); },
   async _gem(text,rate){
-    const url=await this._gemUrl(text,rate<0.8);
-    return new Promise(res=>{ const a=new Audio(url); this.audio=a; a.playbackRate=rate<0.8?1:Math.max(0.8,Math.min(1.3,rate/0.9)); a.onended=res; a.onerror=res; a.play().catch(res); });
+    const url=await this._gemUrl(text);
+    return new Promise(res=>{ const a=new Audio(url); this.audio=a; a.preservesPitch=true; a.playbackRate=rate<0.8?0.72:Math.max(0.8,Math.min(1.3,rate/0.9)); a.onended=res; a.onerror=res; a.play().catch(res); });
   },
   _vi(text,rate){ return new Promise(res=>{ try{ const u=new SpeechSynthesisUtterance(text); const v=speechSynthesis.getVoices().find(x=>/^vi/i.test(x.lang)); u.lang=(v&&v.lang)||'vi-VN'; if(v) u.voice=v; u.rate=Math.max(0.8,rate); u.onend=res; u.onerror=res; speechSynthesis.speak(u); setTimeout(res,1500+text.length*120); }catch(e){ res(); } }); },
   _web(text,rate,v){ return new Promise(res=>{
@@ -676,7 +676,7 @@ function pcmToWavUrl(b64,rate){
 }
 async function geminiTTS(text,slow){
   if(!S.gemKey) throw {message:'chưa có key Gemini'};
-  const say=(slow?'Read slowly, syllable by syllable, very clearly':'Read naturally and clearly, like a native speaker teaching a learner')+', in standard Mandarin Chinese (Putonghua). Read only this text: '+text;
+  const say=text; // chỉ gửi đúng câu tiếng Trung — không kèm chỉ dẫn tiếng Anh (tránh bị đọc thành tiếng)
   const voice=S.gemVoice||'Kore'; let last=null;
   const models=ttsModelOk?[ttsModelOk].concat(TTS_MODELS.filter(m=>m!==ttsModelOk)):TTS_MODELS;
   for(const m of models){
@@ -713,7 +713,8 @@ const AudioRec={stream:null,rec:null,chunks:[],url:null,denied:false,
     return btoa(bin);
   }
 };
-const useAudioEval=()=>S.audioEval!==false && sample && sample.gemini && AudioRec.usable();
+const useAudioEvalAny=()=>!!(sample && sample.gemini && AudioRec.usable());
+const useAudioEval=()=>S.audioEval!==false && useAudioEvalAny();
 async function grabAudio(){ if(!AudioRec.rec) return null; const b=await AudioRec.stop(); if(!b||!useAudioEval()) return null; try{ return await AudioRec.toWavB64(b); }catch(e){ return null; } }
 function audioNote(kind){ return `
 AUDIO: The learner's REAL VOICE RECORDING is attached. Listen to it carefully and base "heard" and every pronunciation judgment on the AUDIO — the transcript above is only a rough hint from a browser recognizer and may be wrong or empty. Judge like a strict but kind native teacher: tones (1st/2nd/3rd/4th/neutral, tone sandhi), initials (zh/z, ch/c, sh/s, j/q/x, r, n/l), finals (ü, -n/-ng, er), rhythm and fluency.
@@ -748,7 +749,7 @@ const Rec={
       }catch(e){ this.fail('error'); }
     }
     if(eng==='audio'){ AudioRec.ensure().then(st=>{ if(!st){ this.fail('audio-capture'); return; } if(this.active) AudioRec.start(); }); UI.status('Đang ghi âm… nói xong bấm micro lần nữa để Gemini chấm'); }
-    else if(useAudioEval() && A.mode!=='script'){ AudioRec.ensure().then(st=>{ if(st&&this.active) AudioRec.start(); }); }
+    else if(A.mode==='script' ? (S.scriptTone && useAudioEvalAny()) : useAudioEval()){ AudioRec.ensure().then(st=>{ if(st&&this.active) AudioRec.start(); }); }
     UI.mic(true); if(eng==='audio') UI.status('🎙 Đang ghi âm… nói xong bấm micro lần nữa');
   },
   stop(){
@@ -1055,7 +1056,7 @@ function go(d){
 
 /* ---------- chấm điểm ---------- */
 async function onSpoken(text,firstAt){
-  if(A.mode==='script'){ AudioRec.stop(); if(text) bumpDaily(); return scriptTurn(text); }
+  if(A.mode==='script'){ SC.audio=null; if(S.scriptTone&&useAudioEvalAny()&&AudioRec.rec){ const bl=await AudioRec.stop(); if(bl) SC.audio=await AudioRec.toWavB64(bl).catch(()=>null); } else AudioRec.stop(); if(text) bumpDaily(); return scriptTurn(text); }
   const audio=await grabAudio();
   if(!text && !audio){ UI.status('Chưa nghe thấy gì — thử nói to và rõ hơn nhé.'); return; }
   bumpDaily();
@@ -1221,8 +1222,50 @@ function kbSearch(q){
   return res;
 }
 
+/* ---------- So sánh từng chữ: câu mẫu A ↔ câu người học đọc ---------- */
+const PY_INI=['zh','ch','sh','b','p','m','f','d','t','n','l','g','k','h','j','q','x','r','z','c','s','y','w'];
+function pySplit(p){ p=(p||'').toLowerCase().replace(/v/g,'ü'); const i=PY_INI.find(x=>p.startsWith(x))||''; return [i,p.slice(i.length)]; }
+function pyHint(exp,got){
+  const [i1,f1]=pySplit(exp),[i2,f2]=pySplit(got), tips=[];
+  const pairI={'zh|z':'zh là âm uốn lưỡi, đừng đọc thành z','ch|c':'ch uốn lưỡi + bật hơi, đừng đọc thành c','sh|s':'sh uốn lưỡi, đừng đọc thành s','n|l':'phân biệt n (mũi) và l','r|l':'r uốn lưỡi rung nhẹ, khác l','j|z':'j đặt lưỡi phẳng sau răng dưới','q|c':'q bật hơi, lưỡi phẳng','x|s':'x lưỡi phẳng, không phải s','b|p':'b không bật hơi, p bật hơi','d|t':'d không bật hơi, t bật hơi','g|k':'g không bật hơi, k bật hơi','zh|j':'zh uốn lưỡi, j lưỡi phẳng','ch|q':'ch uốn lưỡi, q lưỡi phẳng','sh|x':'sh uốn lưỡi, x lưỡi phẳng','h|f':'h phát từ cổ họng, f môi răng'};
+  if(i1!==i2) tips.push(pairI[i1+'|'+i2]||pairI[i2+'|'+i1]||`phụ âm đầu “${i1||'∅'}” bị đọc thành “${i2||'∅'}”`);
+  if(f1!==f2){ const k=[f1,f2].sort().join('|');
+    const pairF={'an|ang':'an (mũi trước) ≠ ang (mũi sau)','en|eng':'en (mũi trước) ≠ eng (mũi sau)','in|ing':'in (mũi trước) ≠ ing (mũi sau)','u|ü':'ü tròn môi đọc như “uy” khép','e|o':'e đọc gần “ưa”, o tròn môi','ian|iang':'ian ≠ iang (mũi sau)','uan|uang':'uan ≠ uang','ou|u':'ou là nguyên âm đôi'};
+    tips.push(pairF[k]||`vần “${f1}” bị đọc thành “${f2}”`); }
+  return tips.join('; ');
+}
+function alignZh(target,said){
+  const A=[...hanOnly(target)], B=[...hanOnly(said)];
+  const pa=pyArr(A.join(''))||A, pb=pyArr(B.join(''))||B;
+  let ta=A, tb=B; try{ ta=pinyinPro.pinyin(A.join(''),{type:'array'}); tb=pinyinPro.pinyin(B.join(''),{type:'array'}); }catch(e){}
+  const n=A.length,m=B.length, D=Array.from({length:n+1},(_,i)=>{ const r=new Array(m+1).fill(0); r[0]=i; return r; });
+  for(let j=0;j<=m;j++) D[0][j]=j;
+  const same=(i,j)=>A[i]===B[j]?0:(pa[i]===pb[j]?0.1:1);
+  for(let i=1;i<=n;i++) for(let j=1;j<=m;j++) D[i][j]=Math.min(D[i-1][j-1]+same(i-1,j-1), D[i-1][j]+1, D[i][j-1]+1);
+  const ops=[]; let i=n,j=m;
+  while(i>0||j>0){
+    if(i>0&&j>0&&D[i][j]===D[i-1][j-1]+same(i-1,j-1)){ const c=same(i-1,j-1); ops.push({t:c===0?'ok':c<1?'homo':'sub',a:A[i-1],b:B[j-1],pa:pa[i-1],pb:pb[j-1],ya:ta[i-1],yb:tb[j-1]}); i--; j--; }
+    else if(i>0&&D[i][j]===D[i-1][j]+1){ ops.push({t:'miss',a:A[i-1],pa:pa[i-1],ya:ta[i-1]}); i--; }
+    else { ops.push({t:'extra',b:B[j-1],pb:pb[j-1],yb:tb[j-1]}); j--; }
+  }
+  ops.reverse();
+  const good=ops.filter(o=>o.t==='ok'||o.t==='homo').length;
+  const score=n?Math.round(good/Math.max(n,good+ops.filter(o=>o.t==='extra').length)*100):0;
+  const errs=ops.filter(o=>o.t==='sub'||o.t==='miss'||o.t==='extra').map(o=>
+    o.t==='sub'?{c:o.a,msg:`đọc “${o.a}” (${o.ya}) thành “${o.b}” (${o.yb})`,hint:pyHint(o.pa,o.pb)}:
+    o.t==='miss'?{c:o.a,msg:`bỏ sót “${o.a}” (${o.ya})`,hint:''}:{c:o.b,msg:`thừa “${o.b}” (${o.yb})`,hint:''});
+  return {ops,score,errs};
+}
+function alignHtml(r){
+  return `<div class="syl">${r.ops.map(o=>{
+    if(o.t==='ok'||o.t==='homo') return `<div class="sy ok"><div class="c">${esc(o.a)}</div><div class="e">${esc(o.ya||'')}</div></div>`;
+    if(o.t==='sub') return `<div class="sy bad"><div class="c">${esc(o.a)}</div><div class="e">${esc(o.ya||'')}</div><div class="h">→ ${esc(o.b)} ${esc(o.yb||'')}</div></div>`;
+    if(o.t==='miss') return `<div class="sy bad"><div class="c">${esc(o.a)}</div><div class="e">${esc(o.ya||'')}</div><div class="h">bỏ sót</div></div>`;
+    return `<div class="sy" style="border-style:dashed;opacity:.8"><div class="c" style="color:var(--gold)">${esc(o.b)}</div><div class="h" style="color:var(--gold)">thừa</div></div>`;
+  }).join('')}</div>`;
+}
 /* ---------- 🎯 Kịch bản A→B: đọc A, trả lời B tức thì (khớp ngay trên máy, không chờ AI) ---------- */
-const SCRIPT_SAMPLE=`你好, 你好！很高兴认识你。
+const SCRIPT_SAMPLE=`你好！, 你好！很高兴认识你。
 你叫什么名字？, 我叫小雨。你呢？
 你是哪国人？, 我是中国人。
 你今天忙吗？, 不太忙，你呢？
@@ -1238,21 +1281,26 @@ function splitPair(l){
   i=l.indexOf('，'); if(i>0) return [l.slice(0,i),l.slice(i+1)];
   return null;
 }
-function parsePairs(t){ return (t||'').split('\n').map(l=>l.trim()).filter(Boolean).map(splitPair).filter(Boolean).map(([a,b])=>({a:a.trim(),b:b.trim()})).filter(x=>x.a&&x.b); }
-const normLat=s=>(s||'').toLowerCase().normalize('NFC').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+function parsePairs(t){ return (t||'').split('\n').map(l=>l.trim()).filter(Boolean).map(splitPair).filter(Boolean).map(([a,b])=>({a:a.trim(),b:b.trim()})).filter(x=>hanOnly(x.a)&&hanOnly(x.b)); }
+const normLat=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
 function scorePair(a,said){
-  if(hanOnly(a)){ const c=localCompare(a,said); return c?c.score:0; }
-  const A=[...normLat(a)], B=[...normLat(said)]; if(!A.length||!B.length) return 0;
-  return Math.round(lcsMask(A,B).len/Math.max(A.length,B.length)*100);
+  if(!hanOnly(a)) return 0;
+  if(!hanOnly(said)){ // máy nghe ra chữ Latin/pinyin → so bằng pinyin không dấu
+    const pa=(pyArr(hanOnly(a))||[]).join(''), B=normLat(said); if(!pa||!B) return 0;
+    return Math.round(lcsMask([...pa],[...B]).len/Math.max(pa.length,B.length)*100);
+  }
+  const c=localCompare(a,said); return c?c.score:0;
 }
-function bestPair(said){ let best=null,bs=0; SC.pairs.forEach((p,i)=>{ const s=scorePair(p.a,said); if(s>bs){bs=s;best={...p,i};} }); return best?{...best,score:bs}:null; }
-function scriptLang(){ const n=SC.pairs.length; if(!n) return 'zh-CN'; const han=SC.pairs.filter(p=>hanOnly(p.a)).length; return han>=n/2?'zh-CN':'vi-VN'; }
+function bestPair(said){ let best=null,bs=0,second=0; SC.pairs.forEach((p,i)=>{ const s=scorePair(p.a,said); if(s>bs){second=bs;bs=s;best={...p,i};} else if(s>second) second=s; }); return best?{...best,score:bs,second}:null; }
+// nhận là câu A khi: khớp ≥60%, hoặc ≥30% và rõ ràng hơn hẳn các câu khác (đọc sai nhiều vẫn nhận ra)
+const isPairHit=b=>b&&(b.score>=60||(b.score>=30&&b.score-b.second>=15));
+function scriptLang(){ return 'zh-CN'; }
 function startScriptMic(){
   Rec.lang=scriptLang();
   Rec.liveCb=t=>{ // khớp ngay khi đang nói: không chờ hết câu
     const b=bestPair(t); if(!b) return false;
-    const aLen=(hanOnly(b.a)||normLat(b.a)).length, tLen=(hanOnly(t)||normLat(t)).length;
-    if(b.score>=88 && tLen>=aLen*0.85){ Rec.finishNow(); return true; }
+    const aLen=hanOnly(b.a).length, tLen=hanOnly(t).length;
+    if(b.score>=97 && tLen>=aLen){ Rec.finishNow(); return true; }
     return false;
   };
   Rec.start(onSpoken);
@@ -1264,16 +1312,18 @@ function renderScript(){
     <div class="meta"><span class="who">🎯 Kịch bản A→B — bạn đọc A, máy trả lời B ngay</span><span>${SC.pairs.length} cặp câu</span></div>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px" class="scgrid">
       <div>
-        <div class="lab">Nội dung của bạn — mỗi dòng: <b>A, B</b> (cũng nhận A | B, A → B)</div>
+        <div class="lab">Nội dung của bạn — mỗi dòng: <b>câu A, câu B</b> (cũng nhận dấu | hoặc →)</div>
         <textarea id="scText" style="width:100%;min-height:260px;border:1px solid var(--line);border-radius:12px;padding:10px;font-family:var(--han),var(--ui);font-size:15px;line-height:1.6;background:var(--paper)">${esc(SC.text)}</textarea>
         <div class="tools" style="justify-content:flex-start"><button class="tbtn" id="scSave">💾 Lưu & dùng</button><button class="tbtn" id="scSwap">🔀 Đảo A↔B</button><button class="tbtn" id="scSample">📄 Mẫu</button></div>
-        <div class="vi" style="font-size:12px">Dấu phẩy thường (,) tách A và B. Dấu phẩy Trung (，) trong câu vẫn giữ nguyên. A và B có thể là tiếng Trung hoặc tiếng Việt.</div>
+        <div class="vi" style="font-size:12px">Dấu phẩy thường (,) tách A và B; dấu phẩy Trung (，) trong câu vẫn giữ nguyên. Chỉ nhận câu tiếng Trung. Đọc sai A máy vẫn nhận ra và chỉ chỗ sai.</div>
+        <div id="scStats" style="margin-top:12px"></div>
       </div>
       <div>
         <div class="microw" style="margin-top:6px"><button class="mic" id="mic" title="Bấm để nói (Space)">${MIC_SVG}</button><div class="mstat" id="mstat">${canAuto&&hands?'Bấm micro một lần — sau đó cứ đọc A, máy trả lời B rồi tự nghe tiếp':'Bấm micro (hoặc Space) rồi đọc câu A'}</div><div class="live" id="live"></div></div>
         <label class="chk" style="justify-content:center"><input type="checkbox" id="scHands" ${hands?'checked':''} ${canAuto?'':'disabled'}> 🔁 Rảnh tay: trả lời xong tự nghe câu tiếp ${canAuto?'':'(cần Chrome/Edge, mở trang GitHub)'}</label>
+        <label class="chk" style="justify-content:center"><input type="checkbox" id="scTone" ${S.scriptTone?'checked':''} ${useAudioEvalAny()?'':'disabled'}> 🎵 Gemini nghe giọng thật, chấm thanh điệu (chạy nền, không làm chậm)</label>
         <label class="chk" style="justify-content:center"><input type="checkbox" id="scAI" ${S.scriptAI?'checked':''} ${sample?'':'disabled'}> 🤖 Câu không có trong danh sách: nhờ AI trả lời nhanh</label>
-        <form class="typerow" id="typeForm"><input id="typeIn" placeholder="Hoặc gõ câu A…" autocomplete="off"><button>Gửi</button></form>
+        <form class="typerow" id="typeForm"><input id="typeIn" placeholder="Hoặc gõ câu A (chữ Hán hoặc pinyin)…" autocomplete="off"><button>Gửi</button></form>
         <div class="chat" id="scLog" style="max-height:38vh;margin-top:10px"></div>
         <div style="text-align:center"><button class="tbtn" id="bReplay">▶ Nghe lại B</button></div>
       </div>
@@ -1281,12 +1331,13 @@ function renderScript(){
     <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">📋 Danh sách cặp câu (${SC.pairs.length})</summary>
       <div style="margin-top:8px">${SC.pairs.map((p,i)=>`<div style="display:grid;grid-template-columns:28px 1fr 1fr 40px;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);align-items:center"><span class="vi">${i+1}</span><span class="zhline" style="font-size:16px">${esc(p.a)}</span><span class="zhline" style="font-size:16px;color:var(--jade)">${esc(p.b)}</span><button class="play" data-b="${i}" style="border:0;background:none;color:var(--red)">▶</button></div>`).join('')}</div></details>`;
   if(window.innerWidth<860) $('.scgrid').style.gridTemplateColumns='1fr';
-  drawScriptLog();
+  drawScriptLog(); drawScriptStats();
   $('#scSave').onclick=()=>{ SC.text=$('#scText').value; store.set('script.text',SC.text); renderScript(); toast('Đã lưu '+SC.pairs.length+' cặp câu'); prefetchScript(); };
   $('#scSwap').onclick=()=>{ SC.text=parsePairs($('#scText').value).map(p=>p.b+' | '+p.a).join('\n'); store.set('script.text',SC.text); renderScript(); };
   $('#scSample').onclick=()=>{ $('#scText').value=SCRIPT_SAMPLE; };
   $('#scHands').onchange=e=>{ S.scriptHands=e.target.checked; saveS(); };
   $('#scAI').onchange=e=>{ S.scriptAI=e.target.checked; saveS(); };
+  $('#scTone').onchange=e=>{ S.scriptTone=e.target.checked; saveS(); };
   $('#mic').onclick=()=>{ if(Rec.active){ SC.stopLoop=true; Rec.stop(); } else { SC.stopLoop=false; startScriptMic(); } };
   $('#typeForm').onsubmit=e=>{ e.preventDefault(); const v=$('#typeIn').value.trim(); if(v){ $('#typeIn').value=''; scriptTurn(v,true);} };
   $('#bReplay').onclick=()=>{ if(SC.last) TTS.speak(SC.last); };
@@ -1294,7 +1345,11 @@ function renderScript(){
 }
 function drawScriptLog(){
   const box=$('#scLog'); if(!box) return;
-  box.innerHTML=SC.log.slice(-30).map(m=>`<div class="msg me" style="max-width:95%"><div class="z" style="font-size:17px">${esc(m.said||'…')}</div>${m.a?`<div class="v">→ khớp “${esc(m.a)}” · ${m.score}%</div>`:''}</div>`+
+  box.innerHTML=SC.log.slice(-30).map(m=>`<div class="msg me" style="max-width:98%;background:var(--card);color:var(--ink);border:1px solid var(--line)">
+      <div class="v" style="color:var(--muted)">Bạn đọc: <span style="font-family:var(--han);font-size:16px;color:var(--ink)">${esc(m.said||'…')}</span></div>
+      ${m.al?`<div class="lab" style="margin-top:6px">Câu A — ${m.al.score>=95?'<span class="tag g">đúng hết</span>':`<span class="tag ${m.al.score>=70?'y':'r'}">đúng ${m.al.score}%</span>`}</div>${alignHtml(m.al)}
+        ${m.al.errs.length?`<div style="margin-top:6px">${m.al.errs.slice(0,6).map(e=>`<div class="vi" style="font-size:13px">✗ ${esc(e.msg)}${e.hint?` — <i>${esc(e.hint)}</i>`:''}</div>`).join('')}</div>`:''}`:''}
+      ${m.tone?`<div style="margin-top:6px"><div class="lab">🎵 Gemini nghe thanh điệu</div>${m.tone}</div>`:''}</div>`+
     (m.b?`<div class="msg ai" style="max-width:95%"><div class="z">${esc(m.b)}</div>${hanOnly(m.b)?`<div class="p">${esc(py(m.b))}</div>`:''}${m.ai?'<div class="v">🤖 AI trả lời (không có trong danh sách)</div>':''}${m.ms!=null?`<div class="v" style="font-size:11px">⚡ ${m.ms} ms</div>`:''}</div>`
      : `<div class="msg ai"><div class="v">${m.wait?'<span class="spin" style="display:inline-block;vertical-align:middle"></span> AI đang trả lời…':'Không khớp câu nào'+(m.guess?` — gần nhất: “${esc(m.guess)}” (${m.gs}%)`:'')}</div></div>`)).join('');
   box.scrollTop=box.scrollHeight;
@@ -1305,8 +1360,10 @@ async function scriptTurn(text,typed){
   if(!text){ UI.status('Chưa nghe rõ — đọc lại câu A nhé.'); return loopScript(); }
   const b=bestPair(text); const entry={said:text};
   SC.log.push(entry);
-  if(b && b.score>=60){
+  if(isPairHit(b)){
     Object.assign(entry,{a:b.a,b:b.b,score:b.score,ms:Math.round(performance.now()-t0)});
+    entry.al = hanOnly(text)? alignZh(b.a,text) : {ops:[...hanOnly(b.a)].map((c,k)=>({t:'ok',a:c,ya:(pinyinPro.pinyin(hanOnly(b.a),{type:'array'})||[])[k]})),score:b.score,errs:[]};
+    recordScript(b.a,entry.al); if(SC.audio){ toneCheck(entry,b.a,SC.audio); SC.audio=null; }
     SC.last=b.b; drawScriptLog(); UI.live('',''); UI.status('');
     await TTS.speak(b.b);
   } else if(S.scriptAI && sample){
@@ -1323,6 +1380,31 @@ async function scriptTurn(text,typed){
     if(b){ entry.guess=b.a; entry.gs=b.score; } drawScriptLog();
   }
   if(!typed) loopScript();
+}
+function recordScript(a,al){
+  const st=store.get('script.stats',{}); const x=st[a]||{n:0,ok:0,err:{}};
+  x.n++; if(al.score>=95) x.ok++; al.errs.forEach(e=>{ x.err[e.c]=(x.err[e.c]||0)+1; });
+  st[a]=x; store.set('script.stats',st); drawScriptStats();
+}
+function drawScriptStats(){
+  const el=$('#scStats'); if(!el) return; const st=store.get('script.stats',{});
+  const rows=SC.pairs.map(p=>({a:p.a,...(st[p.a]||{n:0,ok:0,err:{}})})).filter(x=>x.n);
+  if(!rows.length){ el.innerHTML=''; return; }
+  rows.sort((x,y)=>(x.ok/x.n)-(y.ok/y.n));
+  el.innerHTML=`<div class="lab">📊 Ghi chép lỗi của bạn</div>`+rows.slice(0,8).map(x=>{ const top=Object.entries(x.err).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    return `<div style="padding:5px 0;border-bottom:1px solid var(--line)"><span style="font-family:var(--han)">${esc(x.a)}</span> <span class="tag ${x.ok/x.n>=0.8?'g':x.ok/x.n>=0.5?'y':'r'}">${x.ok}/${x.n} lần đúng</span>${top.length?`<div class="vi" style="font-size:12px">Hay sai: ${top.map(([c,k])=>`<b style="font-family:var(--han)">${esc(c)}</b> ${esc(py(c))} ×${k}`).join(' · ')}</div>`:''}</div>`; }).join('')
+    +`<button class="tbtn" id="scClear" style="margin-top:6px">Xoá ghi chép</button>`;
+  $('#scClear').onclick=()=>{ store.set('script.stats',{}); drawScriptStats(); };
+}
+async function toneCheck(entry,a,b64){
+  try{
+    const r=await askAI(`Mandarin tone & pronunciation check for a Vietnamese learner. Target sentence: "${a}". Listen to the attached recording of the learner reading it. Return ONLY JSON {"syllables":[{"zh":"","py":"correct pinyin with tone mark","heard":"what you heard","ok":true,"tip_vi":"short Vietnamese tip if wrong"}]} — one entry per character of the target.`, b64);
+    const sy=(r&&r.syllables)||[]; if(!sy.length) return;
+    const bad=sy.filter(x=>x.ok===false);
+    entry.tone=`<div class="syl">${sy.map(x=>`<div class="sy ${x.ok===false?'bad':'ok'}"><div class="c">${esc(x.zh)}</div><div class="e">${esc(x.py||'')}</div>${x.ok===false?`<div class="h">${esc(x.heard||'?')}</div>`:''}</div>`).join('')}</div>`+bad.slice(0,4).map(x=>`<div class="vi" style="font-size:13px">✗ ${esc(x.zh)} ${esc(x.py||'')}: ${esc(x.tip_vi||'')}</div>`).join('')+(bad.length?'':'<div class="vi" style="font-size:13px">✓ Thanh điệu đều đúng</div>');
+    if(bad.length){ const st=store.get('script.stats',{}); const t=st[a]; if(t){ bad.forEach(x=>{ t.err[x.zh]=(t.err[x.zh]||0)+1; }); store.set('script.stats',st); drawScriptStats(); } }
+    drawScriptLog();
+  }catch(e){}
 }
 function loopScript(){
   if(A.mode!=='script'||SC.stopLoop||S.scriptHands===false||Rec.pick()!=='native') { UI.status('Bấm micro hoặc Space để đọc câu tiếp'); return; }
