@@ -187,7 +187,7 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;paddi
   <div class="fld" id="keyFld"><label>AI khi mở trang ngoài claude.ai (GitHub Pages)</label>
     <select id="selProv"><option value="auto">Tự động: Gemini nếu có key, không thì Claude</option><option value="gemini">Google Gemini</option><option value="claude">Claude API</option></select>
     <input id="gemKey" type="password" class="ctin" style="margin-top:6px" placeholder="Gemini API key (AIza…) — lấy miễn phí ở aistudio.google.com/apikey" autocomplete="off">
-    <input id="gemModel" class="ctin" style="margin-top:6px" placeholder="Model Gemini (mặc định: gemini-flash-latest)" autocomplete="off">
+    <input id="gemModel" class="ctin" style="margin-top:6px" placeholder="Model Gemini ưu tiên (để trống = tự chọn, tự đổi model khi quá tải)" autocomplete="off">
     <input id="apiKey" type="password" class="ctin" style="margin-top:6px" placeholder="Claude API key (sk-ant-…)" autocomplete="off">
     <div style="margin-top:6px"><button class="tbtn" id="testAI">🔌 Kiểm tra kết nối AI</button> <span id="testAIres" class="h"></span></div>
     <div class="h">Key chỉ lưu trong trình duyệt của bạn và gửi thẳng tới Google (Gemini) hoặc Anthropic (Claude). Không lưu key trên máy dùng chung.</div></div>
@@ -693,13 +693,30 @@ function makeApiSample(key){
     const j=await r.json(); return {text:(j.content||[]).map(c=>c.text||'').join('')};
   };
 }
+const GEM_FALLBACK=['gemini-flash-latest','gemini-flash-lite-latest','gemini-3.6-flash','gemini-3.5-flash-lite'];
+let gemUsed='';
 function makeGemini(key,model){
   return async function(prompt){
-    const m=(model||'gemini-flash-latest').trim();
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},
-      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json'}})});
-    if(!r.ok) throw {code:r.status===429?'rate_limited':'api_error',message:await r.text()};
-    const j=await r.json(); return {text:((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(x=>x.text||'').join('')};
+    const list=[...new Set([(model||'').trim()].filter(Boolean).concat(GEM_FALLBACK))];
+    let last=null;
+    for(let round=0;round<2;round++){
+      for(const m of list){
+        let r;
+        try{
+          r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},
+            body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json'}})});
+        }catch(e){ last={code:'network',message:'Không kết nối được tới Google (mạng hoặc trình duyệt chặn).'}; continue; }
+        if(r.ok){ const j=await r.json(); gemUsed=m; aiName='Gemini ('+m+')';
+          return {text:((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(x=>x.text||'').join('')}; }
+        const body=await r.text();
+        if(r.status===400&&/API key|API_KEY/i.test(body)) throw {code:'bad_key',message:'API key Gemini không hợp lệ — kiểm tra lại key.'};
+        if(r.status===403) throw {code:'forbidden',message:'Key Gemini bị từ chối (403) — kiểm tra key hoặc bật Gemini API trong Google AI Studio.'};
+        last={code:r.status===429?'rate_limited':'api_error',status:r.status,message:'Gemini '+m+' báo lỗi '+r.status+(r.status===503?' (đang quá tải)':r.status===429?' (hết lượt miễn phí tạm thời)':r.status===404?' (không có model này)':'')};
+        // 503 / 500 / 429 / 404 → thử model tiếp theo
+      }
+      await new Promise(res=>setTimeout(res,2500));
+    }
+    throw last||{code:'api_error',message:'Gemini không trả lời.'};
   };
 }
 let aiName='';
@@ -1157,8 +1174,8 @@ $('#gemKey').onchange=e=>{ S.gemKey=e.target.value.trim(); saveS(); useApiKey();
 $('#gemModel').onchange=e=>{ S.gemModel=e.target.value.trim(); saveS(); useApiKey(); };
 $('#selProv').onchange=e=>{ S.provider=e.target.value; saveS(); useApiKey(); render(); };
 $('#testAI').onclick=async()=>{ const o=$('#testAIres'); if(!sample){ o.textContent='Chưa có AI — hãy nhập key.'; return; } o.textContent='Đang thử…';
-  try{ const r=await askAI('Reply ONLY with JSON {"ok":true,"zh":"你好"}'); o.textContent=r&&r.ok?'✅ Kết nối '+(aiName||'AI')+' thành công':'⚠️ AI trả lời lạ: '+JSON.stringify(r).slice(0,80); }
-  catch(e){ o.textContent='❌ Lỗi: '+String((e&&e.message)||e).slice(0,160); } };
+  try{ const r=await askAI('Reply ONLY with JSON {"ok":true,"zh":"你好"}'); o.textContent=r&&r.ok?'✅ Kết nối '+(aiName||'AI')+' thành công':'⚠️ AI trả lời lạ: '+JSON.stringify(r).slice(0,80); renderStatus(); }
+  catch(e){ o.textContent='❌ '+String((e&&e.message)||e).slice(0,200)+(e&&e.code==='rate_limited'||e&&e.status===503?' — Google đang quá tải, đợi 1–2 phút rồi thử lại.':''); } };
 $('#testVoice').onclick=()=>TTS.speak('你好，欢迎来练习汉语口语！');
 
 /* ===================== EVENTS ===================== */
