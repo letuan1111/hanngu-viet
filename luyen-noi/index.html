@@ -615,7 +615,7 @@ const TTS={
     setTimeout(res, 1500+text.length*450/rate);
   });}
 };
-if('speechSynthesis' in window){ TTS.load(); speechSynthesis.onvoiceschanged=()=>TTS.load(); setTimeout(()=>TTS.load(),800); }
+
 
 /* ===================== NHẬN DẠNG GIỌNG NÓI ===================== */
 const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1023,6 +1023,7 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ===================== KHỞI ĐỘNG ===================== */
+if('speechSynthesis' in window){ TTS.load(); speechSynthesis.onvoiceschanged=()=>TTS.load(); setTimeout(()=>TTS.load(),800); }
 render();
 (async()=>{
   if(!(window.claude&&typeof window.claude.use==='function')) { useApiKey(); render(); return; }
