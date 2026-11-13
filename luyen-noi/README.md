@@ -9,6 +9,12 @@ Web luyện phản xạ nói tiếng Trung HSK 1–3 cho người Việt, có AI
 - **❓ Hỏi gì đáp nấy**: hỏi bằng tiếng Trung hoặc tiếng Việt. Trang tra trong kho HSK 1–3 của dự án (khoảng 2.300 từ, 11.600 câu mẫu, 26 đề nói), rồi nhờ AI trả lời dựa trên kho đó.
 - **📝 26 đề nói**: luyện phản xạ và nhại câu với 390 câu của bài nói mẫu.
 
+## Tính năng dùng Gemini
+- **🎙 Chấm giọng thật:** trang ghi âm giọng bạn và gửi cho Gemini. Gemini chấm Phát âm, Thanh điệu, Lưu loát, phân tích từng âm tiết (đúng/sai, nghe thành gì, mẹo sửa). Có nút nghe lại giọng mình và so sánh với giọng mẫu.
+- **🌟 Giọng đọc Gemini AI:** giọng tiếng Trung tự nhiên (Kore, Aoede, Puck…), có chế độ đọc chậm. Trang tự tải trước câu tiếp theo.
+- **⚡ Flash / 🧠 Pro:** chọn chất lượng chấm điểm. Nếu model quá tải, trang tự đổi sang model khác.
+- **🔥 Chuỗi ngày, mục tiêu hằng ngày, 🎯 ôn câu yếu.**
+
 ## Chạy
 Mở `index.html` bằng Chrome hoặc Edge. Edge có giọng 晓晓 Xiaoxiao Neural, đọc tự nhiên nhất.
 Nhận dạng giọng nói dùng Web Speech API (zh-CN). Phần AI cần **Gemini API key** (lấy miễn phí tại https://aistudio.google.com/apikey) hoặc Claude API key, nhập trong ⚙︎ Cài đặt. Key chỉ lưu trong trình duyệt của bạn. Không có key thì trang vẫn trả lời bằng kho dữ liệu offline.

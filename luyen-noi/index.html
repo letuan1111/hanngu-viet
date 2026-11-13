@@ -37,6 +37,15 @@ button{font-family:inherit;cursor:pointer}
 .bar{height:3px;background:var(--line);border-radius:3px;margin-top:4px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--jade)}
 .main{min-width:0}
+.bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:6px 0 10px}
+.barbox{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:12px;color:var(--muted)}
+.barbox b{font-size:16px;color:var(--ink)} .barbox .bar{height:5px;margin-top:5px}
+.syl{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.sy{border:1px solid var(--line);border-radius:10px;padding:5px 8px;text-align:center;min-width:44px;background:#fff}
+.sy .c{font-family:var(--han);font-size:20px;line-height:1.2}.sy .e{font-size:11px;color:var(--muted)}
+.sy.ok{border-color:#b9dcc9;background:#f1f8f4}.sy.bad{border-color:#ecb4a6;background:#fdf1ed}
+.sy.bad .h{color:var(--red);font-size:11px;font-weight:600}
+.goal{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:6px}.goal i{display:block;height:100%;background:var(--red)}
 .cat{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--red);padding:12px 10px 4px}
 .ctin{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-family:var(--ui);font-size:13px;background:var(--paper)}
 @media (max-width:860px){.side #topics{display:flex;flex-direction:column;width:100%}.side #ctList{display:flex;overflow-x:auto;gap:6px}.side .cat{display:none}}
@@ -189,8 +198,14 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;paddi
     <input id="gemKey" type="password" class="ctin" style="margin-top:6px" placeholder="Gemini API key (AIza…) — lấy miễn phí ở aistudio.google.com/apikey" autocomplete="off">
     <input id="gemModel" class="ctin" style="margin-top:6px" placeholder="Model Gemini ưu tiên (để trống = tự chọn, tự đổi model khi quá tải)" autocomplete="off">
     <input id="apiKey" type="password" class="ctin" style="margin-top:6px" placeholder="Claude API key (sk-ant-…)" autocomplete="off">
+    <select id="selTier" style="margin-top:6px"><option value="flash">⚡ Gemini Flash — nhanh, hợp luyện phản xạ</option><option value="pro">🧠 Gemini Pro — chấm kỹ nhất (chậm hơn, tốn lượt hơn)</option></select>
+    <label class="chk" style="margin-top:6px"><input type="checkbox" id="optAudio"> 🎙 Gửi giọng nói thật cho Gemini chấm phát âm & thanh điệu</label>
     <div style="margin-top:6px"><button class="tbtn" id="testAI">🔌 Kiểm tra kết nối AI</button> <span id="testAIres" class="h"></span></div>
     <div class="h">Key chỉ lưu trong trình duyệt của bạn và gửi thẳng tới Google (Gemini) hoặc Anthropic (Claude). Không lưu key trên máy dùng chung.</div></div>
+  <div class="fld" id="gemVoiceFld"><label>Giọng Gemini AI (khi chọn “🌟 Giọng Gemini” ở trên)</label><select id="selGemVoice">
+    <option value="Kore">Kore — nữ, rõ ràng</option><option value="Aoede">Aoede — nữ, nhẹ nhàng</option><option value="Leda">Leda — nữ, trẻ trung</option><option value="Zephyr">Zephyr — nữ, tươi sáng</option>
+    <option value="Puck">Puck — nam, vui vẻ</option><option value="Charon">Charon — nam, trầm</option><option value="Orus">Orus — nam, chắc giọng</option><option value="Fenrir">Fenrir — nam, mạnh</option></select></div>
+  <div class="fld"><label>Mục tiêu mỗi ngày: <span id="goalV"></span> lượt nói</label><input type="range" id="goal" min="5" max="100" step="5"></div>
   <label class="chk"><input type="checkbox" id="optAutoStop"> Tự dừng khi im lặng ~1,8 giây</label>
   <label class="chk"><input type="checkbox" id="optReadBetter"> Tự đọc câu mẫu sau khi chấm</label>
   <label class="chk"><input type="checkbox" id="optAutoPlay"> Tự đọc câu hỏi khi sang câu mới</label>
@@ -573,14 +588,19 @@ function scoreRing(s,label='điểm'){
 }
 
 /* ===================== SETTINGS ===================== */
-const S = Object.assign({rate:0.9, voice:'', rec:'auto', autoStop:true, readBetter:true, autoPlay:true, target:3}, store.get('settings',{}));
+const S = Object.assign({rate:0.9, voice:'', rec:'auto', autoStop:true, readBetter:true, autoPlay:true, target:3, gemTier:'flash', audioEval:true, gemVoice:'Kore', goal:20}, store.get('settings',{}));
 const saveS=()=>store.set('settings',S);
 let progress = store.get('progress',{});      // id -> best score
 let session = {n:0,sum:0,lat:[]};
+let daily = store.get('daily',{});
+const dkey=d=>d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+function bumpDaily(){ const k=dkey(new Date()); daily[k]=(daily[k]||0)+1; store.set('daily',daily); }
+function streak(){ let n=0; const d=new Date(); if(!daily[dkey(d)]) d.setDate(d.getDate()-1); while(daily[dkey(d)]){ n++; d.setDate(d.getDate()-1); } return n; }
+function weakItems(){ const out=[]; Object.values(LEVELS).flat().forEach(t=>t.items.forEach(it=>{ const s=progress[it.id]; if(s!=null&&s<75) out.push([s,it]); })); return out.sort((a,b)=>a[0]-b[0]).slice(0,12).map(x=>x[1]); }
 
 /* ===================== TTS ===================== */
 const TTS={
-  list:[], claude:null, speaking:false,
+  list:[], claude:null, speaking:false, cache:new Map(), audio:null,
   rank(v){ const n=v.name, l=v.lang||''; let s=0;
     if(/zh[-_]CN|cmn|zh$/i.test(l)) s+=30; if(/zh[-_](TW|HK)|yue/i.test(l)) s-=15;
     if(/Natural|Neural/i.test(n)) s+=60; if(/Online/i.test(n)) s+=10;
@@ -594,7 +614,9 @@ const TTS={
     fillVoiceSelect(); renderStatus();
   },
   best(){ return this.list[0]||null; },
+  gemOK(){ return !inClaude && !!S.gemKey; },
   current(){
+    if((S.voice==='gemini'||!S.voice) && this.gemOK()) return {type:'gemini',name:'🌟 Gemini AI · '+(S.gemVoice||'Kore')};
     if(S.voice==='claude' && this.claude) return {type:'claude',name:'Giọng Claude (AI)'};
     if(S.voice && S.voice!=='claude'){ const v=this.list.find(x=>x.voiceURI===S.voice); if(v) return {type:'web',v,name:v.name}; }
     const b=this.best();
@@ -602,18 +624,32 @@ const TTS={
     if(this.claude) return {type:'claude',name:'Giọng Claude (AI)'};
     return b?{type:'web',v:b,name:b.name}:null;
   },
-  stop(){ try{speechSynthesis.cancel()}catch(e){} try{this.claude&&this.claude.stop()}catch(e){} this.speaking=false; },
+  stop(){ try{ if(this.audio){ this.audio.pause(); this.audio=null; } }catch(e){} try{speechSynthesis.cancel()}catch(e){} try{this.claude&&this.claude.stop()}catch(e){} this.speaking=false; },
   speak(text,rate){
     rate = rate||S.rate; this.stop();
     const cur=this.current();
     if(!cur){ toast('Máy chưa có giọng tiếng Trung. Hãy dùng Chrome/Edge hoặc cài gói giọng zh-CN.'); return Promise.resolve(); }
     this.speaking=true;
+    if(cur.type==='gemini'){
+      return this._gem(text,rate).catch(e=>{ const b=this.best(); if(!this._warned){ this._warned=1; toast('Giọng Gemini chưa dùng được ('+((e&&e.message)||'lỗi')+') — tạm dùng giọng máy.',4500);} if(b) return this._web(text,rate,b); })
+        .finally(()=>{this.speaking=false});
+    }
     if(cur.type==='claude'){
       return this.claude.speak(text,{language:'zh-CN',rate:Math.max(0.7,Math.min(1.5,rate))})
         .catch(e=>{ if(e&&e.code==='busy') return; const b=this.best(); if(b){ return this._web(text,rate,b);} })
         .finally(()=>{this.speaking=false});
     }
     return this._web(text,rate,cur.v).finally(()=>{this.speaking=false});
+  },
+  async _gemUrl(text,slow){
+    const k=(S.gemVoice||'Kore')+'|'+(slow?1:0)+'|'+text;
+    if(!this.cache.has(k)) this.cache.set(k, geminiTTS(text,slow).catch(e=>{ this.cache.delete(k); throw e; }));
+    return this.cache.get(k);
+  },
+  prefetch(text){ if(text && this.current()&&this.current().type==='gemini') this._gemUrl(text,false).catch(()=>{}); },
+  async _gem(text,rate){
+    const url=await this._gemUrl(text,rate<0.8);
+    return new Promise(res=>{ const a=new Audio(url); this.audio=a; a.playbackRate=rate<0.8?1:Math.max(0.8,Math.min(1.3,rate/0.9)); a.onended=res; a.onerror=res; a.play().catch(res); });
   },
   _web(text,rate,v){ return new Promise(res=>{
     const u=new SpeechSynthesisUtterance(text); u.lang=(v&&v.lang)||'zh-CN'; if(v) u.voice=v; u.rate=rate; u.pitch=1;
@@ -623,6 +659,64 @@ const TTS={
 };
 
 
+/* ===================== GEMINI: GIỌNG ĐỌC & GHI ÂM ===================== */
+const TTS_MODELS=['gemini-3.8-flash-tts','gemini-3.1-flash-tts-preview','gemini-2.5-flash-preview-tts'];
+let ttsModelOk='';
+function pcmToWavUrl(b64,rate){
+  const bin=atob(b64), n=bin.length, buf=new ArrayBuffer(44+n), v=new DataView(buf);
+  const w=(o,str)=>{ for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+n,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n,true);
+  const u8=new Uint8Array(buf,44); for(let i=0;i<n;i++) u8[i]=bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
+}
+async function geminiTTS(text,slow){
+  if(!S.gemKey) throw {message:'chưa có key Gemini'};
+  const say=(slow?'Read slowly, syllable by syllable, very clearly':'Read naturally and clearly, like a native speaker teaching a learner')+', in standard Mandarin Chinese (Putonghua). Read only this text: '+text;
+  const voice=S.gemVoice||'Kore'; let last=null;
+  const models=ttsModelOk?[ttsModelOk].concat(TTS_MODELS.filter(m=>m!==ttsModelOk)):TTS_MODELS;
+  for(const m of models){
+    for(const vc of [{prebuiltVoiceConfig:{voiceName:voice}},{voice}]){
+      let r; try{ r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':S.gemKey},
+        body:JSON.stringify({contents:[{role:'user',parts:[{text:say}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:vc}}})}); }catch(e){ last={message:'mạng'}; continue; }
+      if(!r.ok){ last={message:'lỗi '+r.status, status:r.status}; if(r.status===400) continue; break; }
+      const j=await r.json(); const part=(((j.candidates||[])[0]||{}).content||{}).parts||[]; const d=part.find(x=>x.inlineData||x.inline_data);
+      if(!d){ last={message:'không có âm thanh'}; break; }
+      const id=d.inlineData||d.inline_data, mime=id.mimeType||id.mime_type||'';
+      ttsModelOk=m;
+      if(/wav|mp3|mpeg|ogg/i.test(mime)) return URL.createObjectURL(new Blob([Uint8Array.from(atob(id.data),c=>c.charCodeAt(0))],{type:mime}));
+      const rate=+((mime.match(/rate=(\d+)/)||[])[1]||24000);
+      return pcmToWavUrl(id.data,rate);
+    }
+  }
+  throw last||{message:'không tạo được giọng'};
+}
+const AudioRec={stream:null,rec:null,chunks:[],url:null,denied:false,
+  usable(){ return !inClaude && !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia) && typeof MediaRecorder!=='undefined' && !this.denied; },
+  async ensure(){ if(this.stream) return this.stream; if(!this.usable()) return null;
+    try{ this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }catch(e){ this.denied=true; return null; } return this.stream; },
+  start(){ if(!this.stream) return; this.chunks=[]; try{ const r=new MediaRecorder(this.stream); r.ondataavailable=e=>{ if(e.data&&e.data.size) this.chunks.push(e.data); }; r.start(); this.rec=r; }catch(e){ this.rec=null; } },
+  stop(){ return new Promise(res=>{ const r=this.rec; this.rec=null; if(!r||r.state==='inactive') return res(null);
+    r.onstop=()=>{ const b=new Blob(this.chunks,{type:r.mimeType||'audio/webm'}); if(this.url) URL.revokeObjectURL(this.url); this.url=b.size>1500?URL.createObjectURL(b):null; res(b.size>1500?b:null); }; try{ r.stop(); }catch(e){ res(null); } }); },
+  async toWavB64(blob){
+    const ctx=new (window.AudioContext||window.webkitAudioContext)(); const ab=await ctx.decodeAudioData(await blob.arrayBuffer()); ctx.close&&ctx.close();
+    const src=ab.getChannelData(0), ratio=ab.sampleRate/16000, n=Math.floor(src.length/ratio), pcm=new Int16Array(n);
+    for(let i=0;i<n;i++){ const x=Math.max(-1,Math.min(1,src[Math.floor(i*ratio)])); pcm[i]=x<0?x*0x8000:x*0x7fff; }
+    const buf=new ArrayBuffer(44+n*2), v=new DataView(buf); const w=(o,str)=>{ for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i)); };
+    w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true); v.setUint32(24,16000,true); v.setUint32(28,32000,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);
+    new Int16Array(buf,44).set(pcm);
+    const u8=new Uint8Array(buf); let bin=''; for(let i=0;i<u8.length;i+=0x8000) bin+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));
+    return btoa(bin);
+  }
+};
+const useAudioEval=()=>S.audioEval!==false && sample && sample.gemini && AudioRec.usable();
+async function grabAudio(){ if(!AudioRec.rec) return null; const b=await AudioRec.stop(); if(!b||!useAudioEval()) return null; try{ return await AudioRec.toWavB64(b); }catch(e){ return null; } }
+function audioNote(kind){ return `
+AUDIO: The learner's REAL VOICE RECORDING is attached. Listen to it carefully and base "heard" and every pronunciation judgment on the AUDIO — the transcript above is only a rough hint from a browser recognizer and may be wrong or empty. Judge like a strict but kind native teacher: tones (1st/2nd/3rd/4th/neutral, tone sandhi), initials (zh/z, ch/c, sh/s, j/q/x, r, n/l), finals (ü, -n/-ng, er), rhythm and fluency.
+Also include in the JSON:
+"scores":{"pron":0-100,"tone":0-100,"fluency":0-100},
+"syllables":[{"zh":"one character","py":"correct pinyin with tone mark","heard":"pinyin you actually heard","ok":true,"tip_vi":"short Vietnamese tip if not ok, else empty"}] — one entry per character of ${kind==='shadow'?'the TARGET sentence':'the sentence the learner actually said'} (max 40).`; }
+
 /* ===================== NHẬN DẠNG GIỌNG NÓI ===================== */
 const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
 let dict=null, sample=null;
@@ -631,7 +725,7 @@ const Rec={
   available(){ return !!(this.pick()); },
   pick(){ if(S.rec==='dict') return dict?'dict':(SR?'native':null);
           if(S.rec==='native') return SR?'native':(dict?'dict':null);
-          return dict?'dict':(SR?'native':null); },
+          return dict?'dict':(SR?'native':(AudioRec.usable()&&sample&&sample.gemini?'audio':null)); },
   start(cb){
     if(this.active) return;
     const eng=this.pick();
@@ -640,7 +734,7 @@ const Rec={
     TTS.stop();
     if(eng==='dict'){
       dict.start().catch(e=>this.fail(e&&e.code||e&&e.message||'error'));
-    } else {
+    } else if(eng==='native') {
       try{
         const r=new SR(); r.lang='zh-CN'; r.interimResults=true; r.continuous=true; r.maxAlternatives=1;
         r.onresult=ev=>{ let f='',p=''; for(let i=0;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) f+=t; else p+=t; } this.buf=f; this.partial=p; this.heard(); };
@@ -649,12 +743,15 @@ const Rec={
         this.nativeObj=r; r.start();
       }catch(e){ this.fail('error'); }
     }
-    UI.mic(true);
+    if(eng==='audio'){ AudioRec.ensure().then(st=>{ if(!st){ this.fail('audio-capture'); return; } if(this.active) AudioRec.start(); }); UI.status('Đang ghi âm… nói xong bấm micro lần nữa để Gemini chấm'); }
+    else if(useAudioEval()){ AudioRec.ensure().then(st=>{ if(st&&this.active) AudioRec.start(); }); }
+    UI.mic(true); if(eng==='audio') UI.status('🎙 Đang ghi âm… nói xong bấm micro lần nữa');
   },
   stop(){
     if(!this.active) return;
     clearTimeout(this.silence);
-    if(this.engine==='dict'){ dict.stop().then(()=>this.end()).catch(()=>this.end()); }
+    if(this.engine==='audio'){ this.end(); }
+    else if(this.engine==='dict'){ dict.stop().then(()=>this.end()).catch(()=>this.end()); }
     else { try{this.nativeObj.stop()}catch(e){ this.end(); } }
   },
   toggle(cb){ this.active? this.stop() : this.start(cb); },
@@ -673,7 +770,7 @@ const Rec={
     const cb=this.cb; this.cb=null; cb&&cb(text,this.firstAt?this.firstAt:null);
   },
   fail(code){
-    this.active=false; clearTimeout(this.silence); UI.mic(false);
+    this.active=false; clearTimeout(this.silence); UI.mic(false); AudioRec.stop();
     const m={'not-allowed':'Micro bị chặn trong khung này. Hãy chọn “Claude dictation” trong Cài đặt, hoặc gõ câu trả lời.',
              'not_granted':'Bạn đã từ chối quyền micro. Có thể gõ câu trả lời bên dưới.',
              'service-not-allowed':'Trình duyệt không cho dùng dịch vụ nhận dạng. Hãy gõ câu trả lời.',
@@ -695,22 +792,25 @@ function makeApiSample(key){
 }
 const GEM_FALLBACK=['gemini-flash-latest','gemini-flash-lite-latest','gemini-3.6-flash','gemini-3.5-flash-lite'];
 let gemUsed='';
+const GEM_PRO=['gemini-pro-latest','gemini-4-argon'];
 function makeGemini(key,model){
-  return async function(prompt){
-    const list=[...new Set([(model||'').trim()].filter(Boolean).concat(GEM_FALLBACK))];
+  const f=async function(prompt,opts){
+    const audio=opts&&opts.audio;
+    const list=[...new Set([(model||'').trim()].filter(Boolean).concat(S.gemTier==='pro'?GEM_PRO:[]).concat(GEM_FALLBACK))];
+    const parts=[{text:prompt}]; if(audio) parts.push({inlineData:{mimeType:'audio/wav',data:audio}});
     let last=null;
     for(let round=0;round<2;round++){
       for(const m of list){
         let r;
         try{
           r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},
-            body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json'}})});
+            body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json'}})});
         }catch(e){ last={code:'network',message:'Không kết nối được tới Google (mạng hoặc trình duyệt chặn).'}; continue; }
         if(r.ok){ const j=await r.json(); gemUsed=m; aiName='Gemini ('+m+')';
           return {text:((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(x=>x.text||'').join('')}; }
         const body=await r.text();
         if(r.status===400&&/API key|API_KEY/i.test(body)) throw {code:'bad_key',message:'API key Gemini không hợp lệ — kiểm tra lại key.'};
-        if(r.status===403) throw {code:'forbidden',message:'Key Gemini bị từ chối (403) — kiểm tra key hoặc bật Gemini API trong Google AI Studio.'};
+        if(r.status===403&&/API key|API_KEY|PERMISSION_DENIED.*key/i.test(body)) throw {code:'forbidden',message:'Key Gemini bị từ chối (403) — kiểm tra key hoặc bật Gemini API trong Google AI Studio.'};
         last={code:r.status===429?'rate_limited':'api_error',status:r.status,message:'Gemini '+m+' báo lỗi '+r.status+(r.status===503?' (đang quá tải)':r.status===429?' (hết lượt miễn phí tạm thời)':r.status===404?' (không có model này)':'')};
         // 503 / 500 / 429 / 404 → thử model tiếp theo
       }
@@ -718,6 +818,7 @@ function makeGemini(key,model){
     }
     throw last||{code:'api_error',message:'Gemini không trả lời.'};
   };
+  f.gemini=true; return f;
 }
 let aiName='';
 function useApiKey(){
@@ -727,13 +828,14 @@ function useApiKey(){
   else if((p==='claude'||p==='auto') && S.apiKey){ sample=makeApiSample(S.apiKey); aiName='Claude API'; }
   else { sample=null; aiName=''; }
 }
-async function askAI(prompt){
+async function askAI(prompt,audio){
   if(!sample) throw {code:'no_ai'};
+  if(sample.gemini){ const r=await sample(prompt,{audio}); const m=(r.text||'').match(/\{[\s\S]*\}/); return JSON.parse(m?m[0]:r.text); }
   if(typeof sample.json==='function'){ return await sample.json(prompt,{modelTier:'quick',cache:false}); }
   const r=await sample(prompt,{modelTier:'quick',cache:false});
   const m=(r.text||'').match(/\{[\s\S]*\}/); return JSON.parse(m?m[0]:r.text);
 }
-function promptReflex(it,lv,said){ return `You are a warm, precise Mandarin speaking coach for a Vietnamese learner at HSK ${lv} level.
+function promptReflex(it,lv,said,au){ return `You are a warm, precise Mandarin speaking coach for a Vietnamese learner at HSK ${lv} level.
 The coach asked (Chinese): "${it.q}"  (Vietnamese meaning: ${it.qv})
 One model answer: "${it.a}"
 Below is the RAW speech-recognition transcript of the learner's spoken answer. It may contain recognition errors: wrong homophone characters, missing characters, pinyin, Latin letters, digits, or Vietnamese words. Reconstruct the Chinese sentence the learner most likely intended to say, preferring characters that sound the same/similar and fit the context.
@@ -741,15 +843,15 @@ Transcript: "${said}"
 Then judge: is it an appropriate, grammatical answer to the question? ANY sensible answer is fine — it does not need to match the model answer.
 Score 0–100 for relevance + grammar + completeness (honest but encouraging; a correct short answer can get 90+).
 Return ONLY JSON:
-{"heard":"Chinese the learner most likely said (simplified), or empty if nothing usable","heard_pinyin":"pinyin with tone marks","heard_vi":"Vietnamese meaning","ok":true,"score":0,"feedback_vi":"1–2 short Vietnamese sentences: what was good and exactly what to fix (grammar, word choice, measure word, tones that seem misheard)","better":"a natural, correct answer in Chinese that keeps the learner's intended meaning (HSK 1–${lv} vocabulary)","better_pinyin":"","better_vi":""}`; }
-function promptShadow(target,vi,said){ return `You are a Mandarin pronunciation coach for a Vietnamese learner.
+{"heard":"Chinese the learner most likely said (simplified), or empty if nothing usable","heard_pinyin":"pinyin with tone marks","heard_vi":"Vietnamese meaning","ok":true,"score":0,"feedback_vi":"1–2 short Vietnamese sentences: what was good and exactly what to fix (grammar, word choice, measure word, tones that seem misheard)","better":"a natural, correct answer in Chinese that keeps the learner's intended meaning (HSK 1–${lv} vocabulary)","better_pinyin":"","better_vi":""}${au?audioNote('reflex'):''}`; }
+function promptShadow(target,vi,said,au){ return `You are a Mandarin pronunciation coach for a Vietnamese learner.
 Target sentence the learner tried to repeat: "${target}" (${vi})
 RAW speech-recognition transcript of what they said (may contain homophones, pinyin or noise): "${said}"
 Infer what the learner actually pronounced. Compare syllable by syllable with the target. Mismatched characters in the transcript usually mean wrong initials/finals/tones.
 Return ONLY JSON:
 {"heard":"what the learner most likely said, in Chinese characters","heard_pinyin":"pinyin with tone marks of what was heard","score":0,"feedback_vi":"1–2 short Vietnamese sentences of feedback","issues":[{"expected":"character or word from target","got":"what was heard instead","tip_vi":"short Vietnamese tip: which tone/initial/final to fix and how"}]}
-Max 4 issues; empty array if the sentence was correct. Score 0–100 for pronunciation accuracy.`; }
-function promptChat(topic,lv,hist,said){
+Max 4 issues; empty array if the sentence was correct. Score 0–100 for pronunciation accuracy.${au?audioNote('shadow'):''}`; }
+function promptChat(topic,lv,hist,said,au){
   const h=hist.map(m=>(m.role==='ai'?'小雨: ':'学生: ')+m.zh).join('\n');
   return `You are 小雨, a friendly young native Mandarin speaker chatting with a Vietnamese learner to train fast speaking reflexes, HSK ${lv} level. Topic: ${topic.zh} (${topic.vi}).
 Rules for your reply: Simplified Chinese only, mostly HSK 1–${lv} vocabulary, 1–2 short sentences (max ~25 characters), natural spoken style, react to what the learner said, then ALWAYS ask one easy follow-up question so the learner keeps talking. Stay near the topic.
@@ -758,7 +860,7 @@ ${h}
 The learner's newest turn is a RAW speech-recognition transcript (may contain homophone errors, pinyin, digits or Vietnamese words): "${said}"
 First reconstruct what Chinese the learner most likely meant. If it has a real mistake, explain briefly in Vietnamese and give the corrected sentence.
 Return ONLY JSON:
-{"heard":"learner's intended sentence in Chinese","heard_pinyin":"","correction_vi":"empty string if correct, else short Vietnamese explanation + corrected Chinese","reply":"your reply in Chinese","reply_pinyin":"pinyin with tone marks","reply_vi":"Vietnamese translation"}`;
+{"heard":"learner's intended sentence in Chinese","heard_pinyin":"","correction_vi":"empty string if correct, else short Vietnamese explanation + corrected Chinese","reply":"your reply in Chinese","reply_pinyin":"pinyin with tone marks","reply_vi":"Vietnamese translation"}${au?'\nAUDIO: the learner\'s real voice recording is attached — base "heard" on the audio, and if a tone or sound was clearly wrong, mention it briefly in correction_vi.':''}`;
 }
 
 /* ===================== APP STATE ===================== */
@@ -802,14 +904,16 @@ function renderStatus(){
   $('#status').innerHTML=
     `<span class="chip ${eng?'ok':'bad'}">🎤 Nhận dạng: <b>${recName}</b></span>`+
     `<span class="chip ${v?'ok':'bad'}">🔊 Giọng: <b>${esc(v?v.name:'chưa có giọng zh')}</b></span>`+
-    `<span class="chip ${sample?'ok':'bad'}">🤖 AI chấm & hội thoại: <b>${sample?(aiName||'Claude')+' sẵn sàng':(inClaude?'đang kết nối…':'cần key Gemini/Claude (⚙︎ Cài đặt)')}</b></span>`+
+    `<span class="chip ${sample?'ok':'bad'}">🤖 AI chấm & hội thoại: <b>${sample?(aiName||'Claude')+' sẵn sàng'+(useAudioEval()?' · 🎙 chấm giọng thật':''):(inClaude?'đang kết nối…':'cần key Gemini/Claude (⚙︎ Cài đặt)')}</b></span>`+
     `<span class="chip">📚 Luyện: <b>${TOTAL} câu</b> · ${Object.keys(progress).length} đã luyện</span>`+
     `<span class="chip ${KB.ready?'ok':''}">🗂 Kho HSK 1–3: <b>${KB.ready?KB.nWords.toLocaleString('vi')+' từ · '+KB.sents.length.toLocaleString('vi')+' câu':'đang nạp…'}</b></span>`;
 }
 function renderStats(){
   const avg=session.n?Math.round(session.sum/session.n):'–';
   const lat=session.lat.length?(session.lat.reduce((a,b)=>a+b,0)/session.lat.length).toFixed(1)+'s':'–';
-  $('#stats').innerHTML=`<div class="stat"><b>${session.n}</b><span>Lượt nói phiên này</span></div><div class="stat"><b style="color:${session.n?scoreColor(avg):'inherit'}">${avg}</b><span>Điểm trung bình</span></div><div class="stat"><b>${lat}</b><span>Thời gian phản xạ TB</span></div><div class="stat"><b>${Object.keys(progress).length}/${TOTAL}</b><span>Câu đã luyện (tất cả cấp)</span></div>`;
+  const today=daily[dkey(new Date())]||0, g=S.goal||20, wk=weakItems().length;
+  $('#stats').innerHTML=`<div class="stat"><b>🔥 ${streak()} ngày</b><span>Chuỗi ngày luyện liên tục</span></div><div class="stat"><b>${today}/${g}</b><span>Mục tiêu hôm nay ${today>=g?'✅':''}</span><div class="goal"><i style="width:${Math.min(100,today/g*100)}%"></i></div></div>`+(wk?`<div class="stat" style="cursor:pointer" id="weakBtn"><b>🎯 ${wk} câu</b><span>Câu điểm thấp — bấm để ôn lại</span></div>`:'')+`<div class="stat"><b>${session.n}</b><span>Lượt nói phiên này</span></div><div class="stat"><b style="color:${session.n?scoreColor(avg):'inherit'}">${avg}</b><span>Điểm trung bình</span></div><div class="stat"><b>${lat}</b><span>Thời gian phản xạ TB</span></div><div class="stat"><b>${Object.keys(progress).length}/${TOTAL}</b><span>Câu đã luyện (tất cả cấp)</span></div>`;
+  const wb=$('#weakBtn'); if(wb) wb.onclick=()=>{ GEN={key:'weak',zh:'🎯 Ôn câu yếu',vi:'Các câu bạn được dưới 75 điểm',lv:A.lv,items:weakItems(),busy:false,err:''}; A.mode='gen'; A.idx=0; render(); if(S.autoPlay) playPrompt(); };
 }
 function renderCT(){
   $('#sideTitle').textContent=`${CT.length} chủ đề trò chuyện`;
@@ -843,7 +947,7 @@ function render(){
   document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('on',b.dataset.m===A.mode));
   if(A.mode==='chat') return renderChat();
   if(A.mode==='ask') return renderAsk();
-  if(A.mode==='gen'){ const t=ctopic(); if(GEN.key!==genKey()||!GEN.items.length) return renderGenStart(); }
+  if(A.mode==='gen'){ if(GEN.key!=='weak' && (GEN.key!==genKey()||!GEN.items.length)) return renderGenStart(); }
   renderDrill();
 }
 
@@ -897,7 +1001,7 @@ function renderDrill(){
       <button class="tbtn" id="bSlow">🐢 Đọc chậm</button>
       <button class="tbtn ${A.blind?'on':''}" id="bBlind">${A.blind?'🙈 Đang chỉ nghe':'👁 Chỉ nghe (ẩn chữ)'}</button>
       ${isReflex?'<button class="tbtn" id="bHint">💡 Gợi ý đáp án</button>':''}
-      ${A.mode==='gen'?`<button class="tbtn" id="bMore">${GEN.busy?'⏳ Đang soạn…':'✨ Soạn thêm 8 câu'}</button><button class="tbtn" id="bNew">🔄 Bộ câu mới</button>`:''}
+      ${A.mode==='gen'&&GEN.key!=='weak'?`<button class="tbtn" id="bMore">${GEN.busy?'⏳ Đang soạn…':'✨ Soạn thêm 8 câu'}</button><button class="tbtn" id="bNew">🔄 Bộ câu mới</button>`:''}
     </div>
     ${isReflex?`<div class="hint" id="hint"><div class="lab">Một câu trả lời mẫu</div><div class="hz">${esc(cur.it.a)}</div><div class="hp">${esc(py(cur.it.a))}</div><div class="hv">${esc(cur.it.av)}</div>${cur.it.full?`<details style="margin-top:8px;text-align:left"><summary style="cursor:pointer">📄 Xem cả bài nói mẫu (${cur.it.full.length} câu)</summary>${cur.it.full.map(x=>`<div style="margin:6px 0"><span class="hz" style="font-size:17px">${esc(x[0])}</span><div class="hp">${esc(x[2]||py(x[0]))}</div><div class="hv">${esc(x[1])}</div></div>`).join('')}</details>`:''}<button class="tbtn" style="margin-top:8px" id="bHintPlay">▶ Nghe câu mẫu</button></div>`:''}
     <div class="microw"><button class="mic" id="mic" title="Bấm để nói (Space)">${MIC_SVG}</button><div class="mstat" id="mstat"></div><div class="live" id="live"></div></div>
@@ -908,7 +1012,7 @@ function renderDrill(){
   $('#bSlow').onclick=()=>playPrompt(0.65);
   $('#bBlind').onclick=()=>{ A.blind=!A.blind; savePos(); $('#prompt').classList.toggle('blur',A.blind); $('#bBlind').classList.toggle('on',A.blind); $('#bBlind').textContent=A.blind?'🙈 Đang chỉ nghe':'👁 Chỉ nghe (ẩn chữ)'; };
   if(isReflex){ $('#bHint').onclick=toggleHint; $('#bHintPlay').onclick=()=>TTS.speak(cur.it.a); }
-  if(A.mode==='gen'){ $('#bMore').onclick=()=>genItems(true); $('#bNew').onclick=()=>genItems(false); }
+  if(A.mode==='gen'&&GEN.key!=='weak'){ $('#bMore').onclick=()=>genItems(true); $('#bNew').onclick=()=>genItems(false); }
   $('#mic').onclick=()=>Rec.toggle(onSpoken);
   $('#typeForm').onsubmit=e=>{ e.preventDefault(); const v=$('#typeIn').value.trim(); if(v){ $('#typeIn').value=''; onSpoken(v,null);} };
   $('#bPrev').onclick=()=>go(-1); $('#bNext').onclick=()=>go(1);
@@ -923,27 +1027,30 @@ function playPrompt(rate){
 function go(d){
   const L=lines(); if(!L.length) return; A.idx=(A.idx+d+L.length)%L.length; savePos(); renderDrill();
   if(S.autoPlay) playPrompt();
+  const nx=L[(A.idx+1)%L.length]; if(nx) setTimeout(()=>TTS.prefetch(nx.zh),1500);
 }
 
 /* ---------- chấm điểm ---------- */
 async function onSpoken(text,firstAt){
-  if(!text){ UI.status('Chưa nghe thấy gì — thử nói to và rõ hơn nhé.'); return; }
-  if(A.mode==='chat') return chatTurn(text);
-  if(A.mode==='ask') return askTurn(text);
+  const audio=await grabAudio();
+  if(!text && !audio){ UI.status('Chưa nghe thấy gì — thử nói to và rõ hơn nhé.'); return; }
+  bumpDaily();
+  if(A.mode==='chat') return chatTurn(text,audio);
+  if(A.mode==='ask') return askTurn(text,audio);
   const cur=lines()[A.idx], lv=hl(), isReflex=A.mode!=='shadow';
   const lat = firstAt? Math.max(0,(firstAt-promptEndAt)/1000) : null;
-  UI.live(text,''); UI.status('');
+  UI.live(text||'🎙 (đã ghi âm)',''); UI.status('');
   const r=$('#result'); r.classList.add('show');
   const target = isReflex? cur.it.a : cur.zh;
   const loc = localCompare(target,text);
-  r.innerHTML=`<div class="thinking"><div class="spin"></div>AI đang nhận dạng chữ bạn nói và chấm điểm…</div>`;
+  r.innerHTML=`<div class="thinking"><div class="spin"></div>${audio?(aiName||'Gemini')+' đang nghe giọng thật của bạn, chấm phát âm & thanh điệu…':'AI đang nhận dạng chữ bạn nói và chấm điểm…'}</div>`;
   let ai=null;
-  if(sample){ try{ ai = await askAI(isReflex? promptReflex(cur.it,lv,text) : promptShadow(cur.zh,cur.vi,text)); }catch(e){ if(e&&e.code==='rate_limited') toast('AI đang quá tải, đợi vài giây rồi thử lại.'); ai=null; } }
+  if(sample){ try{ ai = await askAI(isReflex? promptReflex(cur.it,lv,text,!!audio) : promptShadow(cur.zh,cur.vi,text,!!audio), audio); }catch(e){ if(e&&e.code==='rate_limited') toast('AI đang quá tải, đợi vài giây rồi thử lại.'); ai=null; } }
   let score = ai&&typeof ai.score==='number'? Math.round(ai.score) : (loc?loc.score:0);
   if(!isReflex && loc && ai && ai.heard){ const l2=localCompare(cur.zh,ai.heard); if(l2) score=Math.round((score+l2.score)/2); }
-  const heard = (ai&&ai.heard)||text;
+  const heard = (ai&&ai.heard)||text||'(không rõ)';
   const mask = localCompare(target, heard);
-  if(!String(cur.id).startsWith('g.')){ progress[cur.id]=Math.max(progress[cur.id]||0,score); store.set('progress',progress); }
+  if(!String(cur.id).startsWith('g.')){ /* lưu cả câu ôn tập */ progress[cur.id]=Math.max(progress[cur.id]||0,score); store.set('progress',progress); }
   else cur.it._s=score;
   session.n++; session.sum+=score; if(lat!=null&&lat<30) session.lat.push(lat);
   const latHtml = lat!=null? `<span class="tag ${lat<=S.target?'g':lat<=S.target*2?'y':'r'}">⚡ Phản xạ ${lat.toFixed(1)}s</span>`:'';
@@ -953,7 +1060,7 @@ async function onSpoken(text,firstAt){
     body=`<div class="row">${okTag}${latHtml}</div>
       <div class="row"><div class="lab">AI nghe được bạn nói</div><div class="zhline">${esc(heard)}</div><div class="py">${esc((ai&&ai.heard_pinyin)||py(heard))}</div>${ai&&ai.heard_vi?`<div class="vi">${esc(ai.heard_vi)}</div>`:''}${ai&&ai.heard&&hanOnly(ai.heard)!==hanOnly(text)?`<div class="vi" style="font-size:12px">Máy ghi thô: “${esc(text)}”</div>`:''}</div>
       ${ai&&ai.feedback_vi?`<div class="row fb">${esc(ai.feedback_vi)}</div>`:''}
-      <div class="row"><div class="lab">${ai&&ai.better?'Câu nên nói':'Câu mẫu'}</div><div class="zhline">${esc((ai&&ai.better)||cur.it.a)}</div><div class="py">${esc((ai&&ai.better_pinyin)||py((ai&&ai.better)||cur.it.a))}</div><div class="vi">${esc((ai&&ai.better_vi)||cur.it.av)}</div>
+      <div class="row"><div class="lab">${ai&&ai.better?'Câu nên nói':'Câu mẫu'}</div><div class="zhline">${esc((ai&&ai.better)||cur.it.a)}</div><div class="py">${esc((ai&&ai.better_pinyin)||py((ai&&ai.better)||cur.it.a))}</div><div class="vi">${esc(ai&&ai.better?(ai.better_vi||''):cur.it.av)}</div>
       <button class="tbtn" style="margin-top:6px" id="bBetter">▶ Nghe câu này</button></div>`;
   } else {
     const iss = ai&&Array.isArray(ai.issues)&&ai.issues.length? `<div class="row"><div class="lab">Chỗ cần sửa</div><div class="issues">${ai.issues.map(x=>`<div class="iss"><b>${esc(x.expected)}</b> ← nghe thành <b>${esc(x.got)}</b><div class="vi">${esc(x.tip_vi||'')}</div></div>`).join('')}</div></div>`:'';
@@ -963,7 +1070,16 @@ async function onSpoken(text,firstAt){
       ${ai&&ai.feedback_vi?`<div class="row fb">${esc(ai.feedback_vi)}</div>`:''}${iss}
       <button class="tbtn" id="bBetter">▶ Nghe lại câu gốc</button>`;
   }
+  if(ai&&ai.scores){ const sc=ai.scores, bar=(n,l)=>{ n=Math.max(0,Math.min(100,Math.round(+n||0))); return `<div class="barbox">${l} <b style="color:${scoreColor(n)}">${n}</b><div class="bar"><i style="width:${n}%;background:${scoreColor(n)}"></i></div></div>`; };
+    body=`<div class="bars">${bar(sc.pron,'🗣 Phát âm')}${bar(sc.tone,'🎵 Thanh điệu')}${bar(sc.fluency,'🌊 Lưu loát')}${isReflex?bar(score,'✅ Nội dung'):''}</div>`+body; }
+  if(ai&&Array.isArray(ai.syllables)&&ai.syllables.length){
+    body+=`<div class="row" style="margin-top:10px"><div class="lab">Phân tích từng âm tiết</div><div class="syl">${ai.syllables.slice(0,40).map(x=>`<div class="sy ${x.ok===false?'bad':'ok'}" title="${esc(x.tip_vi||'')}"><div class="c">${esc(x.zh)}</div><div class="e">${esc(x.py||'')}</div>${x.ok===false?`<div class="h">${esc(x.heard||'?')}</div>`:''}</div>`).join('')}</div>
+      ${ai.syllables.filter(x=>x.ok===false&&x.tip_vi).slice(0,5).map(x=>`<div class="vi" style="margin-top:4px">• <b style="font-family:var(--han)">${esc(x.zh)}</b> ${esc(x.py||'')}: ${esc(x.tip_vi)}</div>`).join('')}</div>`; }
+  if(AudioRec.url) body+=`<div class="row"><button class="tbtn" id="bMine">🎧 Nghe lại giọng tôi</button> <button class="tbtn" id="bCompare">🔁 So sánh: mẫu → tôi</button></div>`;
   r.innerHTML=`<div class="rgrid">${scoreRing(score)}<div>${body}</div></div>`;
+  const mine=AudioRec.url;
+  if($('#bMine')) $('#bMine').onclick=()=>{ TTS.stop(); const a=new Audio(mine); TTS.audio=a; a.play().catch(()=>{}); };
+  if($('#bCompare')) $('#bCompare').onclick=async()=>{ await TTS.speak(isReflex?((ai&&ai.better)||cur.it.a):cur.zh); const a=new Audio(mine); TTS.audio=a; a.play().catch(()=>{}); };
   const betterText = isReflex? ((ai&&ai.better)||cur.it.a) : cur.zh;
   $('#bBetter').onclick=()=>TTS.speak(betterText);
   renderTopics(); renderStatus(); renderStats();
@@ -1011,13 +1127,13 @@ function drawChat(){
   box.querySelectorAll('.play').forEach(b=>b.onclick=()=>TTS.speak(chat.hist[+b.dataset.i].zh));
   box.scrollTop=box.scrollHeight;
 }
-async function chatTurn(text){
+async function chatTurn(text,audio){
   if(chat.busy) return;
   UI.live('',''); UI.status('');
-  const me={role:'me',zh:text,raw:text}; chat.hist.push(me); chat.busy=true; drawChat();
+  const me={role:'me',zh:text||'🎙 …',raw:text}; chat.hist.push(me); chat.busy=true; drawChat();
   if(!sample){ chat.busy=false; me.fix='AI chưa sẵn sàng nên chưa thể trả lời.'; drawChat(); return; }
   try{
-    const r=await askAI(promptChat(ctopic(),hl(),chat.hist.slice(0,-1).slice(-12),text));
+    const r=await askAI(promptChat(ctopic(),hl(),chat.hist.slice(0,-1).slice(-12),text,!!audio),audio);
     if(r.heard) me.zh=r.heard; if(r.heard_pinyin) me.py=r.heard_pinyin; if(r.correction_vi) me.fix=r.correction_vi;
     chat.hist.push({role:'ai',zh:r.reply||'嗯，再说一遍好吗？',py:r.reply_pinyin,vi:r.reply_vi});
     session.n++; session.sum+= r.correction_vi?70:95; renderStats();
@@ -1112,10 +1228,10 @@ function drawAsk(){
   box.querySelectorAll('.play').forEach(b=>b.onclick=()=>TTS.speak(b.dataset.t||ask.hist[+b.dataset.i].zh));
   box.scrollTop=box.scrollHeight;
 }
-async function askTurn(text){
+async function askTurn(text,audio){
   if(ask.busy) return;
   UI.live('',''); UI.status('');
-  const me={role:'me',text}; const ai={role:'ai',busy:true};
+  const me={role:'me',text:text||'🎙 (câu hỏi bằng giọng nói)'}; const ai={role:'ai',busy:true};
   ask.hist.push(me,ai); ask.busy=true; drawAsk();
   const R=kbSearch(text);
   const kbEx=R.sents.slice(0,3).map(x=>({zh:x.zh,vi:x.vi}));
@@ -1134,7 +1250,7 @@ Decide what the learner wants and respond:
 (b) They ask IN VIETNAMESE about Chinese (meaning of a word, how to say something, grammar, difference between words, measure words, tones, culture, HSK exam) → explain clearly and concisely in Vietnamese in explain_vi, and put the key Chinese sentence(s) in answer_zh.
 (c) Any other question (general knowledge, advice, chit-chat in Vietnamese) → answer briefly in Vietnamese in explain_vi, and give a simple Chinese version of the main point in answer_zh so they can practise saying it.
 Return ONLY JSON: {"heard":"the learner's sentence as you understood it (corrected Chinese if they spoke Chinese)","answer_zh":"","answer_pinyin":"pinyin with tone marks","answer_vi":"Vietnamese translation of answer_zh","explain_vi":"","examples":[{"zh":"","pinyin":"","vi":""}]}
-examples: 0–3 extra short example sentences useful for this question.`);
+examples: 0–3 extra short example sentences useful for this question.${audio?'\nAUDIO: the learner\'s real voice recording is attached — understand the question from the audio (it may be Chinese or Vietnamese); the transcript is only a hint.':''}`,audio);
       if(r.heard) me.heard=r.heard;
       Object.assign(ai,{busy:false,zh:r.answer_zh||'',py:r.answer_pinyin,vi:r.answer_vi,explain:r.explain_vi,
         examples:(Array.isArray(r.examples)?r.examples:[]).filter(x=>x&&x.zh).concat(kbEx).slice(0,5),words:R.words});
@@ -1152,13 +1268,14 @@ examples: 0–3 extra short example sentences useful for this question.`);
 function fillVoiceSelect(){
   const sel=$('#selVoice'); if(!sel) return;
   const b=TTS.best();
-  sel.innerHTML=`<option value="">★ Tự chọn giọng tốt nhất${b?' ('+esc(b.name)+')':''}</option>`+
+  sel.innerHTML=`<option value="">★ Tự chọn giọng tốt nhất${TTS.gemOK()?' (Gemini AI)':(b?' ('+esc(b.name)+')':'')}</option>`+
+    (TTS.gemOK()?'<option value="gemini">🌟 Giọng Gemini AI — tự nhiên nhất (cần key Gemini)</option>':'')+
     (TTS.claude?'<option value="claude">Giọng Claude (AI)</option>':'')+
     TTS.list.map(v=>`<option value="${esc(v.voiceURI)}">${esc(v.name)} — ${esc(v.lang)}${/Natural|Neural|Google/i.test(v.name)?' ★':''}</option>`).join('');
   sel.value=S.voice||'';
   $('#voiceHint').textContent = TTS.list.length? `Tìm thấy ${TTS.list.length} giọng tiếng Trung trên máy. Giọng có ★ là giọng tự nhiên nhất. Mẹo: mở bằng Microsoft Edge để có giọng 晓晓 Xiaoxiao Neural — giọng chuẩn và mượt nhất.` : 'Chưa tìm thấy giọng tiếng Trung trên trình duyệt này. Hãy dùng Chrome hoặc Edge (có sẵn giọng Google 普通话 / Microsoft Xiaoxiao), hoặc chọn Giọng Claude.';
 }
-function openSet(){ fillVoiceSelect(); $('#rate').value=S.rate; $('#rateV').textContent=S.rate+'×'; $('#selRec').value=S.rec; $('#optAutoStop').checked=S.autoStop; $('#optReadBetter').checked=S.readBetter; $('#optAutoPlay').checked=S.autoPlay; $('#tgt').value=S.target; $('#apiKey').value=S.apiKey||''; $('#gemKey').value=S.gemKey||''; $('#gemModel').value=S.gemModel||''; $('#selProv').value=S.provider||'auto'; $('#keyFld').style.display=inClaude?'none':''; $('#tgtV').textContent=S.target; $('#ov').classList.add('show'); }
+function openSet(){ fillVoiceSelect(); $('#rate').value=S.rate; $('#rateV').textContent=S.rate+'×'; $('#selRec').value=S.rec; $('#optAutoStop').checked=S.autoStop; $('#optReadBetter').checked=S.readBetter; $('#optAutoPlay').checked=S.autoPlay; $('#tgt').value=S.target; $('#apiKey').value=S.apiKey||''; $('#gemKey').value=S.gemKey||''; $('#gemModel').value=S.gemModel||''; $('#selProv').value=S.provider||'auto'; $('#selTier').value=S.gemTier||'flash'; $('#optAudio').checked=S.audioEval!==false; $('#selGemVoice').value=S.gemVoice||'Kore'; $('#goal').value=S.goal||20; $('#goalV').textContent=S.goal||20; $('#gemVoiceFld').style.display=inClaude?'none':''; $('#keyFld').style.display=inClaude?'none':''; $('#tgtV').textContent=S.target; $('#ov').classList.add('show'); }
 $('#btnSet').onclick=openSet;
 $('#closeSet').onclick=()=>{ $('#ov').classList.remove('show'); renderStatus(); };
 $('#ov').onclick=e=>{ if(e.target.id==='ov'){ $('#ov').classList.remove('show'); renderStatus(); } };
@@ -1170,8 +1287,12 @@ $('#optReadBetter').onchange=e=>{ S.readBetter=e.target.checked; saveS(); };
 $('#optAutoPlay').onchange=e=>{ S.autoPlay=e.target.checked; saveS(); };
 $('#tgt').oninput=e=>{ S.target=+e.target.value; $('#tgtV').textContent=S.target; saveS(); };
 $('#apiKey').onchange=e=>{ S.apiKey=e.target.value.trim(); saveS(); useApiKey(); render(); };
-$('#gemKey').onchange=e=>{ S.gemKey=e.target.value.trim(); saveS(); useApiKey(); render(); };
+$('#gemKey').onchange=e=>{ S.gemKey=e.target.value.trim(); if(S.gemKey&&!S.voice) S.voice='gemini'; saveS(); useApiKey(); fillVoiceSelect(); render(); };
 $('#gemModel').onchange=e=>{ S.gemModel=e.target.value.trim(); saveS(); useApiKey(); };
+$('#selTier').onchange=e=>{ S.gemTier=e.target.value; saveS(); };
+$('#optAudio').onchange=e=>{ S.audioEval=e.target.checked; saveS(); };
+$('#selGemVoice').onchange=e=>{ S.gemVoice=e.target.value; saveS(); renderStatus(); if(TTS.current()&&TTS.current().type==='gemini') TTS.speak('你好，我是你的汉语老师。'); };
+$('#goal').oninput=e=>{ S.goal=+e.target.value; $('#goalV').textContent=S.goal; saveS(); renderStats(); };
 $('#selProv').onchange=e=>{ S.provider=e.target.value; saveS(); useApiKey(); render(); };
 $('#testAI').onclick=async()=>{ const o=$('#testAIres'); if(!sample){ o.textContent='Chưa có AI — hãy nhập key.'; return; } o.textContent='Đang thử…';
   try{ const r=await askAI('Reply ONLY with JSON {"ok":true,"zh":"你好"}'); o.textContent=r&&r.ok?'✅ Kết nối '+(aiName||'AI')+' thành công':'⚠️ AI trả lời lạ: '+JSON.stringify(r).slice(0,80); renderStatus(); }
