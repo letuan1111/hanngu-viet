@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HànNgữ Việt · Luyện phản xạ nói HSK 1–3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
+<style>
+:root{
+  --paper:#f6f1e8; --card:#fffdf8; --ink:#1f1b16; --muted:#7a6f62; --line:#e7dccb;
+  --red:#c2381f; --red2:#e0563b; --jade:#2c7a57; --gold:#b9852a; --soft:#f1e7d6;
+  --han:"Noto Serif SC","Noto Sans SC",serif; --ui:"Be Vietnam Pro",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui);font-size:15px}
+button{font-family:inherit;cursor:pointer}
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 20px;background:rgba(246,241,232,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;white-space:nowrap}
+.seal{width:34px;height:34px;border-radius:8px;background:var(--red);color:#fff;display:grid;place-items:center;font-family:var(--han);font-size:19px}
+.brand small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.levels{display:flex;gap:6px;margin-left:auto}
+.lv{border:1px solid var(--line);background:var(--card);padding:7px 14px;border-radius:999px;font-weight:600;color:var(--muted)}
+.lv.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.iconbtn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 11px;font-weight:600}
+.wrap{display:grid;grid-template-columns:270px 1fr;gap:20px;max-width:1240px;margin:0 auto;padding:20px}
+.side{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;align-self:start;position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto}
+.side h3{margin:6px 8px 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.topic{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:10px}
+.topic:hover{background:var(--soft)}
+.topic.on{background:var(--ink);color:#fff}
+.topic .zh{font-family:var(--han);font-size:18px;min-width:52px}
+.topic .vi{font-size:13px;flex:1}
+.topic .pg{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.topic.on .pg{color:#d9cfc0}
+.bar{height:3px;background:var(--line);border-radius:3px;margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--jade)}
+.main{min-width:0}
+.cat{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--red);padding:12px 10px 4px}
+.ctin{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-family:var(--ui);font-size:13px;background:var(--paper)}
+@media (max-width:860px){.side #topics{display:flex;flex-direction:column;width:100%}.side #ctList{display:flex;overflow-x:auto;gap:6px}.side .cat{display:none}}
+.status{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+.chip b{color:var(--ink);font-weight:600}
+.chip.ok b{color:var(--jade)} .chip.bad b{color:var(--red)}
+.modes{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:12px;width:max-content;max-width:100%;overflow:auto;margin-bottom:14px}
+.mode{border:0;background:none;padding:9px 16px;border-radius:9px;font-weight:600;color:var(--muted);white-space:nowrap}
+.mode.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px 28px;box-shadow:0 10px 30px -18px rgba(60,40,10,.25)}
+.meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;margin-bottom:6px;gap:10px;flex-wrap:wrap}
+.who{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--red)}
+.prompt{text-align:center;padding:18px 0 8px}
+.pzh{font-family:var(--han);font-size:40px;line-height:1.35;font-weight:600;letter-spacing:.02em;transition:filter .2s}
+.ppy{color:var(--red);font-size:17px;margin-top:6px}
+.pvi{color:var(--muted);margin-top:4px}
+.blur .pzh,.blur .ppy,.blur .pvi{filter:blur(9px);user-select:none}
+.tools{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0 4px}
+.tbtn{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:7px 14px;font-weight:500;font-size:13px}
+.tbtn:hover{border-color:var(--ink)}
+.tbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.hint{display:none;margin:14px auto 0;max-width:560px;border:1px dashed var(--gold);background:#fbf4e4;border-radius:12px;padding:12px 16px;text-align:center}
+.hint.show{display:block}
+.hint .hz{font-family:var(--han);font-size:22px}
+.hint .hp{color:var(--red);font-size:14px}.hint .hv{color:var(--muted);font-size:13px}
+.microw{display:flex;flex-direction:column;align-items:center;gap:10px;margin:22px 0 6px}
+.mic{width:92px;height:92px;border-radius:50%;border:0;background:var(--red);color:#fff;display:grid;place-items:center;box-shadow:0 10px 24px -8px rgba(194,56,31,.6);position:relative;transition:transform .15s}
+.mic:active{transform:scale(.96)}
+.mic svg{width:38px;height:38px}
+.mic.listening{background:var(--ink)}
+.mic.listening::before,.mic.listening::after{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--red);animation:ring 1.4s infinite}
+.mic.listening::after{animation-delay:.7s}
+.mic:disabled{background:#bfb3a3;box-shadow:none;cursor:not-allowed}
+@keyframes ring{from{transform:scale(.9);opacity:.9}to{transform:scale(1.35);opacity:0}}
+.mstat{font-size:13px;color:var(--muted);min-height:18px;text-align:center}
+.live{font-family:var(--han);font-size:22px;min-height:32px;text-align:center;color:var(--ink)}
+.live .p{color:var(--muted)}
+.typerow{display:flex;gap:8px;max-width:560px;margin:8px auto 0}
+.typerow input{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:15px;font-family:var(--ui),var(--han);background:var(--paper)}
+.typerow button{border:0;background:var(--ink);color:#fff;border-radius:10px;padding:0 16px;font-weight:600}
+.result{margin-top:18px;border-top:1px solid var(--line);padding-top:18px;display:none}
+.result.show{display:block}
+.rgrid{display:grid;grid-template-columns:110px 1fr;gap:18px;align-items:start}
+.score{width:110px;height:110px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:32px;position:relative}
+.score small{display:block;font-size:11px;font-weight:500;color:var(--muted);text-align:center;margin-top:-4px}
+.row{margin-bottom:10px}
+.lab{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:3px}
+.zhline{font-family:var(--han);font-size:22px}
+.zhline .ok{color:var(--jade)} .zhline .no{color:var(--red);text-decoration:underline wavy;text-underline-offset:5px}
+.py{color:var(--red);font-size:14px}
+.vi{color:var(--muted);font-size:14px}
+.fb{background:var(--soft);border-radius:12px;padding:11px 14px;line-height:1.55}
+.issues{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.iss{border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px;background:var(--paper)}
+.iss b{font-family:var(--han);font-size:17px}
+.tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;margin-right:6px}
+.tag.g{background:#e3f1ea;color:var(--jade)} .tag.r{background:#f8e2dc;color:var(--red)} .tag.y{background:#f6ecd5;color:var(--gold)}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:20px;gap:10px}
+.nbtn{border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:10px 18px;font-weight:600}
+.nbtn.pri{background:var(--red);color:#fff;border-color:var(--red)}
+.dots{display:flex;gap:5px;flex-wrap:wrap;justify-content:center}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.dot.cur{background:var(--ink)} .dot.g{background:var(--jade)} .dot.y{background:var(--gold)} .dot.r{background:var(--red2)}
+.thinking{color:var(--muted);font-size:14px;display:flex;align-items:center;gap:8px}
+.spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--red);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* chat */
+.chat{display:flex;flex-direction:column;gap:12px;max-height:56vh;overflow:auto;padding:4px 2px 10px}
+.msg{max-width:80%;padding:12px 15px;border-radius:16px;line-height:1.5}
+.msg.ai{background:var(--soft);align-self:flex-start;border-top-left-radius:4px}
+.msg.me{background:var(--ink);color:#fff;align-self:flex-end;border-top-right-radius:4px}
+.msg .z{font-family:var(--han);font-size:21px}
+.msg .p{font-size:13px;color:var(--red)} .msg.me .p{color:#f3b9a8}
+.msg .v{font-size:13px;color:var(--muted)} .msg.me .v{color:#cfc5b8}
+.msg .c{margin-top:8px;font-size:13px;background:#fff7e6;color:#6b4d12;border-radius:8px;padding:7px 9px}
+.msg .play{border:0;background:none;color:var(--red);font-weight:600;font-size:12px;padding:4px 0 0}
+.chatbar{display:flex;align-items:center;gap:14px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.chatbar .mic{width:72px;height:72px}
+.chatbar .mic svg{width:30px;height:30px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.stat{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.stat b{display:block;font-size:22px}
+.stat span{font-size:12px;color:var(--muted)}
+.keys{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:var(--paper);font-family:var(--ui);font-size:11px}
+/* settings */
+.ov{position:fixed;inset:0;background:rgba(30,20,10,.35);display:none;z-index:50;align-items:center;justify-content:center;padding:16px}
+.ov.show{display:flex}
+.dlg{background:var(--card);border-radius:18px;max-width:520px;width:100%;padding:22px 24px;max-height:90vh;overflow:auto}
+.dlg h2{margin:0 0 14px;font-size:19px}
+.fld{margin-bottom:14px}
+.fld label{display:block;font-weight:600;font-size:13px;margin-bottom:5px}
+.fld select,.fld input[type=range]{width:100%}
+.fld select{padding:8px;border-radius:9px;border:1px solid var(--line);background:var(--paper);font-family:inherit}
+.fld .h{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:8px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;z-index:60;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr;padding:12px}
+  .side{position:static;max-height:none;display:flex;overflow-x:auto;gap:6px;padding:8px}
+  .side h3{display:none}
+  .topic{flex:0 0 auto;width:auto;flex-direction:column;align-items:flex-start;gap:0;min-width:110px}
+  .topic .zh{font-size:16px}
+  .card{padding:18px}
+  .pzh{font-size:30px}
+  .brand small{display:none}
+  .rgrid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><div class="seal">说</div><div>HànNgữ Việt · 口语<small>Luyện phản xạ nói HSK 1–3 với AI</small></div></div>
+  <div class="levels" id="levels"></div>
+  <button class="iconbtn" id="btnSet" title="Cài đặt">⚙︎ Cài đặt</button>
+</header>
+
+<div class="wrap">
+  <aside class="side"><h3 id="sideTitle">Chủ đề</h3><div id="topics"></div></aside>
+  <main class="main">
+    <div class="status" id="status"></div>
+    <div class="modes" id="modes">
+      <button class="mode on" data-m="reflex">⚡ Phản xạ hỏi – đáp</button>
+      <button class="mode" data-m="shadow">🔁 Nghe & nhại câu</button>
+      <button class="mode" data-m="chat">💬 Trò chuyện (120 chủ đề)</button>
+      <button class="mode" data-m="gen">✨ AI tự soạn câu</button>
+    </div>
+    <section class="card" id="stage"></section>
+    <div class="stats" id="stats"></div>
+    <div class="keys"><kbd>Space</kbd> bật/tắt mic · <kbd>R</kbd> nghe lại · <kbd>Enter</kbd> câu tiếp · <kbd>H</kbd> gợi ý</div>
+  </main>
+</div>
+
+<div class="ov" id="ov"><div class="dlg">
+  <h2>Cài đặt giọng & nhận dạng</h2>
+  <div class="fld"><label>Giọng đọc tiếng Trung</label><select id="selVoice"></select>
+    <div class="h" id="voiceHint">Hệ thống tự chọn giọng chuẩn nhất trên máy bạn (ưu tiên giọng Neural/Natural của Microsoft Edge, rồi Google 普通话).</div></div>
+  <div class="fld"><label>Tốc độ đọc: <span id="rateV"></span></label><input type="range" id="rate" min="0.6" max="1.2" step="0.05"></div>
+  <div class="fld"><button class="tbtn" id="testVoice">▶ Nghe thử: 你好，欢迎来练习汉语口语！</button></div>
+  <div class="fld"><label>Bộ nhận dạng giọng nói</label><select id="selRec">
+    <option value="auto">Tự động (khuyên dùng)</option>
+    <option value="dict">Claude dictation</option>
+    <option value="native">Trình duyệt Chrome (zh-CN)</option></select>
+    <div class="h">Bản nhận dạng thô luôn được AI đọc lại để đoán đúng chữ Hán bạn định nói (kể cả khi máy nghe thành chữ đồng âm hoặc pinyin).</div></div>
+  <div class="fld" id="keyFld"><label>API key Claude (chỉ cần khi mở trang ngoài claude.ai, ví dụ GitHub Pages)</label><input id="apiKey" type="password" class="ctin" placeholder="sk-ant-…" autocomplete="off">
+    <div class="h">Key chỉ lưu trong trình duyệt của bạn và gửi thẳng tới api.anthropic.com để AI nhận dạng, chấm điểm, trò chuyện và soạn câu. Không dùng máy chung khi đã lưu key.</div></div>
+  <label class="chk"><input type="checkbox" id="optAutoStop"> Tự dừng khi im lặng ~1,8 giây</label>
+  <label class="chk"><input type="checkbox" id="optReadBetter"> Tự đọc câu mẫu sau khi chấm</label>
+  <label class="chk"><input type="checkbox" id="optAutoPlay"> Tự đọc câu hỏi khi sang câu mới</label>
+  <div class="fld"><label>Mục tiêu phản xạ: <span id="tgtV"></span> giây</label><input type="range" id="tgt" min="1" max="8" step="0.5"></div>
+  <div style="text-align:right"><button class="nbtn pri" id="closeSet">Xong</button></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== DỮ LIỆU LUYỆN NÓI HSK 1–3 =====================
+   Định dạng: #cấp|chủ đề|nghĩa ; mỗi dòng: Câu hỏi|Câu trả lời mẫu|Nghĩa câu hỏi|Nghĩa câu trả lời */
+const RAW = `
+#1|问候|Chào hỏi & giới thiệu
+你好！|你好！|Xin chào!|Xin chào!
+你叫什么名字？|我叫小明。|Bạn tên là gì?|Tôi tên là Tiểu Minh.
+你是哪国人？|我是越南人。|Bạn là người nước nào?|Tôi là người Việt Nam.
+认识你很高兴。|认识你我也很高兴。|Rất vui được quen bạn.|Tôi cũng rất vui được quen bạn.
+你是老师吗？|不是，我是学生。|Bạn là giáo viên à?|Không, tôi là học sinh.
+你身体好吗？|我很好，谢谢。|Bạn có khỏe không?|Tôi rất khỏe, cảm ơn.
+谢谢你！|不客气。|Cảm ơn bạn!|Không có gì.
+对不起！|没关系。|Xin lỗi!|Không sao.
+再见！|明天见！|Tạm biệt!|Mai gặp nhé!
+#1|家庭|Gia đình
+你家有几口人？|我家有四口人。|Nhà bạn có mấy người?|Nhà tôi có bốn người.
+你家有什么人？|爸爸、妈妈、哥哥和我。|Nhà bạn có những ai?|Bố, mẹ, anh trai và tôi.
+你有姐姐吗？|我没有姐姐，我有一个妹妹。|Bạn có chị gái không?|Tôi không có chị, tôi có một em gái.
+你爸爸做什么工作？|我爸爸是医生。|Bố bạn làm nghề gì?|Bố tôi là bác sĩ.
+你妈妈在哪儿工作？|她在医院工作。|Mẹ bạn làm việc ở đâu?|Mẹ tôi làm ở bệnh viện.
+你家在哪儿？|我家在河内。|Nhà bạn ở đâu?|Nhà tôi ở Hà Nội.
+你家有猫吗？|有，我家有一只猫。|Nhà bạn có mèo không?|Có, nhà tôi có một con mèo.
+你的朋友是中国人吗？|是，他是北京人。|Bạn của bạn là người Trung Quốc à?|Đúng, cậu ấy là người Bắc Kinh.
+#1|数字年龄|Số đếm & tuổi tác
+你今年多大？|我今年二十岁。|Năm nay bạn bao nhiêu tuổi?|Năm nay tôi hai mươi tuổi.
+你女儿几岁了？|她五岁了。|Con gái bạn mấy tuổi rồi?|Cháu năm tuổi rồi.
+你爸爸多大了？|他五十岁了。|Bố bạn bao nhiêu tuổi rồi?|Bố tôi năm mươi tuổi rồi.
+你们班有多少学生？|我们班有三十个学生。|Lớp bạn có bao nhiêu học sinh?|Lớp tôi có ba mươi học sinh.
+你有几个中国朋友？|我有三个中国朋友。|Bạn có mấy người bạn Trung Quốc?|Tôi có ba người bạn Trung Quốc.
+你的电话是多少？|我的电话是一三九二八四六五七零一。|Số điện thoại của bạn là bao nhiêu?|Số của tôi là 13928465701.
+你家有几个孩子？|我家有两个孩子。|Nhà bạn có mấy đứa con?|Nhà tôi có hai đứa con.
+这些书一共多少本？|一共十本。|Chỗ sách này tổng cộng bao nhiêu quyển?|Tổng cộng mười quyển.
+#1|时间日期|Thời gian & ngày tháng
+现在几点？|现在八点十分。|Bây giờ là mấy giờ?|Bây giờ là tám giờ mười phút.
+今天几月几号？|今天十一月十三号。|Hôm nay là ngày mấy tháng mấy?|Hôm nay là ngày 13 tháng 11.
+今天星期几？|今天星期五。|Hôm nay là thứ mấy?|Hôm nay là thứ Sáu.
+明天是星期几？|明天是星期六。|Ngày mai là thứ mấy?|Ngày mai là thứ Bảy.
+你几点去学校？|我七点去学校。|Mấy giờ bạn đến trường?|Bảy giờ tôi đến trường.
+你什么时候回家？|我下午五点回家。|Khi nào bạn về nhà?|Năm giờ chiều tôi về nhà.
+你的生日是几月几号？|我的生日是五月九号。|Sinh nhật bạn là ngày nào?|Sinh nhật tôi là ngày 9 tháng 5.
+你昨天去哪儿了？|我昨天去商店了。|Hôm qua bạn đi đâu?|Hôm qua tôi đi cửa hàng.
+#1|吃喝|Ăn uống
+你想吃什么？|我想吃米饭。|Bạn muốn ăn gì?|Tôi muốn ăn cơm.
+你想喝什么？|我想喝茶。|Bạn muốn uống gì?|Tôi muốn uống trà.
+你喜欢吃中国菜吗？|喜欢，中国菜很好吃。|Bạn thích ăn món Trung Quốc không?|Thích, món Trung Quốc rất ngon.
+你会做中国菜吗？|我不会做中国菜。|Bạn biết nấu món Trung Quốc không?|Tôi không biết nấu món Trung Quốc.
+你中午吃什么了？|我吃了米饭和菜。|Trưa nay bạn ăn gì?|Tôi ăn cơm và rau.
+你喝咖啡吗？|不喝，我喝水。|Bạn uống cà phê không?|Không, tôi uống nước.
+你要几个苹果？|我要五个。|Bạn muốn mấy quả táo?|Tôi muốn năm quả.
+我们去饭店吃饭，好吗？|好，我们走吧。|Chúng ta đi nhà hàng ăn nhé?|Được, đi thôi.
+#1|购物|Mua sắm
+你想买什么？|我想买一件衣服。|Bạn muốn mua gì?|Tôi muốn mua một bộ quần áo.
+这个杯子多少钱？|十五块钱。|Cái cốc này bao nhiêu tiền?|Mười lăm tệ.
+这件衣服怎么样？|很漂亮，但是有点儿贵。|Bộ quần áo này thế nào?|Rất đẹp nhưng hơi đắt.
+你在哪儿买的？|我在商店买的。|Bạn mua ở đâu?|Tôi mua ở cửa hàng.
+你买了几本书？|我买了两本。|Bạn mua mấy quyển sách?|Tôi mua hai quyển.
+你喜欢什么颜色？|我喜欢红色。|Bạn thích màu gì?|Tôi thích màu đỏ.
+你要大的还是小的？|我要小的。|Bạn lấy cái to hay cái nhỏ?|Tôi lấy cái nhỏ.
+苹果多少钱一斤？|三块钱一斤。|Táo bao nhiêu tiền một cân?|Ba tệ một cân.
+#1|地点|Nơi chốn
+你在哪儿？|我在学校。|Bạn đang ở đâu?|Tôi đang ở trường.
+你的书在哪儿？|在桌子上。|Sách của bạn ở đâu?|Ở trên bàn.
+医院在哪儿？|医院在学校后面。|Bệnh viện ở đâu?|Bệnh viện ở sau trường học.
+你住在哪儿？|我住在学校里面。|Bạn sống ở đâu?|Tôi sống trong trường.
+你去哪儿？|我去饭店。|Bạn đi đâu đấy?|Tôi đi nhà hàng.
+小猫在哪儿？|小猫在椅子下面。|Con mèo ở đâu?|Con mèo ở dưới ghế.
+你们学校大吗？|很大，学生很多。|Trường các bạn có to không?|Rất to, có nhiều học sinh.
+你的电脑在哪儿？|在我的房间里。|Máy tính của bạn ở đâu?|Ở trong phòng tôi.
+#1|天气|Thời tiết
+今天天气怎么样？|今天天气很好。|Hôm nay thời tiết thế nào?|Hôm nay thời tiết rất đẹp.
+明天会下雨吗？|明天会下雨。|Ngày mai có mưa không?|Ngày mai sẽ mưa.
+今天热吗？|今天很热。|Hôm nay có nóng không?|Hôm nay rất nóng.
+河内现在冷吗？|有点儿冷。|Hà Nội bây giờ có lạnh không?|Hơi lạnh.
+你喜欢下雨天吗？|我不喜欢下雨天。|Bạn có thích trời mưa không?|Tôi không thích trời mưa.
+昨天天气怎么样？|昨天天气不太好。|Hôm qua thời tiết thế nào?|Hôm qua thời tiết không đẹp lắm.
+北京今天多少度？|今天二十五度。|Bắc Kinh hôm nay bao nhiêu độ?|Hôm nay hai mươi lăm độ.
+下雨了，我们还去吗？|不去了，我们在家看电视吧。|Mưa rồi, chúng ta còn đi không?|Không đi nữa, ở nhà xem TV đi.
+#1|能力爱好|Khả năng & sở thích
+你会说汉语吗？|我会说一点儿汉语。|Bạn biết nói tiếng Trung không?|Tôi biết nói một chút tiếng Trung.
+你会开车吗？|我不会开车。|Bạn biết lái xe không?|Tôi không biết lái xe.
+你喜欢做什么？|我喜欢看电影。|Bạn thích làm gì?|Tôi thích xem phim.
+你会写汉字吗？|我会写一些汉字。|Bạn biết viết chữ Hán không?|Tôi biết viết một số chữ Hán.
+你喜欢看书吗？|喜欢，我每天都看书。|Bạn thích đọc sách không?|Thích, ngày nào tôi cũng đọc sách.
+你会做饭吗？|会，我会做越南菜。|Bạn biết nấu ăn không?|Biết, tôi biết nấu món Việt.
+你喜欢看电视吗？|我不太喜欢看电视。|Bạn thích xem TV không?|Tôi không thích xem TV lắm.
+你想学什么？|我想学汉语。|Bạn muốn học gì?|Tôi muốn học tiếng Trung.
+#1|打电话约会|Gọi điện & hẹn gặp
+喂，你是哪位？|我是大卫，你的同学。|Alô, ai đấy?|Tôi là David, bạn cùng lớp của bạn.
+你明天有时间吗？|有时间。|Ngày mai bạn có thời gian không?|Có thời gian.
+明天我们一起去看电影，好吗？|好啊，几点去？|Mai chúng ta cùng đi xem phim nhé?|Được, mấy giờ đi?
+你想几点见面？|下午三点吧。|Bạn muốn gặp lúc mấy giờ?|Ba giờ chiều nhé.
+你在做什么呢？|我在看书呢。|Bạn đang làm gì thế?|Tôi đang đọc sách.
+王老师在吗？|不在，他去学校了。|Thầy Vương có ở đây không?|Không, thầy đi đến trường rồi.
+我们在哪儿见？|在学校前面见吧。|Chúng ta gặp ở đâu?|Gặp trước cổng trường nhé.
+你什么时候有空？|星期六下午有空。|Khi nào bạn rảnh?|Chiều thứ Bảy tôi rảnh.
+#1|交通|Đi lại
+你怎么去学校？|我坐出租车去。|Bạn đến trường bằng gì?|Tôi đi taxi.
+你坐飞机去北京吗？|对，我坐飞机去。|Bạn đi máy bay đến Bắc Kinh à?|Đúng, tôi đi máy bay.
+从这儿到饭店要多长时间？|要十分钟。|Từ đây đến nhà hàng mất bao lâu?|Mất mười phút.
+你是怎么来的？|我是坐出租车来的。|Bạn đến bằng gì?|Tôi đến bằng taxi.
+你是什么时候来中国的？|我是去年来的。|Bạn đến Trung Quốc khi nào?|Tôi đến năm ngoái.
+你是跟谁一起来的？|我是跟朋友一起来的。|Bạn đến cùng ai?|Tôi đến cùng bạn.
+你是开车来的吗？|不是，我是走路来的。|Bạn lái xe đến à?|Không, tôi đi bộ đến.
+你想坐火车去吗？|不想，火车太慢了。|Bạn muốn đi tàu hỏa không?|Không, tàu hỏa chậm quá.
+#2|日常作息|Sinh hoạt hằng ngày
+你每天几点起床？|我每天六点半起床。|Hằng ngày mấy giờ bạn dậy?|Hằng ngày tôi dậy lúc sáu rưỡi.
+你早上吃什么？|我早上喝牛奶，吃鸡蛋。|Buổi sáng bạn ăn gì?|Buổi sáng tôi uống sữa, ăn trứng.
+你晚上一般做什么？|我一般看书或者上网。|Buổi tối bạn thường làm gì?|Tôi thường đọc sách hoặc lên mạng.
+你每天睡几个小时？|我每天睡七个小时。|Mỗi ngày bạn ngủ mấy tiếng?|Mỗi ngày tôi ngủ bảy tiếng.
+你每天怎么去上班？|我每天坐公共汽车去上班。|Hằng ngày bạn đi làm bằng gì?|Hằng ngày tôi đi xe buýt đi làm.
+你星期天一般做什么？|我一般在家休息。|Chủ nhật bạn thường làm gì?|Tôi thường ở nhà nghỉ ngơi.
+你今天累不累？|有点儿累。|Hôm nay bạn có mệt không?|Hơi mệt.
+你昨天晚上几点睡觉的？|我十一点睡觉的。|Tối qua mấy giờ bạn đi ngủ?|Tôi đi ngủ lúc mười một giờ.
+#2|运动健康|Thể thao & sức khỏe
+你喜欢什么运动？|我喜欢踢足球。|Bạn thích môn thể thao nào?|Tôi thích đá bóng.
+你每天运动吗？|我每天早上跑步。|Bạn có tập thể dục hằng ngày không?|Sáng nào tôi cũng chạy bộ.
+你会游泳吗？|会，我游得很好。|Bạn biết bơi không?|Biết, tôi bơi rất giỏi.
+你一个星期运动几次？|一个星期运动三次。|Một tuần bạn tập mấy lần?|Một tuần tập ba lần.
+你怎么了？|我生病了，有点儿发烧。|Bạn sao thế?|Tôi bị ốm, hơi sốt.
+你去医院了吗？|去了，医生让我多休息。|Bạn đi bệnh viện chưa?|Đi rồi, bác sĩ bảo tôi nghỉ ngơi nhiều.
+你吃药了吗？|已经吃了。|Bạn uống thuốc chưa?|Uống rồi.
+打篮球和踢足球，你喜欢哪个？|我喜欢打篮球。|Bóng rổ và bóng đá, bạn thích cái nào?|Tôi thích chơi bóng rổ.
+#2|比较|So sánh
+你和你哥哥谁高？|我哥哥比我高。|Bạn và anh trai ai cao hơn?|Anh trai tôi cao hơn tôi.
+今天比昨天冷吗？|今天比昨天冷一点儿。|Hôm nay lạnh hơn hôm qua không?|Hôm nay lạnh hơn hôm qua một chút.
+汉语难还是英语难？|我觉得汉语比英语难。|Tiếng Trung khó hay tiếng Anh khó?|Tôi thấy tiếng Trung khó hơn tiếng Anh.
+这件衣服比那件贵多少？|贵五十块钱。|Bộ này đắt hơn bộ kia bao nhiêu?|Đắt hơn năm mươi tệ.
+坐飞机快还是坐火车快？|坐飞机比坐火车快多了。|Đi máy bay nhanh hay tàu hỏa nhanh?|Máy bay nhanh hơn tàu hỏa nhiều.
+你妹妹比你高吗？|她没有我高。|Em gái bạn cao hơn bạn không?|Em ấy không cao bằng tôi.
+你觉得哪个菜最好吃？|我觉得这个鱼最好吃。|Bạn thấy món nào ngon nhất?|Tôi thấy món cá này ngon nhất.
+你的房间大还是你朋友的大？|我朋友的房间比我的大。|Phòng bạn to hay phòng bạn của bạn to?|Phòng bạn tôi to hơn phòng tôi.
+#2|经历|Trải nghiệm (过 / 了)
+你去过中国吗？|我去过一次。|Bạn đã từng đến Trung Quốc chưa?|Tôi từng đến một lần.
+你吃过北京烤鸭吗？|吃过，非常好吃。|Bạn ăn vịt quay Bắc Kinh bao giờ chưa?|Ăn rồi, cực kỳ ngon.
+你看过这个电影吗？|没看过。|Bạn xem phim này chưa?|Chưa xem.
+你学汉语学了多长时间了？|我学了一年了。|Bạn học tiếng Trung bao lâu rồi?|Tôi học được một năm rồi.
+你昨天做什么了？|我昨天去朋友家玩了。|Hôm qua bạn làm gì?|Hôm qua tôi đến nhà bạn chơi.
+你考试考得怎么样？|考得还可以。|Bạn thi thế nào?|Thi cũng tạm được.
+你以前来过这儿吗？|没来过，这是第一次。|Trước đây bạn từng đến đây chưa?|Chưa, đây là lần đầu.
+你见过他的女朋友吗？|见过，她很漂亮。|Bạn gặp bạn gái anh ấy chưa?|Gặp rồi, cô ấy rất xinh.
+#2|买东西|Mua sắm nâng cao
+你想买什么样的手机？|我想买一个便宜一点儿的。|Bạn muốn mua điện thoại thế nào?|Tôi muốn mua cái rẻ hơn một chút.
+你穿多大的鞋？|我穿三十九号的。|Bạn đi giày cỡ bao nhiêu?|Tôi đi cỡ 39.
+这个西瓜怎么卖？|五块钱一斤。|Dưa hấu này bán thế nào?|Năm tệ một cân.
+你一共花了多少钱？|一共两百块。|Bạn tiêu hết tổng cộng bao nhiêu tiền?|Tổng cộng hai trăm tệ.
+你觉得这件衣服怎么样？|颜色很好看，就是有点儿长。|Bạn thấy bộ này thế nào?|Màu rất đẹp, chỉ hơi dài.
+你经常在网上买东西吗？|经常，网上的东西比较便宜。|Bạn hay mua đồ trên mạng không?|Thường xuyên, đồ trên mạng khá rẻ.
+你要红色的还是白色的？|我要白色的。|Bạn lấy màu đỏ hay màu trắng?|Tôi lấy màu trắng.
+你喜欢去商店还是在网上买？|我喜欢在网上买。|Bạn thích đi cửa hàng hay mua online?|Tôi thích mua online.
+#2|问路|Hỏi đường
+请问，火车站怎么走？|一直往前走，然后往右走。|Xin hỏi, đến ga tàu đi thế nào?|Cứ đi thẳng, rồi rẽ phải.
+机场离这儿远吗？|很远，坐出租车要一个小时。|Sân bay có xa đây không?|Rất xa, đi taxi mất một tiếng.
+你家离公司近吗？|很近，走路十分钟就到了。|Nhà bạn có gần công ty không?|Rất gần, đi bộ mười phút là tới.
+从你家到学校怎么走？|先坐公共汽车，再走五分钟。|Từ nhà bạn đến trường đi thế nào?|Đi xe buýt trước, rồi đi bộ năm phút.
+洗手间在哪儿？|在左边。|Nhà vệ sinh ở đâu?|Ở bên trái.
+你知道附近有饭馆吗？|前面就有一个。|Bạn biết gần đây có quán ăn không?|Ngay phía trước có một quán.
+你找什么？|我找医院。|Bạn tìm gì thế?|Tôi tìm bệnh viện.
+商店在银行旁边吗？|不是，在银行对面。|Cửa hàng ở cạnh ngân hàng à?|Không, ở đối diện ngân hàng.
+#2|工作学习|Công việc & học tập
+你在哪儿工作？|我在一家电脑公司工作。|Bạn làm việc ở đâu?|Tôi làm ở một công ty máy tính.
+你的工作忙吗？|很忙，每天都工作到很晚。|Công việc của bạn bận không?|Rất bận, ngày nào cũng làm đến muộn.
+你为什么学习汉语？|因为我想去中国工作。|Tại sao bạn học tiếng Trung?|Vì tôi muốn sang Trung Quốc làm việc.
+你们什么时候考试？|下个星期考试。|Khi nào các bạn thi?|Tuần sau thi.
+你的汉语老师怎么样？|她很好，上课很有意思。|Cô giáo tiếng Trung của bạn thế nào?|Cô rất tốt, giờ học rất thú vị.
+你觉得汉字难吗？|有点儿难，但是很有意思。|Bạn thấy chữ Hán khó không?|Hơi khó, nhưng rất thú vị.
+你每天学习几个小时？|我每天学习两个小时。|Mỗi ngày bạn học mấy tiếng?|Mỗi ngày tôi học hai tiếng.
+你的同学都是哪国人？|有中国人，也有韩国人。|Bạn cùng lớp của bạn là người nước nào?|Có người Trung Quốc, cũng có người Hàn Quốc.
+#2|邀请计划|Mời & dự định
+这个周末你打算做什么？|我打算去爬山。|Cuối tuần này bạn định làm gì?|Tôi định đi leo núi.
+我们一起去唱歌吧？|好啊，几点去？|Chúng ta cùng đi hát nhé?|Được, mấy giờ đi?
+明天晚上你能来我家吃饭吗？|能，我一定来。|Tối mai bạn đến nhà tôi ăn cơm được không?|Được, tôi nhất định đến.
+你生日那天想怎么过？|我想和朋友们一起吃饭。|Sinh nhật bạn muốn tổ chức thế nào?|Tôi muốn ăn cơm cùng các bạn.
+下个月你要去旅游吗？|要，我要去上海旅游。|Tháng sau bạn đi du lịch không?|Có, tôi sẽ đi Thượng Hải.
+你想去哪儿玩儿？|我想去海边玩儿。|Bạn muốn đi đâu chơi?|Tôi muốn ra biển chơi.
+你要不要跟我们一起去？|要，等我一下。|Bạn có muốn đi cùng chúng tôi không?|Có, đợi tôi một chút.
+新年你回家吗？|回家，我要跟家人一起过新年。|Năm mới bạn có về nhà không?|Về, tôi sẽ đón năm mới cùng gia đình.
+#2|天气季节|Thời tiết & mùa
+明天天气怎么样？|听说明天是晴天。|Ngày mai thời tiết thế nào?|Nghe nói mai trời nắng.
+外面在下雪吗？|没有，外面在下雨。|Bên ngoài đang có tuyết à?|Không, bên ngoài đang mưa.
+你们国家冬天冷不冷？|我们那儿冬天不太冷。|Mùa đông nước bạn có lạnh không?|Mùa đông chỗ chúng tôi không lạnh lắm.
+你最喜欢什么天气？|我最喜欢晴天。|Bạn thích thời tiết nào nhất?|Tôi thích trời nắng nhất.
+你那儿现在几度？|现在三十度，非常热。|Chỗ bạn bây giờ bao nhiêu độ?|Bây giờ ba mươi độ, rất nóng.
+雨下了多长时间了？|下了两个小时了。|Mưa bao lâu rồi?|Mưa hai tiếng rồi.
+下雪的时候你喜欢做什么？|我喜欢在外面玩雪。|Khi có tuyết bạn thích làm gì?|Tôi thích ra ngoài nghịch tuyết.
+你喜欢春天还是秋天？|我喜欢秋天，不冷也不热。|Bạn thích mùa xuân hay mùa thu?|Tôi thích mùa thu, không lạnh cũng không nóng.
+#2|正在着|Đang làm gì (在 / 着)
+你在干什么呢？|我正在做作业呢。|Bạn đang làm gì thế?|Tôi đang làm bài tập.
+你给谁打电话呢？|我给我妈妈打电话呢。|Bạn đang gọi cho ai thế?|Tôi đang gọi cho mẹ.
+门开着吗？|门开着呢。|Cửa đang mở à?|Cửa đang mở.
+他穿着什么衣服？|他穿着一件白衬衫。|Anh ấy đang mặc gì?|Anh ấy mặc một chiếc áo sơ mi trắng.
+你朋友在等你吗？|对，他在门口等我呢。|Bạn của bạn đang đợi bạn à?|Đúng, cậu ấy đang đợi tôi ở cửa.
+你怎么还没睡觉？|我在准备明天的考试。|Sao bạn vẫn chưa ngủ?|Tôi đang chuẩn bị cho kỳ thi ngày mai.
+你看见我的手机了吗？|在桌子上放着呢。|Bạn có thấy điện thoại của tôi không?|Đang để trên bàn đấy.
+外面还在下雨吗？|没有，雨已经停了。|Bên ngoài vẫn còn mưa à?|Không, mưa tạnh rồi.
+#2|外貌性格|Ngoại hình & tính cách
+你的好朋友长什么样？|她长得很漂亮，眼睛很大。|Bạn thân của bạn trông thế nào?|Cô ấy rất xinh, mắt rất to.
+你哥哥高吗？|很高，一米八。|Anh trai bạn có cao không?|Rất cao, một mét tám.
+你是一个什么样的人？|我很喜欢笑，也喜欢交朋友。|Bạn là người thế nào?|Tôi rất hay cười, cũng thích kết bạn.
+你的老师年轻吗？|很年轻，才二十八岁。|Giáo viên của bạn có trẻ không?|Rất trẻ, mới hai mươi tám tuổi.
+你喜欢什么样的人？|我喜欢热情的人。|Bạn thích người như thế nào?|Tôi thích người nhiệt tình.
+他戴眼镜吗？|戴，他戴着一副眼镜。|Anh ấy có đeo kính không?|Có, anh ấy đeo một cặp kính.
+你和你妈妈长得像吗？|很像，大家都这么说。|Bạn có giống mẹ không?|Rất giống, ai cũng nói vậy.
+你最好的朋友是谁？|是我的大学同学。|Bạn thân nhất của bạn là ai?|Là bạn đại học của tôi.
+#3|旅游|Du lịch
+你最想去哪个城市旅游？|我最想去西安，因为那儿的历史很有意思。|Bạn muốn đi du lịch thành phố nào nhất?|Tôi muốn đến Tây An nhất vì lịch sử ở đó rất thú vị.
+你一般怎么准备旅游？|我一般先上网查一下，然后订宾馆。|Bạn thường chuẩn bị du lịch thế nào?|Tôi thường tra trên mạng trước, rồi đặt khách sạn.
+旅游的时候你喜欢带什么？|我一般会带照相机和地图。|Đi du lịch bạn thích mang gì?|Tôi thường mang máy ảnh và bản đồ.
+你更喜欢一个人旅游还是跟朋友一起？|我更喜欢跟朋友一起，比较热闹。|Bạn thích đi một mình hay đi cùng bạn bè?|Tôi thích đi cùng bạn hơn, vui hơn.
+上次旅游你去了哪儿？|上次我去了岘港，那儿的海很漂亮。|Lần du lịch trước bạn đi đâu?|Lần trước tôi đi Đà Nẵng, biển ở đó rất đẹp.
+你出国旅游过吗？|旅游过，我去过泰国和中国。|Bạn từng đi du lịch nước ngoài chưa?|Rồi, tôi từng đến Thái Lan và Trung Quốc.
+你旅游的时候遇到过什么问题吗？|有一次我的护照差点儿丢了。|Khi du lịch bạn có gặp sự cố gì không?|Có lần tôi suýt mất hộ chiếu.
+坐飞机要注意什么？|要提前两个小时到机场。|Đi máy bay cần chú ý gì?|Phải đến sân bay trước hai tiếng.
+#3|学习方法|Phương pháp học
+你是怎么学习汉语的？|我每天听中文歌，还跟中国朋友聊天。|Bạn học tiếng Trung thế nào?|Hằng ngày tôi nghe nhạc Trung, còn trò chuyện với bạn Trung Quốc.
+你觉得学汉语最难的是什么？|我觉得声调最难。|Bạn thấy học tiếng Trung khó nhất là gì?|Tôi thấy thanh điệu khó nhất.
+你怎么记生词？|我把生词写在本子上，每天复习。|Bạn nhớ từ mới thế nào?|Tôi viết từ mới vào vở, ôn mỗi ngày.
+遇到不懂的问题，你会怎么办？|我会先查词典，然后问老师。|Gặp chỗ không hiểu, bạn làm thế nào?|Tôi tra từ điển trước, rồi hỏi thầy cô.
+你练习口语的时候紧张吗？|刚开始很紧张，现在好多了。|Khi luyện nói bạn có căng thẳng không?|Lúc đầu rất căng thẳng, giờ đỡ nhiều rồi.
+你的汉语水平提高了吗？|提高了不少，我现在能看懂简单的句子。|Trình độ tiếng Trung của bạn có tiến bộ không?|Tiến bộ khá nhiều, giờ tôi đọc hiểu được câu đơn giản.
+你打算参加HSK考试吗？|打算，我想明年参加HSK三级考试。|Bạn có định thi HSK không?|Có, tôi muốn sang năm thi HSK 3.
+看电影对学汉语有帮助吗？|有很大帮助，可以学到很多口语。|Xem phim có giúp ích cho việc học tiếng Trung không?|Giúp ích rất nhiều, học được nhiều khẩu ngữ.
+#3|城市环境|Thành phố & môi trường
+你觉得你住的城市怎么样？|很热闹，但是交通不太方便。|Bạn thấy thành phố bạn sống thế nào?|Rất náo nhiệt, nhưng giao thông không tiện lắm.
+你家附近有什么？|有一个公园、一个超市和一家银行。|Gần nhà bạn có gì?|Có một công viên, một siêu thị và một ngân hàng.
+你喜欢大城市还是小城市？|我喜欢小城市，因为比较安静。|Bạn thích thành phố lớn hay nhỏ?|Tôi thích thành phố nhỏ vì khá yên tĩnh.
+你们那儿的空气怎么样？|空气不太好，汽车太多了。|Không khí chỗ bạn thế nào?|Không khí không tốt lắm, nhiều ô tô quá.
+你每天上班要花多长时间？|大概四十分钟。|Mỗi ngày bạn đi làm mất bao lâu?|Khoảng bốn mươi phút.
+河内和胡志明市有什么不同？|河内有四个季节，胡志明市一年都很热。|Hà Nội và TP.HCM khác nhau thế nào?|Hà Nội có bốn mùa, TP.HCM nóng quanh năm.
+你们城市有地铁吗？|有，最近刚开了一条。|Thành phố bạn có tàu điện ngầm không?|Có, gần đây vừa mở một tuyến.
+你家附近的环境好吗？|很好，有很多树，也很干净。|Môi trường quanh nhà bạn tốt không?|Rất tốt, nhiều cây và sạch sẽ.
+#3|感受情绪|Cảm xúc
+你今天看起来很高兴，有什么好事吗？|是啊，我的考试成绩出来了，考得很好。|Hôm nay trông bạn vui thế, có chuyện gì hay à?|Đúng, điểm thi có rồi, tôi làm bài rất tốt.
+你什么时候会生气？|别人不认真听我说话的时候。|Khi nào bạn tức giận?|Khi người khác không chịu nghe tôi nói.
+你担心什么？|我担心找不到好工作。|Bạn lo lắng điều gì?|Tôi lo không tìm được việc tốt.
+你难过的时候一般做什么？|我会听音乐或者给好朋友打电话。|Lúc buồn bạn thường làm gì?|Tôi nghe nhạc hoặc gọi cho bạn thân.
+你最近忙不忙？|有点儿忙，因为工作太多了。|Dạo này bạn có bận không?|Hơi bận, vì nhiều việc quá.
+什么事情让你最开心？|跟家人在一起的时候我最开心。|Điều gì làm bạn vui nhất?|Lúc ở bên gia đình tôi vui nhất.
+你对现在的生活满意吗？|还比较满意。|Bạn có hài lòng với cuộc sống hiện tại không?|Khá hài lòng.
+你害怕什么？|我害怕一个人走夜路。|Bạn sợ điều gì?|Tôi sợ đi đường đêm một mình.
+#3|饮食健康|Ăn uống lành mạnh
+你平时注意健康吗？|注意，我少吃甜的，多吃水果。|Bình thường bạn có chú ý sức khỏe không?|Có, tôi ăn ít đồ ngọt, ăn nhiều hoa quả.
+你喜欢甜的还是辣的？|我喜欢辣的，越辣越好。|Bạn thích đồ ngọt hay đồ cay?|Tôi thích đồ cay, càng cay càng tốt.
+你最拿手的菜是什么？|我最拿手的是越南春卷。|Món tủ của bạn là gì?|Món tủ của tôi là nem cuốn Việt Nam.
+你一般在家吃饭还是在外面吃？|一般在家吃，因为又干净又便宜。|Bạn thường ăn ở nhà hay ăn ngoài?|Thường ăn ở nhà vì vừa sạch vừa rẻ.
+中国菜和越南菜有什么不同？|中国菜油比较多，越南菜比较清淡。|Món Trung và món Việt khác nhau thế nào?|Món Trung nhiều dầu mỡ hơn, món Việt thanh đạm hơn.
+你每天喝多少水？|我每天喝八杯水。|Mỗi ngày bạn uống bao nhiêu nước?|Mỗi ngày tôi uống tám cốc nước.
+为了健康你做过哪些改变？|我每天早上去跑步，不再喝可乐了。|Vì sức khỏe bạn đã thay đổi những gì?|Sáng nào tôi cũng chạy bộ, không uống coca nữa.
+你晚上一般几点吃晚饭？|七点左右。|Buổi tối bạn thường ăn cơm lúc mấy giờ?|Khoảng bảy giờ.
+#3|工作计划|Công việc & kế hoạch
+你毕业以后打算做什么？|我打算去一家中国公司工作。|Tốt nghiệp xong bạn định làm gì?|Tôi định làm việc cho một công ty Trung Quốc.
+你理想的工作是什么样的？|工资高一点儿，同事也很友好。|Công việc lý tưởng của bạn thế nào?|Lương cao một chút, đồng nghiệp thân thiện.
+你参加过面试吗？|参加过，那次我非常紧张。|Bạn từng đi phỏng vấn chưa?|Từng đi rồi, lần đó tôi rất căng thẳng.
+你觉得什么工作最有意思？|我觉得当导游最有意思，可以去很多地方。|Bạn thấy nghề nào thú vị nhất?|Tôi thấy làm hướng dẫn viên thú vị nhất, được đi nhiều nơi.
+你的同事们怎么样？|他们都很热情，经常帮助我。|Đồng nghiệp của bạn thế nào?|Họ đều rất nhiệt tình, thường giúp đỡ tôi.
+你每天要开几个会？|一般一两个。|Mỗi ngày bạn phải họp mấy cuộc?|Thường một hai cuộc.
+你经常加班吗？|有时候会，特别是周末之前。|Bạn có hay làm thêm giờ không?|Thỉnh thoảng, nhất là trước cuối tuần.
+五年以后你希望自己在做什么？|我希望能有自己的公司。|Năm năm nữa bạn mong mình đang làm gì?|Tôi mong có công ty của riêng mình.
+#3|节日文化|Lễ tết & văn hóa
+你们国家最重要的节日是什么？|是春节，越南叫Tết。|Ngày lễ quan trọng nhất ở nước bạn là gì?|Là Tết Nguyên đán, tiếng Việt gọi là Tết.
+春节的时候你们一般做什么？|我们一家人在一起包粽子、看烟花。|Tết các bạn thường làm gì?|Cả nhà quây quần gói bánh chưng, xem pháo hoa.
+你过过中国的中秋节吗？|过过，我们一起吃月饼、看月亮。|Bạn từng đón Trung thu ở Trung Quốc chưa?|Rồi, chúng tôi cùng ăn bánh trung thu, ngắm trăng.
+你喜欢收什么样的礼物？|我喜欢收书，因为我很喜欢看书。|Bạn thích nhận quà gì?|Tôi thích nhận sách vì rất thích đọc.
+过生日的时候你一般怎么过？|跟家人一起吃蛋糕。|Sinh nhật bạn thường tổ chức thế nào?|Ăn bánh kem cùng gia đình.
+你知道中国人过年吃什么吗？|北方人一般吃饺子。|Bạn biết người Trung Quốc ăn gì dịp Tết không?|Người miền Bắc thường ăn sủi cảo.
+送礼物的时候应该注意什么？|中国人一般不送钟。|Khi tặng quà nên chú ý gì?|Người Trung Quốc thường không tặng đồng hồ.
+你最难忘的节日是哪个？|是去年的春节，因为我第一次在国外过。|Ngày lễ đáng nhớ nhất của bạn là gì?|Tết năm ngoái, vì lần đầu tôi đón Tết ở nước ngoài.
+#3|电脑手机|Máy tính & điện thoại
+你每天用手机用多长时间？|差不多五个小时。|Mỗi ngày bạn dùng điện thoại bao lâu?|Khoảng năm tiếng.
+你一般用手机做什么？|看新闻、听音乐，还有跟朋友聊天。|Bạn thường dùng điện thoại làm gì?|Đọc tin tức, nghe nhạc và nói chuyện với bạn bè.
+你的电脑坏了怎么办？|我会找朋友帮忙修一下。|Máy tính hỏng thì bạn làm sao?|Tôi nhờ bạn sửa giúp.
+你经常上网学习吗？|经常，网上有很多学汉语的视频。|Bạn có hay học trên mạng không?|Thường xuyên, trên mạng có nhiều video học tiếng Trung.
+你觉得手机对孩子好吗？|不太好，孩子应该多去外面玩。|Bạn nghĩ điện thoại có tốt cho trẻ con không?|Không tốt lắm, trẻ nên ra ngoài chơi nhiều hơn.
+你会用电子邮件吗？|会，我经常用电子邮件跟老师联系。|Bạn biết dùng email không?|Biết, tôi hay dùng email liên lạc với thầy cô.
+你上次换手机是什么时候？|去年换的。|Lần trước bạn đổi điện thoại là khi nào?|Năm ngoái.
+没有手机的话，你的生活会怎么样？|会很不方便，但是可能会更轻松。|Nếu không có điện thoại, cuộc sống bạn sẽ thế nào?|Sẽ rất bất tiện, nhưng có thể sẽ thoải mái hơn.
+#3|租房生活|Thuê nhà & cuộc sống
+你现在住的房子是租的吗？|是的，我和朋友一起租的。|Nhà bạn đang ở là nhà thuê à?|Đúng, tôi thuê cùng bạn.
+你的房间里有什么？|有一张床、一张桌子和一个空调。|Trong phòng bạn có gì?|Có một cái giường, một cái bàn và một cái điều hòa.
+你希望找什么样的房子？|离公司近一点儿、安静一点儿的。|Bạn muốn tìm nhà thế nào?|Gần công ty hơn, yên tĩnh hơn một chút.
+你的邻居怎么样？|很好，他们常常请我吃水果。|Hàng xóm của bạn thế nào?|Rất tốt, họ hay mời tôi ăn hoa quả.
+你家里谁做家务？|我和我妈妈一起做。|Ở nhà ai làm việc nhà?|Tôi và mẹ cùng làm.
+房间的空调坏了，你会怎么办？|我会给房东打电话。|Điều hòa trong phòng hỏng, bạn sẽ làm gì?|Tôi sẽ gọi cho chủ nhà.
+你一个月房租多少钱？|大概三百万越南盾。|Tiền thuê nhà một tháng của bạn bao nhiêu?|Khoảng ba triệu đồng.
+搬家的时候你觉得最麻烦的是什么？|整理东西最麻烦。|Khi chuyển nhà bạn thấy phiền nhất là gì?|Dọn dẹp đồ đạc phiền nhất.
+#3|观点表达|Nêu quan điểm (因为…所以 / 虽然…但是 / 如果…就)
+你觉得学外语重要吗？为什么？|很重要，因为可以认识更多的朋友。|Bạn thấy học ngoại ngữ có quan trọng không? Tại sao?|Rất quan trọng, vì có thể quen nhiều bạn hơn.
+如果明天放假，你想做什么？|如果明天放假，我就去看电影。|Nếu mai được nghỉ, bạn muốn làm gì?|Nếu mai được nghỉ, tôi sẽ đi xem phim.
+汉语很难，你为什么还要学？|虽然汉语很难，但是我觉得很有意思。|Tiếng Trung khó vậy, sao bạn vẫn học?|Tuy tiếng Trung khó nhưng tôi thấy rất thú vị.
+你的汉语是不是越来越好了？|是的，我的汉语越来越好了。|Tiếng Trung của bạn có phải ngày càng tốt lên không?|Đúng vậy, tiếng Trung của tôi ngày càng tốt.
+你觉得钱是最重要的吗？|不是，我觉得健康最重要。|Bạn nghĩ tiền là quan trọng nhất à?|Không, tôi thấy sức khỏe quan trọng nhất.
+你同意早睡早起身体好吗？|同意，早睡早起对身体很好。|Bạn có đồng ý ngủ sớm dậy sớm thì khỏe không?|Đồng ý, ngủ sớm dậy sớm rất tốt cho sức khỏe.
+除了汉语，你还会说什么语言？|除了汉语，我还会说英语。|Ngoài tiếng Trung, bạn còn nói được tiếng gì?|Ngoài tiếng Trung, tôi còn nói được tiếng Anh.
+只要努力，就能学好汉语吗？|我觉得只要每天练习，就一定能学好。|Chỉ cần cố gắng là học giỏi tiếng Trung được không?|Tôi nghĩ chỉ cần luyện mỗi ngày là nhất định học tốt.
+#3|把被句|Câu chữ 把 / 被
+你把作业做完了吗？|我已经把作业做完了。|Bạn làm xong bài tập chưa?|Tôi đã làm xong bài tập rồi.
+你的自行车呢？|我的自行车被朋友借走了。|Xe đạp của bạn đâu?|Xe đạp của tôi bị bạn mượn đi rồi.
+你把钥匙放在哪儿了？|我把钥匙放在桌子上了。|Bạn để chìa khóa ở đâu?|Tôi để chìa khóa trên bàn.
+你的蛋糕呢？|被我弟弟吃了。|Bánh kem của bạn đâu?|Bị em trai tôi ăn mất rồi.
+请把门关上，好吗？|好的，我马上关。|Làm ơn đóng cửa lại được không?|Vâng, tôi đóng ngay.
+你的手机怎么了？|被我不小心弄坏了。|Điện thoại của bạn sao thế?|Bị tôi vô ý làm hỏng rồi.
+你能把这本书借给我吗？|当然可以，你拿去吧。|Bạn cho tôi mượn quyển sách này được không?|Tất nhiên rồi, bạn cầm đi.
+你把这件事告诉他了吗？|还没有，我一会儿就告诉他。|Bạn đã nói chuyện này với anh ấy chưa?|Chưa, lát nữa tôi sẽ nói.
+`;
+
+/* ===================== PARSE ===================== */
+const LEVELS = {1:[],2:[],3:[]};
+(function parse(){
+  let cur=null;
+  RAW.trim().split('\n').forEach(line=>{
+    line=line.trim(); if(!line) return;
+    if(line[0]==='#'){ const [lv,zh,vi]=line.slice(1).split('|'); cur={lv:+lv,zh,vi,items:[]}; LEVELS[+lv].push(cur); return; }
+    const [q,a,qv,av]=line.split('|');
+    cur.items.push({q,a,qv,av,id:`${cur.lv}.${LEVELS[cur.lv].length-1}.${cur.items.length}`});
+  });
+})();
+const TOTAL = Object.values(LEVELS).flat().reduce((n,t)=>n+t.items.length,0);
+
+/* ===================== 120 CHỦ ĐỀ TRÒ CHUYỆN TỰ DO ===================== */
+const CT_RAW = `
+个人生活|Cuộc sống cá nhân::自我介绍|Giới thiệu bản thân;我的家人|Gia đình tôi;我的朋友|Bạn bè của tôi;我的一天|Một ngày của tôi;我的房间|Căn phòng của tôi;我的生日|Sinh nhật;我的宠物|Thú cưng;我的性格|Tính cách;我的梦想|Ước mơ;我的家乡|Quê hương
+饮食|Ăn uống::早饭|Bữa sáng;越南菜|Món Việt;中国菜|Món Trung Quốc;在饭馆点菜|Gọi món ở nhà hàng;做饭|Nấu ăn;水果|Hoa quả;喝咖啡|Uống cà phê;奶茶|Trà sữa;街头小吃|Đồ ăn đường phố;健康饮食|Ăn uống lành mạnh
+购物|Mua sắm::买衣服|Mua quần áo;讨价还价|Mặc cả;网上购物|Mua hàng online;逛超市|Đi siêu thị;买手机|Mua điện thoại;买礼物|Mua quà;菜市场|Đi chợ;退换货|Đổi trả hàng;付钱方式|Cách thanh toán;打折活动|Khuyến mãi giảm giá
+交通|Đi lại::问路|Hỏi đường;打车|Gọi taxi;坐公共汽车|Đi xe buýt;坐地铁|Đi tàu điện;骑摩托车|Đi xe máy;坐飞机|Đi máy bay;在火车站|Ở ga tàu;堵车|Tắc đường;租车|Thuê xe;交通安全|An toàn giao thông
+旅游|Du lịch::旅游计划|Kế hoạch du lịch;订酒店|Đặt khách sạn;在机场|Ở sân bay;海边度假|Nghỉ dưỡng biển;爬山|Leo núi;参观博物馆|Tham quan bảo tàng;拍照|Chụp ảnh;买纪念品|Mua quà lưu niệm;去中国旅游|Du lịch Trung Quốc;介绍越南景点|Giới thiệu thắng cảnh Việt Nam
+学习|Học tập::学汉语|Học tiếng Trung;考试|Thi cử;上课|Lên lớp;在图书馆|Ở thư viện;做作业|Làm bài tập;留学|Du học;大学生活|Đời sống đại học;我的老师|Thầy cô của tôi;学习方法|Phương pháp học;毕业以后|Sau khi tốt nghiệp
+工作|Công việc::找工作|Tìm việc;面试|Phỏng vấn xin việc;我的工作|Công việc của tôi;同事|Đồng nghiệp;开会|Họp hành;加班|Làm thêm giờ;工资|Tiền lương;出差|Đi công tác;开公司|Mở công ty;在中国公司工作|Làm cho công ty Trung Quốc
+健康|Sức khỏe::看病|Đi khám bệnh;感冒|Bị cảm;去药店|Đi hiệu thuốc;健身|Tập gym;跑步|Chạy bộ;睡觉|Giấc ngủ;减肥|Giảm cân;压力|Áp lực;看牙医|Đi nha sĩ;保持健康|Giữ gìn sức khỏe
+休闲|Giải trí & sở thích::看电影|Xem phim;听音乐|Nghe nhạc;唱卡拉OK|Hát karaoke;踢足球|Đá bóng;打游戏|Chơi game;看书|Đọc sách;画画|Vẽ tranh;弹吉他|Chơi guitar;周末活动|Hoạt động cuối tuần;刷短视频|Xem video ngắn
+节日文化|Lễ tết & văn hóa::春节|Tết Nguyên đán;中秋节|Tết Trung thu;生日聚会|Tiệc sinh nhật;婚礼|Đám cưới;送礼物|Tặng quà;中国文化|Văn hóa Trung Quốc;越南文化|Văn hóa Việt Nam;茶文化|Văn hóa trà;圣诞节|Giáng sinh;新年愿望|Điều ước năm mới
+生活服务|Dịch vụ đời sống::租房子|Thuê nhà;搬家|Chuyển nhà;在银行|Ở ngân hàng;寄快递|Gửi chuyển phát;理发|Cắt tóc;修手机|Sửa điện thoại;打电话预约|Gọi điện đặt lịch;酒店前台|Lễ tân khách sạn;洗衣服|Giặt quần áo;叫外卖|Gọi đồ ăn về nhà
+社会话题|Chủ đề xã hội::天气和季节|Thời tiết & các mùa;环境保护|Bảo vệ môi trường;城市和农村|Thành thị & nông thôn;手机和科技|Điện thoại & công nghệ;人工智能|Trí tuệ nhân tạo;网络安全|An toàn trên mạng;交朋友|Kết bạn;爱情|Tình yêu;父母和孩子|Cha mẹ & con cái;未来的生活|Cuộc sống tương lai
+`;
+const CT=[];
+CT_RAW.trim().split('\n').forEach(line=>{ const [cat,list]=line.split('::'); const [cz,cv]=cat.split('|');
+  list.split(';').forEach(p=>{ const [zh,vi]=p.split('|'); CT.push({i:CT.length,zh,vi,cz,cv}); }); });
+
+/* ===================== HELPERS ===================== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hanOnly=s=>(s||'').replace(/[^㐀-鿿]/g,'');
+function py(s){ try{ return window.pinyinPro? pinyinPro.pinyin(s,{nonZh:'consecutive'}) : ''; }catch(e){ return ''; } }
+function pyArr(s){ try{ return window.pinyinPro? pinyinPro.pinyin(s,{toneType:'none',type:'array'}) : null; }catch(e){ return null; } }
+function toast(t,ms=2600){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),ms); }
+const store={
+  get(k,d){ try{ const v=localStorage.getItem('hnv-speak.'+k); return v==null?d:JSON.parse(v);}catch(e){return d} },
+  set(k,v){ try{ localStorage.setItem('hnv-speak.'+k,JSON.stringify(v)); }catch(e){} }
+};
+function lcsMask(A,B){ // A,B arrays; returns {len, mask over A}
+  const n=A.length,m=B.length, dp=Array.from({length:n+1},()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) dp[i][j]= A[i]===B[j]? dp[i+1][j+1]+1 : Math.max(dp[i+1][j],dp[i][j+1]);
+  const mask=new Array(n).fill(false); let i=0,j=0;
+  while(i<n&&j<m){ if(A[i]===B[j]){mask[i]=true;i++;j++;} else if(dp[i+1][j]>=dp[i][j+1]) i++; else j++; }
+  return {len:dp[0][0],mask};
+}
+function localCompare(target,said){
+  const A=[...hanOnly(target)], B=[...hanOnly(said)];
+  if(!A.length) return null;
+  const c=lcsMask(A,B); let mask=c.mask.slice(), sim=c.len/Math.max(A.length,B.length||1);
+  const pa=pyArr(A.join('')), pb=pyArr(B.join(''));
+  if(pa&&pb&&pa.length===A.length){ const p=lcsMask(pa,pb); const ps=p.len/Math.max(pa.length,pb.length||1)*0.95; mask=mask.map((v,i)=>v||p.mask[i]); sim=Math.max(sim,ps); }
+  return {score:Math.round(sim*100),mask};
+}
+function diffHtml(target,mask){
+  let k=0, out='';
+  for(const ch of target){ if(/[㐀-鿿]/.test(ch)){ out+=`<span class="${mask[k]?'ok':'no'}">${esc(ch)}</span>`; k++; } else out+=esc(ch); }
+  return out;
+}
+function scoreColor(s){ return s>=85?'var(--jade)':s>=65?'var(--gold)':'var(--red)'; }
+function scoreRing(s,label='điểm'){
+  const c=scoreColor(s);
+  return `<div class="score" style="background:conic-gradient(${c} ${s*3.6}deg, var(--line) 0)"><div style="position:absolute;inset:9px;background:var(--card);border-radius:50%;display:grid;place-items:center"><div style="color:${c}">${s}<small>${label}</small></div></div></div>`;
+}
+
+/* ===================== SETTINGS ===================== */
+const S = Object.assign({rate:0.9, voice:'', rec:'auto', autoStop:true, readBetter:true, autoPlay:true, target:3}, store.get('settings',{}));
+const saveS=()=>store.set('settings',S);
+let progress = store.get('progress',{});      // id -> best score
+let session = {n:0,sum:0,lat:[]};
+
+/* ===================== TTS ===================== */
+const TTS={
+  list:[], claude:null, speaking:false,
+  rank(v){ const n=v.name, l=v.lang||''; let s=0;
+    if(/zh[-_]CN|cmn|zh$/i.test(l)) s+=30; if(/zh[-_](TW|HK)|yue/i.test(l)) s-=15;
+    if(/Natural|Neural/i.test(n)) s+=60; if(/Online/i.test(n)) s+=10;
+    if(/Xiaoxiao|Xiaoyi|Xiaochen|Xiaohan|Xiaomo|Xiaorui|Yunxi|Yunyang|Yunjian/i.test(n)) s+=20;
+    if(/Google/i.test(n)) s+=45; if(/Tingting|Ting-Ting|Meijia|Lili|Yaoyao|Huihui|Kangkang|Yu-shu/i.test(n)) s+=12;
+    return s; },
+  load(){
+    if(!('speechSynthesis' in window)) return;
+    const vs=speechSynthesis.getVoices().filter(v=>/^(zh|cmn|yue)/i.test(v.lang)||/Chinese|普通话|中文|國語|Mandarin/i.test(v.name));
+    this.list=vs.sort((a,b)=>this.rank(b)-this.rank(a));
+    fillVoiceSelect(); renderStatus();
+  },
+  best(){ return this.list[0]||null; },
+  current(){
+    if(S.voice==='claude' && this.claude) return {type:'claude',name:'Giọng Claude (AI)'};
+    if(S.voice && S.voice!=='claude'){ const v=this.list.find(x=>x.voiceURI===S.voice); if(v) return {type:'web',v,name:v.name}; }
+    const b=this.best();
+    if(b && (this.rank(b)>=75 || !this.claude)) return {type:'web',v:b,name:b.name};
+    if(this.claude) return {type:'claude',name:'Giọng Claude (AI)'};
+    return b?{type:'web',v:b,name:b.name}:null;
+  },
+  stop(){ try{speechSynthesis.cancel()}catch(e){} try{this.claude&&this.claude.stop()}catch(e){} this.speaking=false; },
+  speak(text,rate){
+    rate = rate||S.rate; this.stop();
+    const cur=this.current();
+    if(!cur){ toast('Máy chưa có giọng tiếng Trung. Hãy dùng Chrome/Edge hoặc cài gói giọng zh-CN.'); return Promise.resolve(); }
+    this.speaking=true;
+    if(cur.type==='claude'){
+      return this.claude.speak(text,{language:'zh-CN',rate:Math.max(0.7,Math.min(1.5,rate))})
+        .catch(e=>{ if(e&&e.code==='busy') return; const b=this.best(); if(b){ return this._web(text,rate,b);} })
+        .finally(()=>{this.speaking=false});
+    }
+    return this._web(text,rate,cur.v).finally(()=>{this.speaking=false});
+  },
+  _web(text,rate,v){ return new Promise(res=>{
+    const u=new SpeechSynthesisUtterance(text); u.lang=(v&&v.lang)||'zh-CN'; if(v) u.voice=v; u.rate=rate; u.pitch=1;
+    u.onend=res; u.onerror=res; speechSynthesis.speak(u);
+    setTimeout(res, 1500+text.length*450/rate);
+  });}
+};
+if('speechSynthesis' in window){ TTS.load(); speechSynthesis.onvoiceschanged=()=>TTS.load(); setTimeout(()=>TTS.load(),800); }
+
+/* ===================== NHẬN DẠNG GIỌNG NÓI ===================== */
+const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+let dict=null, sample=null;
+const Rec={
+  active:false, engine:null, buf:'', partial:'', cb:null, silence:null, t0:0, firstAt:0, nativeObj:null,
+  available(){ return !!(this.pick()); },
+  pick(){ if(S.rec==='dict') return dict?'dict':(SR?'native':null);
+          if(S.rec==='native') return SR?'native':(dict?'dict':null);
+          return dict?'dict':(SR?'native':null); },
+  start(cb){
+    if(this.active) return;
+    const eng=this.pick();
+    if(!eng){ toast('Trình duyệt này không hỗ trợ nhận dạng giọng nói — hãy gõ câu trả lời bên dưới.'); return; }
+    this.cb=cb; this.buf=''; this.partial=''; this.active=true; this.engine=eng; this.t0=performance.now(); this.firstAt=0; this.err=null;
+    TTS.stop();
+    if(eng==='dict'){
+      dict.start().catch(e=>this.fail(e&&e.code||e&&e.message||'error'));
+    } else {
+      try{
+        const r=new SR(); r.lang='zh-CN'; r.interimResults=true; r.continuous=true; r.maxAlternatives=1;
+        r.onresult=ev=>{ let f='',p=''; for(let i=0;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) f+=t; else p+=t; } this.buf=f; this.partial=p; this.heard(); };
+        r.onerror=e=>{ this.err=e.error; };
+        r.onend=()=>{ if(this.err && this.err!=='no-speech' && this.err!=='aborted' && !this.buf){ this.fail(this.err); } else this.end(); };
+        this.nativeObj=r; r.start();
+      }catch(e){ this.fail('error'); }
+    }
+    UI.mic(true);
+  },
+  stop(){
+    if(!this.active) return;
+    clearTimeout(this.silence);
+    if(this.engine==='dict'){ dict.stop().then(()=>this.end()).catch(()=>this.end()); }
+    else { try{this.nativeObj.stop()}catch(e){ this.end(); } }
+  },
+  toggle(cb){ this.active? this.stop() : this.start(cb); },
+  heard(){
+    if(!this.firstAt) this.firstAt=performance.now();
+    UI.live(this.buf,this.partial);
+    clearTimeout(this.silence);
+    if(S.autoStop) this.silence=setTimeout(()=>this.stop(),1800);
+  },
+  onDictPartial(t){ if(!this.active) return; this.partial=t; this.heard(); },
+  onDictFinal(t){ if(!this.active) return; this.buf+=(this.buf?' ':'')+t; this.partial=''; this.heard(); },
+  onDictState(st){ if(st==='idle' && this.active) this.end(); },
+  end(){
+    if(!this.active) return; this.active=false; clearTimeout(this.silence); UI.mic(false);
+    const text=(this.buf+' '+this.partial).trim();
+    const cb=this.cb; this.cb=null; cb&&cb(text,this.firstAt?this.firstAt:null);
+  },
+  fail(code){
+    this.active=false; clearTimeout(this.silence); UI.mic(false);
+    const m={'not-allowed':'Micro bị chặn trong khung này. Hãy chọn “Claude dictation” trong Cài đặt, hoặc gõ câu trả lời.',
+             'not_granted':'Bạn đã từ chối quyền micro. Có thể gõ câu trả lời bên dưới.',
+             'service-not-allowed':'Trình duyệt không cho dùng dịch vụ nhận dạng. Hãy gõ câu trả lời.',
+             'network':'Lỗi mạng khi nhận dạng giọng nói.','audio-capture':'Không tìm thấy micro.'};
+    toast(m[code]||('Không bật được micro ('+code+'). Bạn vẫn có thể gõ câu trả lời.'),4200);
+    UI.status('');
+  }
+};
+
+/* ===================== AI ===================== */
+let inClaude=false;
+function makeApiSample(key){
+  return async function(prompt){
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-5-5',max_tokens:1500,messages:[{role:'user',content:prompt}]})});
+    if(!r.ok) throw {code:r.status===429?'rate_limited':'api_error',message:await r.text()};
+    const j=await r.json(); return {text:(j.content||[]).map(c=>c.text||'').join('')};
+  };
+}
+function useApiKey(){ if(inClaude) return; sample = S.apiKey? makeApiSample(S.apiKey) : null; }
+async function askAI(prompt){
+  if(!sample) throw {code:'no_ai'};
+  if(typeof sample.json==='function'){ return await sample.json(prompt,{modelTier:'quick',cache:false}); }
+  const r=await sample(prompt,{modelTier:'quick',cache:false});
+  const m=(r.text||'').match(/\{[\s\S]*\}/); return JSON.parse(m?m[0]:r.text);
+}
+function promptReflex(it,lv,said){ return `You are a warm, precise Mandarin speaking coach for a Vietnamese learner at HSK ${lv} level.
+The coach asked (Chinese): "${it.q}"  (Vietnamese meaning: ${it.qv})
+One model answer: "${it.a}"
+Below is the RAW speech-recognition transcript of the learner's spoken answer. It may contain recognition errors: wrong homophone characters, missing characters, pinyin, Latin letters, digits, or Vietnamese words. Reconstruct the Chinese sentence the learner most likely intended to say, preferring characters that sound the same/similar and fit the context.
+Transcript: "${said}"
+Then judge: is it an appropriate, grammatical answer to the question? ANY sensible answer is fine — it does not need to match the model answer.
+Score 0–100 for relevance + grammar + completeness (honest but encouraging; a correct short answer can get 90+).
+Return ONLY JSON:
+{"heard":"Chinese the learner most likely said (simplified), or empty if nothing usable","heard_pinyin":"pinyin with tone marks","heard_vi":"Vietnamese meaning","ok":true,"score":0,"feedback_vi":"1–2 short Vietnamese sentences: what was good and exactly what to fix (grammar, word choice, measure word, tones that seem misheard)","better":"a natural, correct answer in Chinese that keeps the learner's intended meaning (HSK 1–${lv} vocabulary)","better_pinyin":"","better_vi":""}`; }
+function promptShadow(target,vi,said){ return `You are a Mandarin pronunciation coach for a Vietnamese learner.
+Target sentence the learner tried to repeat: "${target}" (${vi})
+RAW speech-recognition transcript of what they said (may contain homophones, pinyin or noise): "${said}"
+Infer what the learner actually pronounced. Compare syllable by syllable with the target. Mismatched characters in the transcript usually mean wrong initials/finals/tones.
+Return ONLY JSON:
+{"heard":"what the learner most likely said, in Chinese characters","heard_pinyin":"pinyin with tone marks of what was heard","score":0,"feedback_vi":"1–2 short Vietnamese sentences of feedback","issues":[{"expected":"character or word from target","got":"what was heard instead","tip_vi":"short Vietnamese tip: which tone/initial/final to fix and how"}]}
+Max 4 issues; empty array if the sentence was correct. Score 0–100 for pronunciation accuracy.`; }
+function promptChat(topic,lv,hist,said){
+  const h=hist.map(m=>(m.role==='ai'?'小雨: ':'学生: ')+m.zh).join('\n');
+  return `You are 小雨, a friendly young native Mandarin speaker chatting with a Vietnamese learner to train fast speaking reflexes, HSK ${lv} level. Topic: ${topic.zh} (${topic.vi}).
+Rules for your reply: Simplified Chinese only, mostly HSK 1–${lv} vocabulary, 1–2 short sentences (max ~25 characters), natural spoken style, react to what the learner said, then ALWAYS ask one easy follow-up question so the learner keeps talking. Stay near the topic.
+Conversation so far:
+${h}
+The learner's newest turn is a RAW speech-recognition transcript (may contain homophone errors, pinyin, digits or Vietnamese words): "${said}"
+First reconstruct what Chinese the learner most likely meant. If it has a real mistake, explain briefly in Vietnamese and give the corrected sentence.
+Return ONLY JSON:
+{"heard":"learner's intended sentence in Chinese","heard_pinyin":"","correction_vi":"empty string if correct, else short Vietnamese explanation + corrected Chinese","reply":"your reply in Chinese","reply_pinyin":"pinyin with tone marks","reply_vi":"Vietnamese translation"}`;
+}
+
+/* ===================== APP STATE ===================== */
+let A = Object.assign({lv:1, ti:0, mode:'reflex', idx:0, blind:false, hint:false, ct:0, custom:'', q:''}, store.get('pos',{}));
+A.hint=false; A.q='';
+let chat={key:'',hist:[],busy:false};
+let GEN={key:'',zh:'',vi:'',lv:1,items:[],busy:false,err:''};
+let promptEndAt=performance.now();
+const savePos=()=>store.set('pos',{lv:A.lv,ti:A.ti,mode:A.mode,idx:A.idx,blind:A.blind,ct:A.ct,custom:A.custom});
+const freeMode=()=>A.mode==='chat'||A.mode==='gen';
+function ctopic(){ return A.custom? {zh:A.custom,vi:A.custom,custom:true} : (CT[A.ct]||CT[0]); }
+function topic(){ if(A.mode==='gen') return GEN; return LEVELS[A.lv][A.ti]||LEVELS[A.lv][0]; }
+function lines(){ // danh sách câu luyện cho chế độ hiện tại
+  const t=topic();
+  if(A.mode==='shadow') return t.items.flatMap(it=>[{id:it.id+'q',zh:it.q,vi:it.qv},{id:it.id+'a',zh:it.a,vi:it.av}]);
+  return t.items.map(it=>({id:it.id,zh:it.q,vi:it.qv,it}));
+}
+
+/* ===================== UI ===================== */
+const MIC_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const UI={
+  mic(on){ document.querySelectorAll('.mic').forEach(b=>b.classList.toggle('listening',on)); this.status(on?'Đang nghe… nói bằng tiếng Trung (bấm lần nữa để dừng)':''); if(on) this.live('',''); },
+  live(f,p){ const el=$('#live'); if(el) el.innerHTML=`${esc(f)}<span class="p">${esc(p)}</span>`; },
+  status(t){ const el=$('#mstat'); if(el) el.textContent=t; }
+};
+function renderLevels(){
+  $('#levels').innerHTML=[1,2,3].map(l=>`<button class="lv ${A.lv===l?'on':''}" data-l="${l}">HSK ${l}</button>`).join('');
+}
+function topicDone(t){ return t.items.filter(it=>progress[it.id]!=null).length; }
+function renderTopics(){
+  if(freeMode()) return renderCT();
+  $('#sideTitle').textContent=`HSK ${A.lv} · ${LEVELS[A.lv].length} chủ đề · ${LEVELS[A.lv].reduce((n,t)=>n+t.items.length,0)} câu`;
+  $('#topics').innerHTML=LEVELS[A.lv].map((t,i)=>{ const d=topicDone(t);
+    return `<button class="topic ${i===A.ti?'on':''}" data-t="${i}"><span class="zh">${t.zh}</span><span style="flex:1;min-width:0"><span class="vi">${esc(t.vi)}</span><div class="bar"><i style="width:${d/t.items.length*100}%"></i></div></span><span class="pg">${d}/${t.items.length}</span></button>`; }).join('');
+}
+function renderStatus(){
+  const v=TTS.current(), eng=Rec.pick();
+  const recName= eng==='dict'?'Claude dictation': eng==='native'?'Chrome zh-CN':'không có (gõ phím)';
+  $('#status').innerHTML=
+    `<span class="chip ${eng?'ok':'bad'}">🎤 Nhận dạng: <b>${recName}</b></span>`+
+    `<span class="chip ${v?'ok':'bad'}">🔊 Giọng: <b>${esc(v?v.name:'chưa có giọng zh')}</b></span>`+
+    `<span class="chip ${sample?'ok':'bad'}">🤖 AI chấm & hội thoại: <b>${sample?'sẵn sàng':(inClaude?'đang kết nối…':'cần API key (⚙︎ Cài đặt)')}</b></span>`+
+    `<span class="chip">📚 Tổng: <b>${TOTAL} câu</b> · ${Object.keys(progress).length} đã luyện</span>`;
+}
+function renderStats(){
+  const avg=session.n?Math.round(session.sum/session.n):'–';
+  const lat=session.lat.length?(session.lat.reduce((a,b)=>a+b,0)/session.lat.length).toFixed(1)+'s':'–';
+  $('#stats').innerHTML=`<div class="stat"><b>${session.n}</b><span>Lượt nói phiên này</span></div><div class="stat"><b style="color:${session.n?scoreColor(avg):'inherit'}">${avg}</b><span>Điểm trung bình</span></div><div class="stat"><b>${lat}</b><span>Thời gian phản xạ TB</span></div><div class="stat"><b>${Object.keys(progress).length}/${TOTAL}</b><span>Câu đã luyện (tất cả cấp)</span></div>`;
+}
+function renderCT(){
+  $('#sideTitle').textContent=`${CT.length} chủ đề trò chuyện`;
+  const box=$('#topics');
+  if(!$('#ctSearch')){
+    box.innerHTML=`<div style="padding:0 6px 8px;display:flex;flex-direction:column;gap:6px;min-width:220px">
+      <input id="ctSearch" class="ctin" placeholder="🔎 Tìm chủ đề (Việt / 中文)…" autocomplete="off">
+      <form id="customForm" style="display:flex;gap:6px"><input id="customIn" class="ctin" placeholder="✍️ Tự nhập chủ đề bất kỳ…" autocomplete="off"><button class="iconbtn" style="padding:6px 10px">OK</button></form>
+      <button class="tbtn" id="ctRandom">🎲 Chủ đề ngẫu nhiên</button></div><div id="ctList"></div>`;
+    $('#ctSearch').oninput=e=>{ A.q=e.target.value; drawCTList(); };
+    $('#customForm').onsubmit=e=>{ e.preventDefault(); const v=$('#customIn').value.trim(); if(!v) return; A.custom=v; A.idx=0; savePos(); render(); afterTopicPick(); };
+    $('#ctRandom').onclick=()=>{ A.custom=''; A.ct=Math.floor(Math.random()*CT.length); A.idx=0; savePos(); render(); afterTopicPick(); };
+  }
+  drawCTList();
+}
+function drawCTList(){
+  const q=(A.q||'').toLowerCase().trim(); let lastCat='', html='';
+  if(A.custom) html+=`<button class="topic on"><span class="zh">✍️</span><span class="vi" style="flex:1">${esc(A.custom)}</span></button>`;
+  CT.filter(t=>!q||(t.zh+t.vi+t.cv+t.cz).toLowerCase().includes(q)).forEach(t=>{
+    if(t.cz!==lastCat){ lastCat=t.cz; html+=`<div class="cat">${t.cz} · ${esc(t.cv)}</div>`; }
+    html+=`<button class="topic ${!A.custom&&t.i===A.ct?'on':''}" data-c="${t.i}"><span class="zh" style="font-size:15px;min-width:86px">${t.zh}</span><span class="vi" style="flex:1">${esc(t.vi)}</span></button>`;
+  });
+  $('#ctList').innerHTML=html||'<p class="vi" style="padding:8px">Không thấy — hãy tự nhập chủ đề ở ô phía trên.</p>';
+}
+function afterTopicPick(){
+  if(A.mode==='chat'){ /* renderChat tự mở đầu */ }
+  else if(A.mode==='gen') genItems(false);
+}
+function render(){
+  renderLevels(); renderTopics(); renderStatus(); renderStats();
+  document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('on',b.dataset.m===A.mode));
+  if(A.mode==='chat') return renderChat();
+  if(A.mode==='gen'){ const t=ctopic(); if(GEN.key!==genKey()||!GEN.items.length) return renderGenStart(); }
+  renderDrill();
+}
+
+/* ---------- AI tự soạn câu ---------- */
+function genKey(){ const t=ctopic(); return A.lv+'|'+t.zh; }
+function renderGenStart(){
+  const t=ctopic();
+  $('#stage').innerHTML=`<div class="meta"><span class="who">✨ AI tự soạn câu luyện phản xạ</span><span>HSK ${A.lv} · ${esc(t.zh)}${t.custom?'':' · '+esc(t.vi)}</span></div>
+   <div style="text-align:center;padding:30px 10px">
+     <div class="pzh" style="font-size:34px">${esc(t.zh)}</div><div class="pvi" style="margin:6px 0 20px">${t.custom?'Chủ đề bạn tự nhập':esc(t.vi)}</div>
+     ${GEN.busy?`<div class="thinking" style="justify-content:center"><div class="spin"></div>AI đang soạn 8 cặp hỏi – đáp mới theo trình độ HSK ${A.lv}…</div>`
+       : `<button class="nbtn pri" id="bGen">✨ Soạn 8 câu mới cho chủ đề này</button>
+          <p class="vi" style="margin-top:12px">Chọn chủ đề ở cột trái (120 chủ đề) hoặc tự nhập. Mỗi lần bấm AI soạn bộ câu khác nhau, đúng trình độ HSK đang chọn.</p>`}
+     ${GEN.err?`<p style="color:var(--red)">${esc(GEN.err)}</p>`:''}
+     ${sample?'':'<p class="vi">AI cần quyền “Hỏi Claude” — hãy cho phép khi trang hỏi.</p>'}
+   </div>`;
+  const b=$('#bGen'); if(b) b.onclick=()=>genItems(false);
+}
+async function genItems(more){
+  if(GEN.busy) return;
+  const t=ctopic(), key=genKey();
+  if(!sample){ GEN.err='AI chưa sẵn sàng.'; return render(); }
+  if(GEN.key!==key){ GEN={key,zh:t.zh,vi:t.vi,lv:A.lv,items:[],busy:false,err:''}; }
+  GEN.busy=true; GEN.err=''; if(!more) { GEN.items=[]; A.idx=0; } render();
+  const avoid=GEN.items.map(x=>x.q).join(' / ');
+  const prompt=`You write speaking-reflex drills for Vietnamese learners of Mandarin.
+Level: HSK ${A.lv} (use mostly HSK 1–${A.lv} vocabulary and grammar${A.lv===3?'; include patterns like 把, 被, 虽然…但是, 如果…就, 越来越 where natural':''}${A.lv===2?'; include patterns like 比, 过, 着, 正在, 得 complements where natural':''}).
+Topic: ${t.zh}${t.custom?'':' ('+t.vi+')'}.
+Write 8 NEW, varied, natural spoken questions a Chinese friend would ask about this topic, each with a short natural model answer (first person, realistic for a Vietnamese person). Questions ≤ 18 characters, answers ≤ 22 characters. Mix question types (吗, 什么, 怎么, 为什么, 几/多少, 还是, A不A).${avoid?' Do not repeat these: '+avoid:''}
+Return ONLY JSON: {"items":[{"q":"Chinese question","a":"Chinese answer","qv":"Vietnamese translation of q","av":"Vietnamese translation of a"}]}`;
+  try{
+    const r=await (typeof sample.json==='function'? sample.json(prompt,{cache:false}) : askAI(prompt));
+    const items=(r&&r.items||[]).filter(x=>x&&x.q&&x.a).map((x,i)=>({q:x.q,a:x.a,qv:x.qv||'',av:x.av||'',id:'g.'+Date.now()+'.'+i}));
+    if(!items.length) throw {message:'empty'};
+    const start=GEN.items.length; GEN.items=GEN.items.concat(items); if(more) A.idx=start;
+  }catch(e){ GEN.err= e&&e.code==='rate_limited'?'AI đang bận, thử lại sau vài giây.':'AI chưa soạn được, bấm thử lại nhé.'; }
+  GEN.busy=false; render();
+  if(GEN.items.length && S.autoPlay) playPrompt();
+}
+function renderDrill(){
+  const L=lines(); if(A.idx>=L.length) A.idx=0;
+  const cur=L[A.idx], t=topic(), isReflex=A.mode!=='shadow';
+  const dots=L.map((l,i)=>{ const s=progress[l.id] ?? (l.it&&l.it._s); return `<span class="dot ${i===A.idx?'cur':s==null?'':s>=85?'g':s>=65?'y':'r'}"></span>`; }).join('');
+  $('#stage').innerHTML=`
+    <div class="meta"><span class="who">${isReflex?'⚡ AI hỏi – bạn trả lời ngay':'🔁 Nghe rồi nói lại thật giống'}</span><span>${t.zh} · ${esc(t.vi)} · câu ${A.idx+1}/${L.length}</span></div>
+    <div class="prompt ${A.blind?'blur':''}" id="prompt">
+      <div class="pzh">${esc(cur.zh)}</div><div class="ppy">${esc(py(cur.zh))}</div><div class="pvi">${esc(cur.vi)}</div>
+    </div>
+    <div class="tools">
+      <button class="tbtn" id="bPlay">▶ Nghe</button>
+      <button class="tbtn" id="bSlow">🐢 Đọc chậm</button>
+      <button class="tbtn ${A.blind?'on':''}" id="bBlind">${A.blind?'🙈 Đang chỉ nghe':'👁 Chỉ nghe (ẩn chữ)'}</button>
+      ${isReflex?'<button class="tbtn" id="bHint">💡 Gợi ý đáp án</button>':''}
+      ${A.mode==='gen'?`<button class="tbtn" id="bMore">${GEN.busy?'⏳ Đang soạn…':'✨ Soạn thêm 8 câu'}</button><button class="tbtn" id="bNew">🔄 Bộ câu mới</button>`:''}
+    </div>
+    ${isReflex?`<div class="hint" id="hint"><div class="lab">Một câu trả lời mẫu</div><div class="hz">${esc(cur.it.a)}</div><div class="hp">${esc(py(cur.it.a))}</div><div class="hv">${esc(cur.it.av)}</div><button class="tbtn" style="margin-top:8px" id="bHintPlay">▶ Nghe câu mẫu</button></div>`:''}
+    <div class="microw"><button class="mic" id="mic" title="Bấm để nói (Space)">${MIC_SVG}</button><div class="mstat" id="mstat"></div><div class="live" id="live"></div></div>
+    <form class="typerow" id="typeForm"><input id="typeIn" placeholder="Không dùng được micro? Gõ chữ Hán / pinyin ở đây…" autocomplete="off"><button>Chấm</button></form>
+    <div class="result" id="result"></div>
+    <div class="nav"><button class="nbtn" id="bPrev">← Trước</button><div class="dots">${dots}</div><button class="nbtn pri" id="bNext">Tiếp →</button></div>`;
+  $('#bPlay').onclick=()=>playPrompt();
+  $('#bSlow').onclick=()=>playPrompt(0.65);
+  $('#bBlind').onclick=()=>{ A.blind=!A.blind; savePos(); $('#prompt').classList.toggle('blur',A.blind); $('#bBlind').classList.toggle('on',A.blind); $('#bBlind').textContent=A.blind?'🙈 Đang chỉ nghe':'👁 Chỉ nghe (ẩn chữ)'; };
+  if(isReflex){ $('#bHint').onclick=toggleHint; $('#bHintPlay').onclick=()=>TTS.speak(cur.it.a); }
+  if(A.mode==='gen'){ $('#bMore').onclick=()=>genItems(true); $('#bNew').onclick=()=>genItems(false); }
+  $('#mic').onclick=()=>Rec.toggle(onSpoken);
+  $('#typeForm').onsubmit=e=>{ e.preventDefault(); const v=$('#typeIn').value.trim(); if(v){ $('#typeIn').value=''; onSpoken(v,null);} };
+  $('#bPrev').onclick=()=>go(-1); $('#bNext').onclick=()=>go(1);
+  promptEndAt=performance.now();
+}
+function toggleHint(){ const h=$('#hint'); if(h) h.classList.toggle('show'); }
+function playPrompt(rate){
+  const cur=lines()[A.idx]; if(!cur) return;
+  UI.status('🔊 Đang đọc…');
+  TTS.speak(cur.zh,rate).then(()=>{ promptEndAt=performance.now(); if(!Rec.active) UI.status('Đến lượt bạn! Bấm micro hoặc phím Space'); });
+}
+function go(d){
+  const L=lines(); if(!L.length) return; A.idx=(A.idx+d+L.length)%L.length; savePos(); renderDrill();
+  if(S.autoPlay) playPrompt();
+}
+
+/* ---------- chấm điểm ---------- */
+async function onSpoken(text,firstAt){
+  if(!text){ UI.status('Chưa nghe thấy gì — thử nói to và rõ hơn nhé.'); return; }
+  if(A.mode==='chat') return chatTurn(text);
+  const cur=lines()[A.idx], lv=A.lv, isReflex=A.mode!=='shadow';
+  const lat = firstAt? Math.max(0,(firstAt-promptEndAt)/1000) : null;
+  UI.live(text,''); UI.status('');
+  const r=$('#result'); r.classList.add('show');
+  const target = isReflex? cur.it.a : cur.zh;
+  const loc = localCompare(target,text);
+  r.innerHTML=`<div class="thinking"><div class="spin"></div>AI đang nhận dạng chữ bạn nói và chấm điểm…</div>`;
+  let ai=null;
+  if(sample){ try{ ai = await askAI(isReflex? promptReflex(cur.it,lv,text) : promptShadow(cur.zh,cur.vi,text)); }catch(e){ if(e&&e.code==='rate_limited') toast('AI đang quá tải, đợi vài giây rồi thử lại.'); ai=null; } }
+  let score = ai&&typeof ai.score==='number'? Math.round(ai.score) : (loc?loc.score:0);
+  if(!isReflex && loc && ai && ai.heard){ const l2=localCompare(cur.zh,ai.heard); if(l2) score=Math.round((score+l2.score)/2); }
+  const heard = (ai&&ai.heard)||text;
+  const mask = localCompare(target, heard);
+  if(!String(cur.id).startsWith('g.')){ progress[cur.id]=Math.max(progress[cur.id]||0,score); store.set('progress',progress); }
+  else cur.it._s=score;
+  session.n++; session.sum+=score; if(lat!=null&&lat<30) session.lat.push(lat);
+  const latHtml = lat!=null? `<span class="tag ${lat<=S.target?'g':lat<=S.target*2?'y':'r'}">⚡ Phản xạ ${lat.toFixed(1)}s</span>`:'';
+  let body='';
+  if(isReflex){
+    const okTag = ai? (ai.ok?'<span class="tag g">✓ Trả lời phù hợp</span>':'<span class="tag r">✗ Chưa đúng ý câu hỏi</span>') : '<span class="tag y">So với câu mẫu (AI chưa sẵn sàng)</span>';
+    body=`<div class="row">${okTag}${latHtml}</div>
+      <div class="row"><div class="lab">AI nghe được bạn nói</div><div class="zhline">${esc(heard)}</div><div class="py">${esc((ai&&ai.heard_pinyin)||py(heard))}</div>${ai&&ai.heard_vi?`<div class="vi">${esc(ai.heard_vi)}</div>`:''}${ai&&ai.heard&&hanOnly(ai.heard)!==hanOnly(text)?`<div class="vi" style="font-size:12px">Máy ghi thô: “${esc(text)}”</div>`:''}</div>
+      ${ai&&ai.feedback_vi?`<div class="row fb">${esc(ai.feedback_vi)}</div>`:''}
+      <div class="row"><div class="lab">${ai&&ai.better?'Câu nên nói':'Câu mẫu'}</div><div class="zhline">${esc((ai&&ai.better)||cur.it.a)}</div><div class="py">${esc((ai&&ai.better_pinyin)||py((ai&&ai.better)||cur.it.a))}</div><div class="vi">${esc((ai&&ai.better_vi)||cur.it.av)}</div>
+      <button class="tbtn" style="margin-top:6px" id="bBetter">▶ Nghe câu này</button></div>`;
+  } else {
+    const iss = ai&&Array.isArray(ai.issues)&&ai.issues.length? `<div class="row"><div class="lab">Chỗ cần sửa</div><div class="issues">${ai.issues.map(x=>`<div class="iss"><b>${esc(x.expected)}</b> ← nghe thành <b>${esc(x.got)}</b><div class="vi">${esc(x.tip_vi||'')}</div></div>`).join('')}</div></div>`:'';
+    body=`<div class="row">${latHtml}</div>
+      <div class="row"><div class="lab">Câu gốc (xanh = đúng, đỏ = sai/thiếu)</div><div class="zhline">${mask?diffHtml(cur.zh,mask.mask):esc(cur.zh)}</div><div class="py">${esc(py(cur.zh))}</div></div>
+      <div class="row"><div class="lab">AI nghe được bạn nói</div><div class="zhline">${esc(heard)}</div><div class="py">${esc((ai&&ai.heard_pinyin)||py(heard))}</div></div>
+      ${ai&&ai.feedback_vi?`<div class="row fb">${esc(ai.feedback_vi)}</div>`:''}${iss}
+      <button class="tbtn" id="bBetter">▶ Nghe lại câu gốc</button>`;
+  }
+  r.innerHTML=`<div class="rgrid">${scoreRing(score)}<div>${body}</div></div>`;
+  const betterText = isReflex? ((ai&&ai.better)||cur.it.a) : cur.zh;
+  $('#bBetter').onclick=()=>TTS.speak(betterText);
+  renderTopics(); renderStatus(); renderStats();
+  const dots=document.querySelectorAll('.dot'); if(dots[A.idx]) dots[A.idx].className='dot cur';
+  if(S.readBetter) TTS.speak(betterText);
+}
+
+/* ---------- hội thoại tự do ---------- */
+function chatKey(){ return A.lv+'|'+ctopic().zh; }
+async function chatOpen(){
+  const t=ctopic(), key=chat.key;
+  const fallback={role:'ai',zh:`你好！我是小雨。今天我们聊聊“${t.zh}”吧，好吗？`,vi:`Chào bạn! Mình là Tiểu Vũ. Hôm nay mình nói chuyện về “${t.vi}” nhé?`};
+  if(!sample){ chat.hist=[fallback]; drawChat(); return; }
+  chat.busy=true; drawChat();
+  try{
+    const r=await askAI(`You are 小雨, a friendly young native Mandarin speaker starting a speaking-practice chat with a Vietnamese learner (HSK ${A.lv}). Topic: ${t.zh}${t.custom?'':' ('+t.vi+')'}.
+Write your opening turn: a short greeting that names the topic + ONE easy, concrete question about it. Simplified Chinese, HSK 1–${A.lv} vocabulary, max ~25 characters.
+Return ONLY JSON: {"reply":"","reply_pinyin":"","reply_vi":"Vietnamese translation"}`);
+    if(chat.key!==key) return;
+    chat.hist=[{role:'ai',zh:r.reply||fallback.zh,py:r.reply_pinyin,vi:r.reply_vi||''}];
+  }catch(e){ if(chat.key!==key) return; chat.hist=[fallback]; }
+  chat.busy=false; drawChat();
+  TTS.speak(chat.hist[0].zh).then(()=>{ promptEndAt=performance.now(); });
+}
+function renderChat(){
+  const t=ctopic(); let opening=false;
+  if(chat.key!==chatKey()){ chat={key:chatKey(),hist:[],busy:false}; opening=true; }
+  $('#stage').innerHTML=`
+    <div class="meta"><span class="who">💬 Trò chuyện tự do với AI 小雨</span><span>HSK ${A.lv} · ${esc(t.zh)}${t.custom?'':' · '+esc(t.vi)}</span></div>
+    <div class="chat" id="chat"></div>
+    <div class="mstat" id="mstat" style="margin-top:8px"></div><div class="live" id="live"></div>
+    <div class="chatbar"><button class="tbtn" id="bReplay">▶ Nghe lại câu AI</button><button class="mic" id="mic" title="Bấm để nói (Space)">${MIC_SVG}</button><button class="tbtn" id="bReset">↺ Bắt đầu lại</button></div>
+    <form class="typerow" id="typeForm"><input id="typeIn" placeholder="Hoặc gõ câu trả lời (chữ Hán / pinyin)…" autocomplete="off"><button>Gửi</button></form>
+    ${sample?'':'<p class="vi" style="text-align:center">AI hội thoại cần quyền “Hỏi Claude” — hãy mở trang trên claude.ai và cho phép khi được hỏi.</p>'}`;
+  drawChat(); if(opening) chatOpen();
+  $('#mic').onclick=()=>Rec.toggle(onSpoken);
+  $('#bReplay').onclick=()=>{ const last=[...chat.hist].reverse().find(m=>m.role==='ai'); if(last) TTS.speak(last.zh).then(()=>promptEndAt=performance.now()); };
+  $('#bReset').onclick=()=>{ chat.key=''; renderChat(); };
+  $('#typeForm').onsubmit=e=>{ e.preventDefault(); const v=$('#typeIn').value.trim(); if(v){ $('#typeIn').value=''; chatTurn(v);} };
+}
+function drawChat(){
+  const box=$('#chat'); if(!box) return;
+  box.innerHTML=chat.hist.map((m,i)=>`<div class="msg ${m.role==='ai'?'ai':'me'}"><div class="z">${esc(m.zh)}</div><div class="p">${esc(m.py||py(m.zh))}</div>${m.vi?`<div class="v">${esc(m.vi)}</div>`:''}${m.raw&&hanOnly(m.raw)!==hanOnly(m.zh)?`<div class="v" style="font-size:11px">Máy ghi thô: “${esc(m.raw)}”</div>`:''}${m.fix?`<div class="c">✏️ ${esc(m.fix)}</div>`:''}${m.role==='ai'?`<button class="play" data-i="${i}">▶ nghe</button>`:''}</div>`).join('')
+    + (chat.busy?'<div class="msg ai"><div class="thinking"><div class="spin"></div>小雨 đang nghe và trả lời…</div></div>':'');
+  box.querySelectorAll('.play').forEach(b=>b.onclick=()=>TTS.speak(chat.hist[+b.dataset.i].zh));
+  box.scrollTop=box.scrollHeight;
+}
+async function chatTurn(text){
+  if(chat.busy) return;
+  UI.live('',''); UI.status('');
+  const me={role:'me',zh:text,raw:text}; chat.hist.push(me); chat.busy=true; drawChat();
+  if(!sample){ chat.busy=false; me.fix='AI chưa sẵn sàng nên chưa thể trả lời.'; drawChat(); return; }
+  try{
+    const r=await askAI(promptChat(ctopic(),A.lv,chat.hist.slice(0,-1).slice(-12),text));
+    if(r.heard) me.zh=r.heard; if(r.heard_pinyin) me.py=r.heard_pinyin; if(r.correction_vi) me.fix=r.correction_vi;
+    chat.hist.push({role:'ai',zh:r.reply||'嗯，再说一遍好吗？',py:r.reply_pinyin,vi:r.reply_vi});
+    session.n++; session.sum+= r.correction_vi?70:95; renderStats();
+    chat.busy=false; drawChat();
+    TTS.speak(r.reply).then(()=>{ promptEndAt=performance.now(); if(!Rec.active) UI.status('Đến lượt bạn — bấm micro hoặc Space'); });
+  }catch(e){ chat.busy=false; me.fix= e&&e.code==='rate_limited'?'AI đang bận, thử lại sau vài giây.':'Không kết nối được AI, thử lại nhé.'; drawChat(); }
+}
+
+/* ===================== SETTINGS UI ===================== */
+function fillVoiceSelect(){
+  const sel=$('#selVoice'); if(!sel) return;
+  const b=TTS.best();
+  sel.innerHTML=`<option value="">★ Tự chọn giọng tốt nhất${b?' ('+esc(b.name)+')':''}</option>`+
+    (TTS.claude?'<option value="claude">Giọng Claude (AI)</option>':'')+
+    TTS.list.map(v=>`<option value="${esc(v.voiceURI)}">${esc(v.name)} — ${esc(v.lang)}${/Natural|Neural|Google/i.test(v.name)?' ★':''}</option>`).join('');
+  sel.value=S.voice||'';
+  $('#voiceHint').textContent = TTS.list.length? `Tìm thấy ${TTS.list.length} giọng tiếng Trung trên máy. Giọng có ★ là giọng tự nhiên nhất. Mẹo: mở bằng Microsoft Edge để có giọng 晓晓 Xiaoxiao Neural — giọng chuẩn và mượt nhất.` : 'Chưa tìm thấy giọng tiếng Trung trên trình duyệt này. Hãy dùng Chrome hoặc Edge (có sẵn giọng Google 普通话 / Microsoft Xiaoxiao), hoặc chọn Giọng Claude.';
+}
+function openSet(){ fillVoiceSelect(); $('#rate').value=S.rate; $('#rateV').textContent=S.rate+'×'; $('#selRec').value=S.rec; $('#optAutoStop').checked=S.autoStop; $('#optReadBetter').checked=S.readBetter; $('#optAutoPlay').checked=S.autoPlay; $('#tgt').value=S.target; $('#apiKey').value=S.apiKey||''; $('#keyFld').style.display=inClaude?'none':''; $('#tgtV').textContent=S.target; $('#ov').classList.add('show'); }
+$('#btnSet').onclick=openSet;
+$('#closeSet').onclick=()=>{ $('#ov').classList.remove('show'); renderStatus(); };
+$('#ov').onclick=e=>{ if(e.target.id==='ov'){ $('#ov').classList.remove('show'); renderStatus(); } };
+$('#selVoice').onchange=e=>{ S.voice=e.target.value; saveS(); renderStatus(); };
+$('#rate').oninput=e=>{ S.rate=+e.target.value; $('#rateV').textContent=S.rate+'×'; saveS(); };
+$('#selRec').onchange=e=>{ S.rec=e.target.value; saveS(); renderStatus(); };
+$('#optAutoStop').onchange=e=>{ S.autoStop=e.target.checked; saveS(); };
+$('#optReadBetter').onchange=e=>{ S.readBetter=e.target.checked; saveS(); };
+$('#optAutoPlay').onchange=e=>{ S.autoPlay=e.target.checked; saveS(); };
+$('#tgt').oninput=e=>{ S.target=+e.target.value; $('#tgtV').textContent=S.target; saveS(); };
+$('#apiKey').onchange=e=>{ S.apiKey=e.target.value.trim(); saveS(); useApiKey(); render(); };
+$('#testVoice').onclick=()=>TTS.speak('你好，欢迎来练习汉语口语！');
+
+/* ===================== EVENTS ===================== */
+$('#levels').onclick=e=>{ const b=e.target.closest('.lv'); if(!b) return; A.lv=+b.dataset.l; A.ti=0; A.idx=0; savePos(); render(); };
+$('#topics').onclick=e=>{ const b=e.target.closest('.topic'); if(!b) return;
+  if(b.dataset.c!=null){ A.custom=''; A.ct=+b.dataset.c; A.idx=0; savePos(); render(); afterTopicPick(); return; }
+  if(b.dataset.t==null) return; A.ti=+b.dataset.t; A.idx=0; savePos(); render(); if(A.mode!=='chat'&&S.autoPlay) playPrompt(); else if(A.mode==='chat'){ const m=chat.hist[0]; if(m) TTS.speak(m.zh); } };
+$('#modes').onclick=e=>{ const b=e.target.closest('.mode'); if(!b) return; A.mode=b.dataset.m; A.idx=0; savePos(); render(); };
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input,select,textarea')||$('#ov').classList.contains('show')) return;
+  if(e.code==='Space'){ e.preventDefault(); Rec.toggle(onSpoken); }
+  else if(e.key==='Enter' && A.mode!=='chat'){ e.preventDefault(); go(1); }
+  else if((e.key==='r'||e.key==='R')){ if(A.mode==='chat') $('#bReplay')&&$('#bReplay').click(); else playPrompt(); }
+  else if((e.key==='h'||e.key==='H') && A.mode!=='shadow' && A.mode!=='chat') toggleHint();
+  else if(e.key==='ArrowRight' && A.mode!=='chat') go(1);
+  else if(e.key==='ArrowLeft' && A.mode!=='chat') go(-1);
+});
+
+/* ===================== KHỞI ĐỘNG ===================== */
+render();
+(async()=>{
+  if(!(window.claude&&typeof window.claude.use==='function')) { useApiKey(); render(); return; }
+  inClaude=true;
+  const [d,s,t]=await Promise.all([
+    claude.use('dictation').catch(()=>null), claude.use('sample').catch(()=>null), claude.use('tts').catch(()=>null)]);
+  dict=d; sample=s; TTS.claude=t;
+  if(dict){ dict.onPartial(({text})=>Rec.onDictPartial(text)); dict.onFinal(({text})=>Rec.onDictFinal(text)); dict.onState(({state})=>Rec.onDictState(state)); }
+  fillVoiceSelect(); render();
+})();
+</script>
+</body>
+</html>
