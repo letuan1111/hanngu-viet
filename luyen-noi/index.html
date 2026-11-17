@@ -157,6 +157,23 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;paddi
   .rgrid{grid-template-columns:1fr}
 }
 </style>
+<style>
+#ytPanel[hidden],#ytPanel [hidden]{display:none}
+#ytPanel h2{margin-top:0}
+#ytPanel input,#ytPanel textarea,#ytPanel select{font:inherit;border:1px solid #b8b5a8;border-radius:8px;padding:.55em;background:white;color:#292b25}
+#ytPanel textarea{display:block;width:100%;box-sizing:border-box;margin:.5rem 0}
+.ytrow{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.ytrow input{flex:1;min-width:10rem}
+#ytPanel button{cursor:pointer}
+.ytrow button{border:0;background:#215b50;color:white;padding:.65em 1em;border-radius:8px;font:inherit}
+#ytScreen iframe{width:100%;aspect-ratio:16/9;min-height:200px;border:0;margin-bottom:.8rem}
+#ytLine{line-height:1.9;font-size:clamp(24px,5vw,40px);color:#124e41;background:#f0f6ef;border-radius:12px;padding:.35em;text-align:center}
+#ytLine:empty{display:none}
+#ytLine button{color:inherit;border:0;border-bottom:2px dotted #679a85;background:transparent;font:inherit;padding:0 .04em}
+#ytLine button:focus,#ytLine button:hover{background:#f7d388}
+#ytMeaning{display:block;font-size:1.05rem;margin:.8rem 0}
+#ytPanel summary{cursor:pointer;font-weight:bold}
+</style>
 </head>
 <body>
 <header class="top">
@@ -171,12 +188,34 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;paddi
     <div class="status" id="status"></div>
     <div class="modes" id="modes">
       <button class="mode on" data-m="reflex">⚡ Phản xạ hỏi – đáp</button>
+      <button class="mode" data-m="youtube">▶ YouTube karaoke</button>
       <button class="mode" data-m="shadow">🔁 Nghe & nhại câu</button>
       <button class="mode" data-m="chat">💬 Trò chuyện (120 chủ đề)</button>
       <button class="mode" data-m="gen">✨ AI tự soạn câu</button>
       <button class="mode" data-m="script">🎯 Kịch bản A→B</button>
       <button class="mode" data-m="ask">❓ Hỏi gì đáp nấy</button>
     </div>
+    <section id="ytPanel" class="card" hidden>
+  <h2>Luyện nghe YouTube</h2>
+  <form id="ytForm"><label for="ytLink">Link video YouTube</label>
+    <div class="ytrow"><input id="ytLink" required placeholder="Dán link YouTube hoặc Shorts"><button>Mở video</button></div>
+  </form>
+  <p id="ytStatus" role="status"></p>
+  <div id="ytScreen" hidden><div id="ytPlayer"></div></div>
+  <div id="ytTools" hidden>
+    <label>Tốc độ nghe <select id="ytRate" disabled><option>1×</option></select></label>
+    <p>Video có phụ đề sẽ hiện chữ trong khung phát. Để bấm tra từ, hãy thêm lời thoại có mốc thời gian bên dưới.</p>
+    <div id="ytLine" lang="zh-Hans"></div>
+    <output id="ytMeaning" aria-live="polite"></output>
+    <details open><summary>Lời thoại tương tác</summary>
+      <p>Dán bản chép lời có mốc thời gian từ YouTube, hoặc dùng Gemini trong Cài đặt để tạo bản nháp cho video công khai.</p>
+      <label for="ytText">Mốc thời gian và câu tiếng Trung</label>
+      <textarea id="ytText" rows="5" placeholder="0:02 你喜欢什么运动？&#10;0:06 我喜欢踢足球。"></textarea>
+      <div class="ytrow"><button id="ytApply">Dùng lời thoại</button><button id="ytAI">Tạo lời bằng Gemini</button></div>
+      <p id="ytFeedback" role="status"></p>
+    </details>
+  </div>
+</section>
     <section class="card" id="stage"></section>
     <div class="stats" id="stats"></div>
     <div class="keys"><kbd>Space</kbd> bật/tắt mic · <kbd>R</kbd> nghe lại · <kbd>Enter</kbd> câu tiếp · <kbd>H</kbd> gợi ý</div>
@@ -968,6 +1007,8 @@ function afterTopicPick(){
 function render(){
   renderLevels(); renderTopics(); renderStatus(); renderStats();
   document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('on',b.dataset.m===A.mode));
+  karaoke.show(A.mode==='youtube');
+  if(A.mode==='youtube') return;
   if(A.mode==='chat') return renderChat();
   if(A.mode==='ask') return renderAsk();
   if(A.mode==='script') return renderScript();
@@ -1518,12 +1559,12 @@ $('#testVoice').onclick=()=>TTS.speak('你好，欢迎来练习汉语口语！')
 /* ===================== EVENTS ===================== */
 $('#levels').onclick=e=>{ const b=e.target.closest('.lv'); if(!b) return; A.lv=+b.dataset.l; A.ti=0; A.idx=0; savePos(); render(); };
 $('#topics').onclick=e=>{ const b=e.target.closest('.topic'); if(!b) return;
-  if(A.mode==='ask'||A.mode==='script'){ A.mode='reflex'; }
+  if(['youtube','ask','script'].includes(A.mode)){ A.mode='reflex'; }
   if(b.dataset.c!=null){ A.custom=''; A.ct=+b.dataset.c; A.idx=0; savePos(); render(); afterTopicPick(); return; }
   if(b.dataset.t==null) return; A.ti=+b.dataset.t; A.idx=0; savePos(); render(); if(A.mode!=='chat'&&S.autoPlay) playPrompt(); else if(A.mode==='chat'){ const m=chat.hist[0]; if(m) TTS.speak(m.zh); } };
 $('#modes').onclick=e=>{ const b=e.target.closest('.mode'); if(!b) return; Rec.liveCb=null; Rec.lang='zh-CN'; SC.stopLoop=true; if(Rec.active) Rec.stop(); A.mode=b.dataset.m; A.idx=0; savePos(); render(); };
 document.addEventListener('keydown',e=>{
-  if(e.target.matches('input,select,textarea')||$('#ov').classList.contains('show')) return;
+  if(A.mode==='youtube'||e.target.matches('input,select,textarea')||$('#ov').classList.contains('show')) return;
   if(e.code==='Space'){ e.preventDefault(); if(A.mode==='script'&&$('#mic')) $('#mic').click(); else Rec.toggle(onSpoken); }
   else if(e.key==='Enter' && !['chat','ask','script'].includes(A.mode)){ e.preventDefault(); go(1); }
   else if((e.key==='r'||e.key==='R')){ if(['chat','ask','script'].includes(A.mode)) $('#bReplay')&&$('#bReplay').click(); else playPrompt(); }
@@ -1531,6 +1572,134 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowRight' && !['chat','ask','script'].includes(A.mode)) go(1);
   else if(e.key==='ArrowLeft' && !['chat','ask','script'].includes(A.mode)) go(-1);
 });
+
+function videoId(raw){
+  try {
+    const url=new URL(raw.includes('://')?raw:'https://'+raw);
+    if(!['https:','http:'].includes(url.protocol)) return null;
+    const host=url.hostname.replace(/^(www\.|m\.|music\.)/,'');
+    const parts=url.pathname.split('/');
+    const id=host==='youtu.be'?parts[1]:host==='youtube.com'?(parts[1]==='watch'?url.searchParams.get('v'):['embed','shorts','live'].includes(parts[1])?parts[2]:null):null;
+    return /^[\w-]{11}$/.test(id||'')?id:null;
+  } catch { return null; }
+}
+function timedLines(text){
+  const cues=[];
+  let cue;
+  for(const line of text.trim().split(/\r?\n/)){
+    const m=line.trim().match(/^\[?(?:(\d+):)?(\d+):([0-5]\d)(?:[.,](\d+))?\]?\s*(.*)$/);
+    if(m){
+      cue={time:Number(m[1]||0)*3600+Number(m[2])*60+Number(m[3])+Number('0.'+(m[4]||0)),text:m[5]};
+      cues.push(cue);
+    } else if(cue && line.trim()) cue.text+=line.trim();
+  }
+  return cues.filter(c=>c.text).sort((a,b)=>a.time-b.time);
+}
+function wordParts(line,words){
+  const chars=Array.from(line), parts=[];
+  for(let i=0;i<chars.length;){
+    let end=i+1;
+    for(let j=i+1;j<=Math.min(i+12,chars.length);j++){
+      const entry=words.get(chars.slice(i,j).join(''));
+      if(entry && entry.lv>=1 && entry.lv<=3 && entry.vi) end=j;
+    }
+    parts.push(chars.slice(i,end).join('')); i=end;
+  }
+  return parts;
+}
+const karaoke=(()=>{
+  const el=id=>document.getElementById(id);
+  let api,player,id='',ready=false,cues=[],active=null,timer,request;
+  function loadAPI(){
+    if(window.YT?.Player) return Promise.resolve();
+    if(!api) api=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      const fail=()=>{clearTimeout(timeout);api=null;script.remove();reject(Error('Không tải được trình phát YouTube. Hãy thử lại.'));};
+      const timeout=setTimeout(fail,18000);
+      window.onYouTubeIframeAPIReady=()=>{clearTimeout(timeout);resolve();};
+      script.onerror=fail;script.src='https://www.youtube.com/iframe_api';document.head.append(script);
+    });
+    return api;
+  }
+  function draw(force=false){
+    if(!ready || el('ytPanel').hidden) return;
+    const now=player.getCurrentTime();
+    let lo=0,hi=cues.length;
+    while(lo<hi){const mid=(lo+hi)>>1;if(cues[mid].time<=now)lo=mid+1;else hi=mid;}
+    const cue=cues[lo-1];
+    if(cue===active && !force)return;
+    active=cue;
+    el('ytMeaning').textContent='';
+    el('ytLine').replaceChildren();
+    for(const word of wordParts(cue?.text||'',KB.words)){
+      if(!/\p{Script=Han}/u.test(word)){el('ytLine').append(word);continue;}
+      const b=document.createElement('button');b.textContent=word;
+      b.onclick=()=>{player.pauseVideo();const w=KB.words.get(word);
+        el('ytMeaning').textContent=[word,w?.p||py(word),w?.lv>=1&&w?.lv<=3&&w.vi?w.vi+' · HSK '+w.lv:'Chưa có nghĩa trong kho HSK 1–3.'].filter(Boolean).join(' · ');};
+      el('ytLine').append(b);
+    }
+  }
+  function rates(){
+    const select=el('ytRate'), values=player.getAvailablePlaybackRates()||[];
+    select.replaceChildren(...values.map(r=>new Option(r+'×',r)));
+    select.value=player.getPlaybackRate();select.disabled=values.length<2;
+  }
+  el('ytRate').onchange=e=>{if(ready) player.setPlaybackRate(Number(e.target.value));};
+  el('ytForm').onsubmit=async e=>{
+    e.preventDefault();const next=videoId(el('ytLink').value.trim());
+    if(!next){el('ytStatus').textContent='Hãy dán link của một video YouTube cụ thể.';return;}
+    request?.abort();el('ytAI').disabled=false;id=next;ready=false;
+    player?.destroy();player=null;el('ytScreen').innerHTML='<div id="ytPlayer"></div>';
+    cues=[];active=null;
+    for(const key of ['ytFeedback','ytLine','ytMeaning'])el(key).textContent='';
+    el('ytText').value='';el('ytRate').disabled=true;
+    el('ytScreen').hidden=false;el('ytTools').hidden=true;el('ytStatus').textContent='Đang mở video…';
+    const screen=el('ytPlayer');
+    try{
+      await loadAPI();if(!screen.isConnected)return;
+      player=new YT.Player(screen,{videoId:id,playerVars:{cc_load_policy:1,cc_lang_pref:'zh-Hans',playsinline:1,origin:location.origin},events:{
+        onReady:e=>{if(e.target!==player)return;ready=true;rates();el('ytTools').hidden=false;el('ytStatus').textContent='Bấm phát để bắt đầu nghe.';},
+        onStateChange:e=>{if(e.target===player&&ready){rates();draw();}},
+        onPlaybackRateChange:e=>{if(e.target===player)rates();},
+        onError:e=>{if(e.target===player)el('ytStatus').textContent='YouTube không phát được video này trên trang. Hãy thử một video công khai cho phép nhúng.';}
+      }});
+    } catch(err){if(screen.isConnected)el('ytStatus').textContent=err.message;}
+  };
+  function apply(){
+    const parsed=timedLines(el('ytText').value);
+    if(!parsed.length){el('ytFeedback').textContent='Cần ít nhất một mốc thời gian kèm lời thoại, ví dụ 0:02 你好。';return;}
+    cues=parsed;el('ytFeedback').textContent='Đã đồng bộ '+cues.length+' câu. Bấm vào từ để tra nghĩa.';draw(true);
+  }
+  el('ytApply').onclick=apply;
+  el('ytAI').onclick=async()=>{
+    if(!S.gemKey){el('ytFeedback').textContent='Thêm Gemini API key ở Cài đặt hoặc dán lời thoại có mốc thời gian.';return;}
+    const controller=new AbortController();request=controller;
+    el('ytAI').disabled=true;el('ytFeedback').textContent='Gemini đang nghe và tạo lời thoại…';
+    try{
+      const model=S.gemModel||'gemini-2.5-flash';
+      const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',{
+        method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','x-goog-api-key':S.gemKey},
+        body:JSON.stringify({contents:[{parts:[{fileData:{fileUri:'https://www.youtube.com/watch?v='+id}},{text:'Transcribe only audible Mandarin speech in simplified Chinese, verbatim. Each line must start with its actual elapsed video timestamp MM:SS followed by one short phrase. No invented dialogue, markdown or headings. Return empty if no Mandarin speech.'}]}]})});
+      if(!response.ok)throw Error();
+      const result=await response.json();
+      if(controller.signal.aborted)return;
+      const candidate=result.candidates?.[0];
+      const content=(candidate?.content?.parts||[]).map(p=>p.text||'').join('\n');
+      if(!timedLines(content).length)throw Error();
+      el('ytText').value=content;apply();el('ytFeedback').textContent+=' Lời và thời gian do AI ước tính, bạn có thể sửa lại.';
+    } catch{if(!controller.signal.aborted)el('ytFeedback').textContent='Chưa tạo được lời cho video này. Hãy kiểm tra key, model hoặc dán bản chép lời.';}
+    finally{if(request===controller)el('ytAI').disabled=false;}
+  };
+  return {show(on){
+    const changed=el('ytPanel').hidden===on;
+    el('ytPanel').hidden=!on;el('stage').hidden=on;
+    document.querySelector('.keys').hidden=on;
+    if(!changed){if(on)draw(true);return;}
+    clearInterval(timer);
+    if(on){TTS.stop();timer=setInterval(draw,180);}
+    else if(ready)player.pauseVideo();
+  }};
+})();
 
 /* ===================== KHỞI ĐỘNG ===================== */
 if('speechSynthesis' in window){ TTS.load(); speechSynthesis.onvoiceschanged=()=>TTS.load(); setTimeout(()=>TTS.load(),800); }
