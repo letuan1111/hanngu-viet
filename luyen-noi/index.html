@@ -172,6 +172,14 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;paddi
 #ytLine button{color:inherit;border:0;border-bottom:2px dotted #679a85;background:transparent;font:inherit;padding:0 .04em}
 #ytLine button:focus,#ytLine button:hover{background:#f7d388}
 #ytMeaning{display:block;font-size:1.05rem;margin:.8rem 0}
+#ytPinyin,#ytVietnamese{text-align:center;margin:.35rem auto}
+#ytPinyin{color:#536a62}
+#ytVietnamese{font-size:1.12rem}
+#ytList{max-height:18rem;overflow:auto;display:grid;gap:.25rem}
+#ytList button{display:grid;grid-template-columns:4em 1fr;gap:.2rem .6rem;text-align:left;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;padding:.55rem}
+#ytList button[aria-current=true]{background:#dfefe6}
+#ytList small{grid-column:2;color:#435b50}
+#ytTools[data-vi=off] #ytList small{display:none}
 #ytPanel summary{cursor:pointer;font-weight:bold}
 </style>
 </head>
@@ -199,20 +207,26 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;paddi
   <h2>Luyện nghe YouTube</h2>
   <form id="ytForm"><label for="ytLink">Link video YouTube</label>
     <div class="ytrow"><input id="ytLink" required placeholder="Dán link YouTube hoặc Shorts"><button>Mở video</button></div>
+    <label><input type="checkbox" id="ytAuto"> Tự tạo phụ đề Trung – Việt bằng Gemini khi mở video mới (cần API key)</label>
   </form>
   <p id="ytStatus" role="status"></p>
   <div id="ytScreen" hidden><div id="ytPlayer"></div></div>
   <div id="ytTools" hidden>
     <label>Tốc độ nghe <select id="ytRate" disabled><option>1×</option></select></label>
-    <p>Video có phụ đề sẽ hiện chữ trong khung phát. Để bấm tra từ, hãy thêm lời thoại có mốc thời gian bên dưới.</p>
+    <label><input id="ytVi" type="checkbox" checked> Tiếng Việt</label>
+    <label><input id="ytPy" type="checkbox"> Pinyin</label>
     <div id="ytLine" lang="zh-Hans"></div>
+    <div id="ytPinyin" lang="zh-Latn-pinyin"></div>
+    <div id="ytVietnamese" lang="vi"></div>
     <output id="ytMeaning" aria-live="polite"></output>
-    <details open><summary>Lời thoại tương tác</summary>
-      <p>Dán bản chép lời có mốc thời gian từ YouTube, hoặc dùng Gemini trong Cài đặt để tạo bản nháp cho video công khai.</p>
-      <label for="ytText">Mốc thời gian và câu tiếng Trung</label>
-      <textarea id="ytText" rows="5" placeholder="0:02 你喜欢什么运动？&#10;0:06 我喜欢踢足球。"></textarea>
-      <div class="ytrow"><button id="ytApply">Dùng lời thoại</button><button id="ytAI">Tạo lời bằng Gemini</button></div>
-      <p id="ytFeedback" role="status"></p>
+    <div class="ytrow"><button id="ytReplay" disabled>Nghe lại câu</button></div>
+    <div id="ytList" aria-label="Danh sách phụ đề"></div>
+    <p id="ytFeedback" role="status"></p>
+    <details id="ytEditor" open><summary>Thêm hoặc sửa phụ đề</summary>
+      <p>Dán lời thoại có mốc thời gian. Nếu có bản dịch, thêm sau dấu |. Bạn cũng có thể dùng Gemini để dịch lời đã dán hoặc tạo phụ đề từ video.</p>
+      <label for="ytText">Lời thoại Trung – Việt</label>
+      <textarea id="ytText" rows="5" placeholder="0:02 你喜欢什么运动？ | Bạn thích môn thể thao nào?&#10;0:06 我喜欢踢足球。 | Tôi thích đá bóng."></textarea>
+      <div class="ytrow"><button id="ytApply">Dùng lời thoại</button><button id="ytTranslate">Dịch lời đã dán</button><button id="ytAI">Tạo phụ đề từ video</button></div>
     </details>
   </div>
 </section>
@@ -1593,6 +1607,10 @@ function timedLines(text){
       cues.push(cue);
     } else if(cue && line.trim()) cue.text+=line.trim();
   }
+  for(const cue of cues){
+    const [zh,...vi]=cue.text.split('|');
+    cue.text=zh.trim();cue.vi=vi.join('|').trim();
+  }
   return cues.filter(c=>c.text).sort((a,b)=>a.time-b.time);
 }
 function wordParts(line,words){
@@ -1621,6 +1639,27 @@ const karaoke=(()=>{
     });
     return api;
   }
+  function seek(cue){
+    if(ready && cue){player.seekTo(cue.time,true);player.playVideo();}
+  }
+  function makeList(){
+    const rows=cues.map(cue=>{
+      const row=document.createElement('button');
+      const time=document.createElement('span'),zh=document.createElement('span'),vi=document.createElement('small');
+      time.textContent=Math.floor(cue.time/60)+':'+String(Math.floor(cue.time%60)).padStart(2,'0');
+      zh.lang='zh-Hans';zh.textContent=cue.text;vi.textContent=cue.vi;
+      row.append(time,zh,vi);row.onclick=()=>seek(cue);
+      return row;
+    });
+    el('ytList').replaceChildren(...rows);
+  }
+  el('ytReplay').onclick=()=>seek(active);
+  el('ytVi').onchange=()=>{
+    el('ytTools').dataset.vi=el('ytVi').checked?'on':'off';draw(true);
+  };
+  el('ytPy').onchange=()=>draw(true);
+  el('ytAuto').checked=store.get('youtube.autoBilingual',false);
+  el('ytAuto').onchange=()=>store.set('youtube.autoBilingual',el('ytAuto').checked);
   function draw(force=false){
     if(!ready || el('ytPanel').hidden) return;
     const now=player.getCurrentTime();
@@ -1629,6 +1668,16 @@ const karaoke=(()=>{
     const cue=cues[lo-1];
     if(cue===active && !force)return;
     active=cue;
+    const list=el('ytList'),row=list.children[lo-1];
+    list.querySelector('[aria-current]')?.removeAttribute('aria-current');
+    if(row){
+      row.setAttribute('aria-current','true');
+      const rect=row.getBoundingClientRect(),box=list.getBoundingClientRect();
+      if(rect.bottom>box.bottom||rect.top<box.top)list.scrollTop+=rect.top-box.top;
+    }
+    el('ytVietnamese').textContent=el('ytVi').checked?(cue?.vi||''):'';
+    el('ytPinyin').textContent=el('ytPy').checked&&cue?py(cue.text):'';
+    el('ytReplay').disabled=!cue;
     el('ytMeaning').textContent='';
     el('ytLine').replaceChildren();
     for(const word of wordParts(cue?.text||'',KB.words)){
@@ -1648,17 +1697,21 @@ const karaoke=(()=>{
   el('ytForm').onsubmit=async e=>{
     e.preventDefault();const next=videoId(el('ytLink').value.trim());
     if(!next){el('ytStatus').textContent='Hãy dán link của một video YouTube cụ thể.';return;}
-    request?.abort();el('ytAI').disabled=false;id=next;ready=false;
+    request?.abort();request=null;el('ytTranslate').disabled=el('ytAI').disabled=false;id=next;ready=false;
     player?.destroy();player=null;el('ytScreen').innerHTML='<div id="ytPlayer"></div>';
     cues=[];active=null;
-    for(const key of ['ytFeedback','ytLine','ytMeaning'])el(key).textContent='';
-    el('ytText').value='';el('ytRate').disabled=true;
+    for(const key of ['ytFeedback','ytLine','ytMeaning','ytVietnamese','ytPinyin','ytList'])el(key).textContent='';
+    el('ytReplay').disabled=true;el('ytEditor').open=true;el('ytText').value='';el('ytRate').disabled=true;
     el('ytScreen').hidden=false;el('ytTools').hidden=true;el('ytStatus').textContent='Đang mở video…';
     const screen=el('ytPlayer');
     try{
       await loadAPI();if(!screen.isConnected)return;
       player=new YT.Player(screen,{videoId:id,playerVars:{cc_load_policy:1,cc_lang_pref:'zh-Hans',playsinline:1,origin:location.origin},events:{
-        onReady:e=>{if(e.target!==player)return;ready=true;rates();el('ytTools').hidden=false;el('ytStatus').textContent='Bấm phát để bắt đầu nghe.';},
+        onReady:e=>{if(e.target!==player)return;ready=true;rates();el('ytTools').hidden=false;el('ytStatus').textContent='Bấm phát để bắt đầu nghe.';
+          const saved=store.get('youtube.captions.'+id,'');
+          if(saved){el('ytText').value=saved;apply();}
+          else if(el('ytAuto').checked) generate(false);
+          else el('ytFeedback').textContent='Thêm lời thoại hoặc chọn “Tạo phụ đề từ video” để xem bản dịch theo từng câu.';},
         onStateChange:e=>{if(e.target===player&&ready){rates();draw();}},
         onPlaybackRateChange:e=>{if(e.target===player)rates();},
         onError:e=>{if(e.target===player)el('ytStatus').textContent='YouTube không phát được video này trên trang. Hãy thử một video công khai cho phép nhúng.';}
@@ -1668,28 +1721,43 @@ const karaoke=(()=>{
   function apply(){
     const parsed=timedLines(el('ytText').value);
     if(!parsed.length){el('ytFeedback').textContent='Cần ít nhất một mốc thời gian kèm lời thoại, ví dụ 0:02 你好。';return;}
-    cues=parsed;el('ytFeedback').textContent='Đã đồng bộ '+cues.length+' câu. Bấm vào từ để tra nghĩa.';draw(true);
+    cues=parsed;makeList();el('ytEditor').open=false;store.set('youtube.captions.'+id,el('ytText').value);el('ytFeedback').textContent='Đã đồng bộ '+cues.length+' câu. Bấm vào từ để tra nghĩa.';draw(true);
   }
-  el('ytApply').onclick=apply;
-  el('ytAI').onclick=async()=>{
+  el('ytApply').onclick=()=>{request?.abort();apply();};
+  el('ytAI').onclick=()=>generate(false);
+  el('ytTranslate').onclick=()=>generate(true);
+  async function generate(translate){
     if(!S.gemKey){el('ytFeedback').textContent='Thêm Gemini API key ở Cài đặt hoặc dán lời thoại có mốc thời gian.';return;}
+    const draft=el('ytText').value;
+    const source=translate?timedLines(draft):[];
+    if(translate&&!source.length){el('ytFeedback').textContent='Dán lời có mốc thời gian trước khi dịch.';return;}
+    const parts=translate?[{text:'Translate each Mandarin sentence into natural Vietnamese. Return only a JSON array of translated strings in the same order. Input: '+JSON.stringify(source.map(c=>c.text))}]:
+      [{fileData:{fileUri:'https://www.youtube.com/watch?v='+id}},{text:'Transcribe audible Mandarin faithfully in short phrases. Use simplified Chinese and a natural Vietnamese translation for each phrase. Each line must be MM:SS Chinese | Vietnamese, with actual elapsed video timestamps. No headings or markdown. Return empty for no Mandarin.'}];
+    request?.abort();
     const controller=new AbortController();request=controller;
-    el('ytAI').disabled=true;el('ytFeedback').textContent='Gemini đang nghe và tạo lời thoại…';
+    el('ytTranslate').disabled=el('ytAI').disabled=true;el('ytFeedback').textContent=translate?'Đang dịch sang tiếng Việt…':'Đang nghe video và tạo phụ đề Trung – Việt…';
     try{
       const model=S.gemModel||'gemini-2.5-flash';
       const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',{
         method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','x-goog-api-key':S.gemKey},
-        body:JSON.stringify({contents:[{parts:[{fileData:{fileUri:'https://www.youtube.com/watch?v='+id}},{text:'Transcribe only audible Mandarin speech in simplified Chinese, verbatim. Each line must start with its actual elapsed video timestamp MM:SS followed by one short phrase. No invented dialogue, markdown or headings. Return empty if no Mandarin speech.'}]}]})});
+        body:JSON.stringify({contents:[{parts}],...(translate?{generationConfig:{responseMimeType:'application/json'}}:{})})});
       if(!response.ok)throw Error();
       const result=await response.json();
       if(controller.signal.aborted)return;
       const candidate=result.candidates?.[0];
-      const content=(candidate?.content?.parts||[]).map(p=>p.text||'').join('\n');
-      if(!timedLines(content).length)throw Error();
-      el('ytText').value=content;apply();el('ytFeedback').textContent+=' Lời và thời gian do AI ước tính, bạn có thể sửa lại.';
+      let content=(candidate?.content?.parts||[]).map(p=>p.text||'').join('\n');
+      if(translate){
+        const vi=JSON.parse(content);
+        if(!Array.isArray(vi)||vi.length!==source.length||vi.some(t=>typeof t!=='string'||!t.trim()))throw Error();
+        content=source.map((c,i)=>Math.floor(c.time/60)+':'+(c.time%60).toFixed(3).padStart(6,'0')+' '+c.text+' | '+vi[i].replace(/\s+/g,' ').trim()).join('\n');
+      }
+      const resultLines=timedLines(content);
+      if(!resultLines.length||resultLines.some(c=>!c.vi))throw Error();
+      if(el('ytText').value!==draft){el('ytFeedback').textContent='Lời thoại đã thay đổi. Hãy thử lại với bản mới.';return;}
+      el('ytText').value=content;apply();el('ytFeedback').textContent+=translate?' Đã dịch sang tiếng Việt.':' Phụ đề và mốc thời gian do AI ước tính.';
     } catch{if(!controller.signal.aborted)el('ytFeedback').textContent='Chưa tạo được lời cho video này. Hãy kiểm tra key, model hoặc dán bản chép lời.';}
-    finally{if(request===controller)el('ytAI').disabled=false;}
-  };
+    finally{if(request===controller)el('ytTranslate').disabled=el('ytAI').disabled=false;}
+  }
   return {show(on){
     const changed=el('ytPanel').hidden===on;
     el('ytPanel').hidden=!on;el('stage').hidden=on;
